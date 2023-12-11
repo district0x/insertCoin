@@ -1,2 +1,3 @@
 # insertCoin
-Smart contract for tournament
+Smart contract for tournament crowdfunding 
+
