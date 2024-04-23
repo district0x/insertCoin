@@ -5,6 +5,8 @@ import os
 import sys
 import discord
 from discord.ext import commands
+from discord.commands import Option
+import logging
 import openai
 from pinecone import Pinecone, ServerlessSpec
 import time
@@ -12,8 +14,6 @@ import datetime
 from dotenv import load_dotenv
 from discord.ui import Button, View
 import tracemalloc
-
-
 from config_strings import (
     primer,
     primer_messages,
@@ -23,6 +23,7 @@ from config_strings import (
     tournament_primer_no_items,
     unidentified_prompt_message,
 )
+
 tracemalloc.start()
 
 # Add the parent directory to the import search path
@@ -87,17 +88,11 @@ intents = discord.Intents.default()
 intents.messages = True
 intents.guilds = True
 intents.message_content = True
+bot = commands.Bot(command_prefix="!", intents=intents)
 
 max_prompt_length = 1000
 
 api_counter = APICounter(max_uses_per_day)
-
-bot = discord.Client(intents=intents)
-
-
-@bot.event
-async def on_ready():
-    logger.info(f"Logged in as {bot.user.name}")
 
 
 class CustomHelpCommand(commands.DefaultHelpCommand):
@@ -108,14 +103,18 @@ bot.help_command = CustomHelpCommand()
 
 
 class AcceptButton(Button):
-    def __init__(self, label: str, style: discord.ButtonStyle, custom_id: str, challenge_creator_id: str):
+    def __init__(self, label, style, custom_id, challenge_creator_id, channel):
         super().__init__(label=label, style=style, custom_id=custom_id)
         self.challenge_creator_id = challenge_creator_id
+        self.channel = channel
 
-    async def callback(self, interaction: discord.Interaction):
+    async def callback(self, interaction):
+        # Find the channel and the challenger from stored data
         guild = interaction.guild
-        challenge_creator = guild.get_member(int(self.challenge_creator_id))
+        challenge_creator = guild.get_member(self.challenge_creator_id)
+        channel = guild.get_channel(self.channel)
 
+        # Set up permissions to make the channel private
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
             guild.me: discord.PermissionOverwrite(read_messages=True),
@@ -123,14 +122,29 @@ class AcceptButton(Button):
             interaction.user: discord.PermissionOverwrite(read_messages=True)
         }
 
-        match_channel = await guild.create_text_channel(
-            name=f"match-{challenge_creator.display_name}-{interaction.user.display_name}",
-            overwrites=overwrites
-        )
+        # Modify the existing channel's permissions to make it private
+        await channel.edit(overwrites=overwrites)
+        await channel.send(f"{challenge_creator.mention} and {interaction.user.mention}, your private match channel is ready!")
+        await interaction.response.send_message(f"Your private match channel {channel.mention} is ready!", ephemeral=True)
 
-        await match_channel.send(f"{challenge_creator.mention} and {interaction.user.mention}, your private match channel is ready!")
 
-        await interaction.response.send_message(f'Your private match channel {match_channel.mention} is ready!', ephemeral=True)
+@bot.slash_command(name="1v1", description="Start a 1v1 challenge.")
+async def one_v_one(ctx, platform: Option(str, "Choose your platform", choices=["PS5", "PC"], required=True)):
+    # Create a text channel (public by default, to be made private once challenge is accepted)
+    channel = await ctx.guild.create_text_channel(name=f"1v1-{ctx.author.display_name}-{platform}")
+
+    # Store channel and challenge information, for example in a global or database
+    # This example does not include actual storage for simplicity
+
+    # Respond to the command with details and an accept button
+    view = View()
+    button = AcceptButton("Accept Challenge", discord.ButtonStyle.green,
+                          "accept_1v1", ctx.author.id, channel.id)
+    view.add_item(button)
+    await ctx.respond(f"{ctx.author.mention} has initiated a 1v1 challenge on {platform}. Waiting for an opponent!", view=view)
+
+    # Optionally delete the channel if not accepted after some time
+    # This can be handled via a background task or similar mechanism
 
 
 def time_ago(timestamp):
@@ -381,6 +395,22 @@ async def on_message(message):
             )
 
         await message.reply(result_message)
+
+
+@bot.event
+async def on_ready():
+    print(f'Logged in as {bot.user}!')
+    print("Registered commands:")
+    for cmd in bot.application_commands:
+        print(cmd.name)
+
+
+@bot.slash_command(name="my-balance", description="Check your current credit balance.")
+async def my_balance(ctx):
+    user_id = str(ctx.author.id)
+    balance = 25  # Simulating a balance retrieval, replace with your method
+    await ctx.respond(f"Your current balance is: {balance} credits")
+
 
 print(discord.__version__)
 bot.run(iscoinGPT_token)
