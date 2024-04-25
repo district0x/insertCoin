@@ -11,6 +11,7 @@ import openai
 from pinecone import Pinecone, ServerlessSpec
 import time
 import datetime
+import urllib.parse
 from dotenv import load_dotenv
 from discord.ui import Button, View
 import tracemalloc
@@ -125,7 +126,38 @@ class AcceptButton(Button):
         # Modify the existing channel's permissions to make it private
         await channel.edit(overwrites=overwrites)
         await channel.send(f"{challenge_creator.mention} and {interaction.user.mention}, your private match channel is ready!")
+        # Generate the transaction URL with some dummy data
+        transaction_data = {
+            # Use the display_name attribute if more suitable
+            'player1_name': str(challenge_creator.display_name),
+            'player2_name': str(interaction.user.display_name),
+            'match_id': '12345'  # Example match ID
+        }
+        transaction_url = generate_transaction_url(transaction_data)
+        await channel.send(f"Please complete the match setup here: {transaction_url}")
+
         await interaction.response.send_message(f"Your private match channel {channel.mention} is ready!", ephemeral=True)
+
+
+@bot.event
+async def on_private_channel_created(channel, player1, player2, transaction_data):
+    transaction_url = generate_transaction_url(transaction_data)
+    embed = discord.Embed(title="Transaction Link",
+                          description="Please confirm the transaction for this match.", color=0x00ff00)
+    embed.add_field(name="Transaction",
+                    value=f"[Confirm Transaction]({transaction_url})", inline=False)
+    await channel.send(content=f"{player1.mention} and {player2.mention}, please complete the transaction:", embed=embed)
+
+
+def generate_transaction_url(data):
+    # Assuming `data` includes necessary query parameters like to, from, value, etc.
+    base_url = "http://localhost:8000/lobby.html"
+    query_params = urllib.parse.urlencode({
+        'player1': data['player1_name'],
+        'player2': data['player2_name'],
+        # Add other parameters as needed
+    })
+    return f"{base_url}?{query_params}"
 
 
 @bot.slash_command(name="1v1", description="Start a 1v1 challenge.")
