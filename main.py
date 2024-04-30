@@ -102,12 +102,22 @@ class CustomHelpCommand(commands.DefaultHelpCommand):
 
 bot.help_command = CustomHelpCommand()
 
+lobbies = {}  # Dictionary to store lobby information
+
+
+async def getNextLobbyId():
+    if not lobbies:
+        return 1  # If no lobbies exist, start with lobby ID 1
+    else:
+        return max(lobbies.keys()) + 1  # Increment the maximum lobby ID by 1
+
 
 class AcceptButton(Button):
-    def __init__(self, label, style, custom_id, challenge_creator_id, channel):
+    def __init__(self, label, style, custom_id, challenge_creator_id, channel, transaction_data):
         super().__init__(label=label, style=style, custom_id=custom_id)
         self.challenge_creator_id = challenge_creator_id
         self.channel = channel
+        self.transaction_data = transaction_data
 
     async def callback(self, interaction):
         # Find the channel and the challenger from stored data
@@ -126,15 +136,16 @@ class AcceptButton(Button):
         # Modify the existing channel's permissions to make it private
         await channel.edit(overwrites=overwrites)
         await channel.send(f"{challenge_creator.mention} and {interaction.user.mention}, your private match channel is ready!")
-        # Generate the transaction URL with some dummy data
-        transaction_data = {
-            # Use the display_name attribute if more suitable
-            'player1_name': str(challenge_creator.display_name),
-            'player2_name': str(interaction.user.display_name),
-            'match_id': '12345'  # Example match ID
-        }
-        transaction_url = generate_transaction_url(transaction_data)
-        await channel.send(f"Please complete the match setup here: {transaction_url}")
+
+        # Update the transaction_data with player2 information
+        self.transaction_data['player2_name'] = str(
+            interaction.user.display_name)
+
+        # Generate the link to the lobby page with match details and transaction data
+        lobby_url = generate_transaction_url(self.transaction_data)
+
+        # Send the link in the private channel
+        await channel.send(f"To start the match, please visit: {lobby_url}")
 
         await interaction.response.send_message(f"Your private match channel {channel.mention} is ready!", ephemeral=True)
 
@@ -150,33 +161,65 @@ async def on_private_channel_created(channel, player1, player2, transaction_data
 
 
 def generate_transaction_url(data):
-    # Assuming `data` includes necessary query parameters like to, from, value, etc.
     base_url = "http://localhost:8000/lobby.html"
     query_params = urllib.parse.urlencode({
         'player1': data['player1_name'],
         'player2': data['player2_name'],
-        # Add other parameters as needed
+        # Assuming this data is available
+        'player1_wallet': data['player1_wallet'],
+        'player2_wallet': data['player2_wallet'],
     })
     return f"{base_url}?{query_params}"
 
 
 @bot.slash_command(name="1v1", description="Start a 1v1 challenge.")
-async def one_v_one(ctx, platform: Option(str, "Choose your platform", choices=["PS5", "PC"], required=True)):
+async def one_v_one(ctx, platform: Option(str, "Choose your platform", choices=["PS5", "PC"], required=True), match_amount: Option(float, "Enter the match amount in ETH", required=True)):
     # Create a text channel (public by default, to be made private once challenge is accepted)
     channel = await ctx.guild.create_text_channel(name=f"1v1-{ctx.author.display_name}-{platform}")
 
     # Store channel and challenge information, for example in a global or database
     # This example does not include actual storage for simplicity
 
+    # Store the match amount and player wallets in the transaction_data dictionary
+    transaction_data = {
+        'player1_name': str(ctx.author.display_name),
+        'player2_name': None,  # This will be set when the challenge is accepted
+        'player1_wallet': None,  # This will be gathered when the user logs in via MetaMask
+        'player2_wallet': None,  # This will be gathered when the user logs in via MetaMask
+        'match_amount': match_amount,
+        'match_id': '12345'  # Example match ID
+    }
+
     # Respond to the command with details and an accept button
     view = View()
     button = AcceptButton("Accept Challenge", discord.ButtonStyle.green,
-                          "accept_1v1", ctx.author.id, channel.id)
+                          "accept_1v1", ctx.author.id, channel.id, transaction_data)
     view.add_item(button)
-    await ctx.respond(f"{ctx.author.mention} has initiated a 1v1 challenge on {platform}. Waiting for an opponent!", view=view)
+    await ctx.respond(f"{ctx.author.mention} has initiated a 1v1 challenge on {platform} with a match amount of {match_amount} ETH. Waiting for an opponent!", view=view)
 
     # Optionally delete the channel if not accepted after some time
     # This can be handled via a background task or similar mechanism
+
+
+@bot.command(name="start_match")
+async def start_match(ctx, match_amount: float):
+    # Convert the match amount to Wei
+    match_amount_wei = web3.toWei(match_amount, 'ether')
+
+    # Get the next lobby ID
+    lobby_id = await getNextLobbyId()
+
+    # Call the contract's startMatch function
+    tx_hash = await contract.functions.startMatch(lobby_id, match_amount_wei).transact({'from': ctx.author.id})
+
+    # Wait for the transaction to be mined
+    receipt = await web3.eth.waitForTransactionReceipt(tx_hash)
+
+    # Check if the transaction was successful
+    if receipt['status']:
+        await ctx.send(f"Match started successfully. Lobby ID: {lobby_id}")
+    else:
+        await ctx.send("Failed to start the match.")
 
 
 def time_ago(timestamp):
