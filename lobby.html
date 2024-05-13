@@ -1,121 +1,331 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Lobby</title>
     <script src="https://unpkg.com/@metamask/detect-provider/dist/detect-provider.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/web3@1.5.2/dist/web3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
     <script src="contractABI.js"></script>
     <style>
-        /* Add your CSS styles here */
+      /* Add your CSS styles here */
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="container">
-        <div class="header">
-            <h1>Lobby</h1>
-            <p id="userAddress"></p>
-        </div>
-        <div class="content">
-            <h2>Player Information</h2>
-            <p id="player1"></p>
-            <p id="player2"></p>
-            <!-- Add other content here -->
-        </div>
+      <div class="header">
+        <h1>Lobby</h1>
+        <p id="userAddress"></p>
+      </div>
+      <div class="content">
+        <h2>Player Information</h2>
+        <p id="player1"></p>
+        <p id="player2"></p>
+        <p id="matchId"></p>
+        <!-- Add other content here -->
+        <input
+          type="number"
+          id="matchAmountUsdInput"
+          placeholder="Enter match amount in USD"
+          step="0.01"
+        />
+        <button id="startMatchButton" onclick="startMatch()">Start Match</button>
+        <button id="joinMatchButton" onclick="joinMatch()">Join Match</button>
+        <input type="text" id="winnerAddressInput" placeholder="Enter winner's address" />
+        <button id="closeMatchButton" onclick="closeMatch()">Close Match</button>
+      </div>
     </div>
 
     <script type="text/javascript">
-        // Contract address
-        const contractAddress = '0x2719D895Fb6a200855c6199E9023803CDC6a4AE7';
+      // Contract address
+      const contractAddress = "0xCb41Ef8F11AEBd6E4222b917CAd98c56Ac5941B6";
 
-        // Web3 initialization
-        let web3;
+      // Web3 initialization
+      let web3;
+      let contract;
 
-        const userAddressElement = document.getElementById('userAddress');
+      const userAddressElement = document.getElementById("userAddress");
+      web3 = new Web3(
+        "https://sepolia.infura.io/v3/5ed3495255e94d868dc8cace9455f237"
+      );
 
-        async function checkMetaMask() {
-            const provider = await detectEthereumProvider();
+      async function checkMetaMask() {
+        const provider = await detectEthereumProvider();
 
-            if (provider) {
-                console.log('MetaMask is installed!');
-                return true;
-            } else {
-                console.log('Please install MetaMask!');
-                return false;
-            }
+        if (provider) {
+          console.log("MetaMask is installed!");
+          return true;
+        } else {
+          console.log("Please install MetaMask!");
+          return false;
         }
+      }
 
-        async function loginWithMetaMask() {
-            const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
-            const address = accounts[0];
-            userAddressElement.textContent = 'Logged in with address: ' + address;
-            localStorage.setItem('loggedInUserWallet', address);
+      async function loginWithMetaMask() {
+        const accounts = await ethereum.request({
+          method: "eth_requestAccounts",
+        });
+        const address = accounts[0];
+        userAddressElement.textContent = "Logged in with address: " + address;
+        localStorage.setItem("loggedInUserWallet", address);
+      }
+
+      async function getLoggedInUserWallet() {
+        const accounts = await ethereum.request({ method: "eth_accounts" });
+        return accounts[0];
+      }
+
+      async function displayPlayerInfo() {
+        const player1Name = getURLParameter("player1");
+        const player2Name = getURLParameter("player2");
+
+        // Retrieve player wallet addresses from local storage if available
+        const player1Wallet = localStorage.getItem("player1_wallet") || "";
+        const player2Wallet = localStorage.getItem("player2_wallet") || "";
+
+        document.getElementById("player1").textContent =
+          "Player 1: " + player1Name + " - Wallet: " + player1Wallet;
+        document.getElementById("player2").textContent =
+          "Player 2: " + player2Name + " - Wallet: " + player2Wallet;
+      }
+
+      async function updateTransactionData() {
+        const loggedInUserWallet = await getLoggedInUserWallet();
+        const player1Name = getURLParameter("player1");
+        const player2Name = getURLParameter("player2");
+
+        if (player1Name === loggedInUserWallet) {
+          localStorage.setItem("player1_wallet", loggedInUserWallet);
+        } else if (player2Name === loggedInUserWallet) {
+          localStorage.setItem("player2_wallet", loggedInUserWallet);
         }
+      }
 
-        async function getLoggedInUserWallet() {
-            const accounts = await ethereum.request({ method: 'eth_accounts' });
-            return accounts[0];
-        }
+      function getURLParameter(name) {
+        const url = window.location.href;
+        name = name.replace(/[\[\]]/g, "\\$&");
+        const regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)");
+        const results = regex.exec(url);
+        if (!results) return null;
+        if (!results[2]) return "";
+        return decodeURIComponent(results[2].replace(/\+/g, " "));
+      }
 
-        async function displayPlayerInfo() {
-            const player1Name = getURLParameter('player1');
-            const player2Name = getURLParameter('player2');
-            
-            // Retrieve player wallet addresses from local storage if available
-            const player1Wallet = localStorage.getItem('player1_wallet') || '';
-            const player2Wallet = localStorage.getItem('player2_wallet') || '';
+      async function getEthPriceInUsd() {
+        const response = await fetch(
+          "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
+        );
+        const data = await response.json();
+        return data.ethereum.usd;
+      }
 
-            document.getElementById('player1').textContent = 'Player 1: ' + player1Name + ' - Wallet: ' + player1Wallet;
-            document.getElementById('player2').textContent = 'Player 2: ' + player2Name + ' - Wallet: ' + player2Wallet;
-        }
+      // async function getMatchAmountInEth(matchAmountUsd) {
+      //   if (matchAmountUsd !== null && !isNaN(matchAmountUsd)) {
+      //     const ethPriceInUsd = await getEthPriceInUsd();
+      //     const matchAmountEth = matchAmountUsd / ethPriceInUsd;
+      //     return matchAmountEth.toString();
+      //   } else {
+      //     // Return a default value or handle the case when match_amount_usd is not available or invalid
+      //     console.log("Match amount in USD not found or invalid");
+      //     return "0"; // Return '0' as a default value
+      //   }
+      // }
 
-        async function updateTransactionData() {
+      async function getMatchAmountInEth(matchAmountUsd) {
+        const response = await fetch(
+          "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
+        );
+        const data = await response.json();
+        const ethPriceInUsd = data.ethereum.usd;
+        const matchAmountEth = (matchAmountUsd / ethPriceInUsd).toFixed(18);
+        return matchAmountEth;
+      }
+
+      async function init() {
+        try {
+          const isMetaMaskInstalled = await checkMetaMask();
+          if (isMetaMaskInstalled) {
+            await loginWithMetaMask();
+            web3 = new Web3(window.ethereum);
+
+            // Initialize the contract object after web3 is initialized
+            contract = new web3.eth.Contract(contractABI, contractAddress);
+
+            await updateTransactionData();
+            displayPlayerInfo();
+
+            // Assign the loggedInUserWallet variable
             const loggedInUserWallet = await getLoggedInUserWallet();
-            const player1Name = getURLParameter('player1');
-            const player2Name = getURLParameter('player2');
+            console.log("Logged-in user wallet:", loggedInUserWallet);
+          } else {
+            console.error("MetaMask is not installed or not enabled.");
+            // You can display an error message to the user here
+          }
+        } catch (error) {
+          console.error("Error initializing:", error);
+          // You can also display an error message to the user here
+        }
+      }
 
-            if (player1Name === loggedInUserWallet) {
-                localStorage.setItem('player1_wallet', loggedInUserWallet);
-            } else if (player2Name === loggedInUserWallet) {
-                localStorage.setItem('player2_wallet', loggedInUserWallet);
-            }
+      async function startMatch() {
+        const matchAmountUsdInput = document.getElementById(
+          "matchAmountUsdInput"
+        );
+        const matchAmountUsd = parseFloat(matchAmountUsdInput.value);
+
+        if (!isNaN(matchAmountUsd) && matchAmountUsd > 0) {
+          const matchAmountEth = await getMatchAmountInEth(matchAmountUsd);
+          if (matchAmountEth === "0") {
+            console.error("Invalid USD amount.");
+            return;
+          }
+
+          const matchAmountWei = web3.utils.toWei(matchAmountEth, "ether");
+          const fromAddress = ethereum.selectedAddress;
+
+          try {
+            await contract.methods
+              .startMatch(matchAmountWei)
+              .send({
+                from: fromAddress,
+              })
+              .on("transactionHash", function (hash) {
+                console.log("Transaction hash:", hash);
+              })
+              .on("receipt", function (receipt) {
+                console.log("Receipt:", receipt);
+                // Retrieve the "MatchId" from the transaction receipt
+                const matchId = receipt.events.MatchStarted.returnValues.matchId;
+                // Update the frontend with the "MatchId"
+                document.getElementById("matchId").textContent = "Match ID: " + matchId;
+                // Store the player 1 address in local storage
+                localStorage.setItem("player1_address", fromAddress);
+                
+              })
+              .on("error", function (error) {
+                console.error("Error:", error);
+              });
+
+            // Populate player 1 wallet address
+            const player1Wallet = await getLoggedInUserWallet();
+            document.getElementById("player1").textContent =
+              "Player 1: " + getURLParameter("player1") + " - Wallet: " + player1Wallet;
+          } catch (error) {
+            console.error("Failed to start match:", error);
+          }
+        } else {
+          console.error("Invalid match amount input.");
+        }
+      }
+
+      async function joinMatch() {
+        const matchId = document.getElementById("matchId").textContent.split(": ")[1];
+        const matchAmountUsd = parseFloat(document.getElementById("matchAmountUsdInput").value);
+
+        if (!isNaN(matchAmountUsd) && matchAmountUsd > 0) {
+          const matchAmountEth = await getMatchAmountInEth(matchAmountUsd);
+          if (matchAmountEth === "0") {
+            console.error("Invalid USD amount.");
+            return;
+          }
+
+          const matchAmountWei = web3.utils.toWei(matchAmountEth, "ether");
+          const fromAddress = ethereum.selectedAddress;
+
+          try {
+            await contract.methods
+              .joinMatch(matchId)
+              .send({
+                from: fromAddress,
+                value: matchAmountWei,
+              })
+              .on("transactionHash", function (hash) {
+                console.log("Transaction hash:", hash);
+              })
+              .on("receipt", function (receipt) {
+                console.log("Receipt:", receipt);
+                // Store the player 2 address in local storage
+                localStorage.setItem("player2_address", fromAddress);
+              })
+              .on("error", function (error) {
+                console.error("Error:", error);
+              });
+
+            // Populate player 2 wallet address
+            const player2Wallet = await getLoggedInUserWallet();
+            document.getElementById("player2").textContent =
+              "Player 2: " + getURLParameter("player2") + " - Wallet: " + player2Wallet;
+          } catch (error) {
+            console.error("Failed to join match:", error);
+          }
+        } else {
+          console.error("Invalid match amount input.");
+        }
+      }
+
+      async function closeMatch() {
+        const matchId = document.getElementById("matchId").textContent.split(": ")[1];
+        const winnerAddress = document.getElementById("winnerAddressInput").value;
+
+        if (!winnerAddress) {
+          console.error("Winner address not provided.");
+          return;
         }
 
-        async function getNextLobbyId() {
-            const currentLobbyId = await window.contract.methods.getCurrentLobbyId().call();
-            return parseInt(currentLobbyId) + 1;
+        try {
+          await contract.methods
+            .closeMatch(matchId, winnerAddress)
+            .send({
+              from: ethereum.selectedAddress,
+            })
+            .on("transactionHash", function (hash) {
+              console.log("Transaction hash:", hash);
+            })
+            .on("receipt", async function (receipt) {
+              console.log("Receipt:", receipt);
+
+              // Retrieve the event data from the receipt
+              const matchClosedEvent = receipt.events.MatchClosed;
+              const winnerAmountWei = matchClosedEvent.returnValues.winnerAmount;
+              const multisigAmountWei = matchClosedEvent.returnValues.multisigAmount;
+              const poolAmountWei = matchClosedEvent.returnValues.poolAmount;
+
+              // Convert the amounts from Wei to Ether
+              const winnerAmountEth = web3.utils.fromWei(winnerAmountWei, "ether");
+              const multisigAmountEth = web3.utils.fromWei(multisigAmountWei, "ether");
+              const poolAmountEth = web3.utils.fromWei(poolAmountWei, "ether");
+
+              // Get the current ETH price in USD
+              const ethPriceInUsd = await getEthPriceInUsd();
+
+              // Calculate the amounts in USD
+              const winnerAmountUsd = (parseFloat(winnerAmountEth) * ethPriceInUsd).toFixed(2);
+              const multisigAmountUsd = (parseFloat(multisigAmountEth) * ethPriceInUsd).toFixed(2);
+              const poolAmountUsd = (parseFloat(poolAmountEth) * ethPriceInUsd).toFixed(2);
+
+              // Display the match result
+              const matchResult = `
+                Match Result:
+                Winning Player Address: ${winnerAddress}
+                Winning Player Amount: ${winnerAmountUsd} USD
+                Amount to Matching Pool: ${poolAmountUsd} USD
+                Amount to Contract Owner: ${multisigAmountUsd} USD
+              `;
+              alert(matchResult);
+            })
+            .on("error", function (error) {
+              console.error("Error:", error);
+            });
+
+          console.log("Match closed successfully.");
+        } catch (error) {
+          console.error("Failed to close match:", error);
         }
+      }
 
-        function getMatchAmountWei() {
-            const matchAmount = 0.1; // Example match amount in regular units
-            return web3.utils.toWei(matchAmount.toString(), 'ether');
-        }
+      console.log("Logged-in user wallet:");
 
-        function getURLParameter(name) {
-            const url = window.location.href;
-            name = name.replace(/[\[\]]/g, '\\$&');
-            const regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)');
-            const results = regex.exec(url);
-            if (!results) return null;
-            if (!results[2]) return '';
-            return decodeURIComponent(results[2].replace(/\+/g, ' '));
-        }
-
-        async function init() {
-            const isMetaMaskInstalled = await checkMetaMask();
-            if (isMetaMaskInstalled) {
-                web3 = new Web3(window.ethereum);
-                await loginWithMetaMask();
-                await updateTransactionData();
-                displayPlayerInfo();
-
-                const matchAmountWei = getMatchAmountWei();
-                console.log('Match amount in Wei:', matchAmountWei);
-            }
-        }
-
-        init();
+      init();
     </script>
-</body>
+  </body>
 </html>
