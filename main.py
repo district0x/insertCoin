@@ -3,6 +3,7 @@ import logging
 from APICounter import APICounter
 import os
 import sys
+import requests
 import discord
 from discord.ext import commands
 from discord.commands import Option
@@ -165,15 +166,14 @@ def generate_transaction_url(data):
     query_params = urllib.parse.urlencode({
         'player1': data['player1_name'],
         'player2': data['player2_name'],
-        # Assuming this data is available
         'player1_wallet': data['player1_wallet'],
         'player2_wallet': data['player2_wallet'],
     })
     return f"{base_url}?{query_params}"
 
 
-@bot.slash_command(name="1v1", description="Start a 1v1 challenge.")
-async def one_v_one(ctx, platform: Option(str, "Choose your platform", choices=["PS5", "PC"], required=True), match_amount: Option(float, "Enter the match amount in ETH", required=True)):
+@bot.slash_command(name="1v1", description="Start a 1v1 challenge.", force_registration=True)
+async def one_v_one(ctx, platform: Option(str, "Choose your platform", choices=["PS5", "PC"], required=True)):
     # Create a text channel (public by default, to be made private once challenge is accepted)
     channel = await ctx.guild.create_text_channel(name=f"1v1-{ctx.author.display_name}-{platform}")
 
@@ -186,7 +186,6 @@ async def one_v_one(ctx, platform: Option(str, "Choose your platform", choices=[
         'player2_name': None,  # This will be set when the challenge is accepted
         'player1_wallet': None,  # This will be gathered when the user logs in via MetaMask
         'player2_wallet': None,  # This will be gathered when the user logs in via MetaMask
-        'match_amount': match_amount,
         'match_id': '12345'  # Example match ID
     }
 
@@ -195,31 +194,13 @@ async def one_v_one(ctx, platform: Option(str, "Choose your platform", choices=[
     button = AcceptButton("Accept Challenge", discord.ButtonStyle.green,
                           "accept_1v1", ctx.author.id, channel.id, transaction_data)
     view.add_item(button)
-    await ctx.respond(f"{ctx.author.mention} has initiated a 1v1 challenge on {platform} with a match amount of {match_amount} ETH. Waiting for an opponent!", view=view)
+    await ctx.respond(f"{ctx.author.mention} has initiated a 1v1 challenge on {platform}. Waiting for an opponent!", view=view)
 
     # Optionally delete the channel if not accepted after some time
     # This can be handled via a background task or similar mechanism
 
-
-@bot.command(name="start_match")
-async def start_match(ctx, match_amount: float):
-    # Convert the match amount to Wei
-    match_amount_wei = web3.toWei(match_amount, 'ether')
-
-    # Get the next lobby ID
-    lobby_id = await getNextLobbyId()
-
-    # Call the contract's startMatch function
-    tx_hash = await contract.functions.startMatch(lobby_id, match_amount_wei).transact({'from': ctx.author.id})
-
-    # Wait for the transaction to be mined
-    receipt = await web3.eth.waitForTransactionReceipt(tx_hash)
-
-    # Check if the transaction was successful
-    if receipt['status']:
-        await ctx.send(f"Match started successfully. Lobby ID: {lobby_id}")
-    else:
-        await ctx.send("Failed to start the match.")
+# async def one_v_one():
+    return "heloo"
 
 
 def time_ago(timestamp):
@@ -461,13 +442,17 @@ async def on_message(message):
         elif prompt_type == "list":
             result_message = handle_show_list(index=index, embeds=embeds)
         else:
-            result_message = await handle_user_post(
-                index=index,
-                prompt_type=prompt_type,
-                embeds=embeds,
-                message=message,
-                prompt=prompt,
-            )
+            try:
+                result_message = await handle_user_post(
+                    index=index,
+                    prompt_type=prompt_type,
+                    embeds=embeds,
+                    message=message,
+                    prompt=prompt,
+                )
+            except Exception as e:
+                logger.error(f"Error handling user post: {e}")
+                result_message = "An error occurred while processing your request. Please try again later."
 
         await message.reply(result_message)
 
