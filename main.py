@@ -168,12 +168,14 @@ def generate_transaction_url(data):
         'player2': data['player2_name'],
         'player1_wallet': data['player1_wallet'],
         'player2_wallet': data['player2_wallet'],
+        'match_amount_usd': str(data['match_amount_usd'])
     })
     return f"{base_url}?{query_params}"
 
 
 @bot.slash_command(name="1v1", description="Start a 1v1 challenge.", force_registration=True)
-async def one_v_one(ctx, platform: Option(str, "Choose your platform", choices=["PS5", "PC"], required=True)):
+async def one_v_one(ctx, platform: Option(str, "Choose your platform", choices=["PS5", "PC"], required=True), match_amount_usd: Option(int, "Enter the match amount in USD", required=True)):
+    # ... rest of the code ...
     # Create a text channel (public by default, to be made private once challenge is accepted)
     channel = await ctx.guild.create_text_channel(name=f"1v1-{ctx.author.display_name}-{platform}")
 
@@ -183,10 +185,11 @@ async def one_v_one(ctx, platform: Option(str, "Choose your platform", choices=[
     # Store the match amount and player wallets in the transaction_data dictionary
     transaction_data = {
         'player1_name': str(ctx.author.display_name),
-        'player2_name': None,  # This will be set when the challenge is accepted
-        'player1_wallet': None,  # This will be gathered when the user logs in via MetaMask
-        'player2_wallet': None,  # This will be gathered when the user logs in via MetaMask
-        'match_id': '12345'  # Example match ID
+        'player2_name': None,
+        'player1_wallet': None,
+        'player2_wallet': None,
+        'match_id': '12345',
+        'match_amount_usd': int(match_amount_usd)  # Convert to int
     }
 
     # Respond to the command with details and an accept button
