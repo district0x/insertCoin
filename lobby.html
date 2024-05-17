@@ -38,16 +38,14 @@
 
     <script type="text/javascript">
       // Contract address
-      const contractAddress = "0xCb41Ef8F11AEBd6E4222b917CAd98c56Ac5941B6";
+      const contractAddress = "0x4e57936348BB3C7703fdC585BcF96c9880cB36C8";
 
       // Web3 initialization
       let web3;
       let contract;
 
       const userAddressElement = document.getElementById("userAddress");
-      web3 = new Web3(
-        "https://sepolia.infura.io/v3/5ed3495255e94d868dc8cace9455f237"
-      );
+      web3 = new Web3("https://sepolia.base.org");
 
       async function checkMetaMask() {
         const provider = await detectEthereumProvider();
@@ -74,6 +72,7 @@
         const accounts = await ethereum.request({ method: "eth_accounts" });
         return accounts[0];
       }
+      
 
       async function displayPlayerInfo() {
         const player1Name = getURLParameter("player1");
@@ -108,7 +107,8 @@
         const results = regex.exec(url);
         if (!results) return null;
         if (!results[2]) return "";
-        return decodeURIComponent(results[2].replace(/\+/g, " "));
+        const value = decodeURIComponent(results[2].replace(/\+/g, " "));
+        return name === "match_amount_usd" ? parseInt(value) : value;
       }
 
       async function getEthPriceInUsd() {
@@ -157,6 +157,13 @@
             // Assign the loggedInUserWallet variable
             const loggedInUserWallet = await getLoggedInUserWallet();
             console.log("Logged-in user wallet:", loggedInUserWallet);
+
+            // Get the match_amount_usd value from the URL query parameters
+            const matchAmountUsd = getURLParameter("match_amount_usd");
+            if (matchAmountUsd) {
+              // Set the value of the matchAmountUsdInput field
+              document.getElementById("matchAmountUsdInput").value = matchAmountUsd;
+            }
           } else {
             console.error("MetaMask is not installed or not enabled.");
             // You can display an error message to the user here
