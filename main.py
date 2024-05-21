@@ -174,13 +174,16 @@ def generate_transaction_url(data):
 
 
 @bot.slash_command(name="1v1", description="Start a 1v1 challenge.", force_registration=True)
-async def one_v_one(ctx, platform: Option(str, "Choose your platform", choices=["PS5", "PC"], required=True), match_amount_usd: Option(int, "Enter the match amount in USD", required=True)):
-    # ... rest of the code ...
+async def one_v_one(
+    ctx,
+    platform: Option(str, "Choose your platform", choices=["PS5", "PC"], required=True),
+    category: Option(str, "Choose the game category", choices=["Sports", "Fighting", "Racing"], required=True),
+    game: Option(str, "Choose the game", required=True),
+    match_amount_usd: Option(
+        int, "Enter the match amount in USD", required=True)
+):
     # Create a text channel (public by default, to be made private once challenge is accepted)
-    channel = await ctx.guild.create_text_channel(name=f"1v1-{ctx.author.display_name}-{platform}")
-
-    # Store channel and challenge information, for example in a global or database
-    # This example does not include actual storage for simplicity
+    channel = await ctx.guild.create_text_channel(name=f"1v1-{ctx.author.display_name}-{platform}-{game}")
 
     # Store the match amount and player wallets in the transaction_data dictionary
     transaction_data = {
@@ -189,7 +192,10 @@ async def one_v_one(ctx, platform: Option(str, "Choose your platform", choices=[
         'player1_wallet': None,
         'player2_wallet': None,
         'match_id': '12345',
-        'match_amount_usd': int(match_amount_usd)  # Convert to int
+        'match_amount_usd': int(match_amount_usd),  # Convert to int
+        'platform': platform,
+        'category': category,
+        'game': game
     }
 
     # Respond to the command with details and an accept button
@@ -197,13 +203,36 @@ async def one_v_one(ctx, platform: Option(str, "Choose your platform", choices=[
     button = AcceptButton("Accept Challenge", discord.ButtonStyle.green,
                           "accept_1v1", ctx.author.id, channel.id, transaction_data)
     view.add_item(button)
-    await ctx.respond(f"{ctx.author.mention} has initiated a 1v1 challenge on {platform}. Waiting for an opponent!", view=view)
-
-    # Optionally delete the channel if not accepted after some time
-    # This can be handled via a background task or similar mechanism
+    await ctx.respond(f"{ctx.author.mention} has initiated a 1v1 challenge for {game} on {platform} with a match amount of ${match_amount_usd}. Waiting for an opponent!", view=view)
 
 # async def one_v_one():
     return "heloo"
+
+
+@bot.slash_command(name="record", description="Fetch your post history.")
+async def record(ctx):
+    user_id = str(ctx.author.id)
+    try:
+        index = pc.Index(pinecone_index_name)
+        pine_res = index.query(
+            filter={"author_id": user_id},
+            top_k=100,  # Adjust this number based on how many records you want to fetch
+            include_metadata=True,
+        )
+        matches = pine_res["matches"]
+
+        if not matches:
+            await ctx.respond("No post history found.")
+            return
+
+        formatted_matches = "\n\n".join(
+            [format_user_post(item) for item in matches]
+        )
+
+        await ctx.respond(f"Your post history:\n\n{formatted_matches}")
+    except Exception as e:
+        logger.error(f"Error fetching post history: {e}")
+        await ctx.respond("An error occurred while fetching your post history. Please try again later.")
 
 
 def time_ago(timestamp):
@@ -239,8 +268,7 @@ def format_user_post(user_post):
     return f"<@{author_id}>: *{text}* ({created_ago})"
 
 
-async def handle_user_post(index, prompt_type, embeds, prompt, message):
-    print(embeds)
+async def handle_user_post(index, prompt_type, embeds, prompt, message, transaction_data):
     index.upsert(
         vectors=[
             {
@@ -251,15 +279,18 @@ async def handle_user_post(index, prompt_type, embeds, prompt, message):
                     "author_id": str(message.author.id),
                     "prompt_type": prompt_type,
                     "created": time.time(),
+                    "platform": transaction_data.get('platform'),
+                    "category": transaction_data.get('category'),
+                    "game": transaction_data.get('game'),
+                    "match_amount_usd": transaction_data.get('match_amount_usd'),
                 },
             }
         ]
     )
 
+    # Corrected query to use only filter
     pine_res = index.query(
-        vector=embeds,
-        filter={"prompt_type": "prompt_type" if prompt_type ==
-                "1v1" else "tournament"},
+        filter={"prompt_type": prompt_type},
         top_k=5,
         include_metadata=True,
     )
@@ -320,8 +351,8 @@ async def handle_user_post(index, prompt_type, embeds, prompt, message):
 
 
 def handle_delete_post(index, embeds, message):
+    # Corrected query to use only filter
     pine_res = index.query(
-        vector=embeds,
         filter={"author_id": str(message.author.id)},
         top_k=1,
         include_metadata=True,
@@ -330,7 +361,7 @@ def handle_delete_post(index, embeds, message):
     if matches:
         post_id = matches[0]["id"]
         index.delete(ids=[post_id])
-        return f"I have deleted following post:\n\n {format_user_post(matches[0])}"
+        return f"I have deleted the following post:\n\n {format_user_post(matches[0])}"
     else:
         return (
             f"I'm sorry, I haven't found any post of yours you described. Please describe in more detail what"
@@ -339,7 +370,12 @@ def handle_delete_post(index, embeds, message):
 
 
 def handle_show_list(index, embeds):
-    pine_res = index.query(vector=embeds, top_k=5, include_metadata=True)
+    # Corrected query to use only vector
+    pine_res = index.query(
+        vector=embeds,
+        top_k=5,
+        include_metadata=True
+    )
     matches = pine_res["matches"]
     filtered_matches = [
         match for match in matches if match["score"] >= min_pinecone_score
