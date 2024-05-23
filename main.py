@@ -173,12 +173,24 @@ def generate_transaction_url(data):
     return f"{base_url}?{query_params}"
 
 
+game_choices = {
+    "Sports": ["FIFA 23", "NBA 2K23", "Madden NFL 23"],
+    "Fighting": ["Street Fighter 6", "Tekken 8", "Mortal Kombat 12", "Guilty Gear Strive", "DNF Duel", "Dragon Ball FighterZ"],
+    "Racing": ["Forza Motorsport", "Gran Turismo 7", "Need for Speed Unbound", "F1 23", "Dirt 5"]
+}
+
+
+async def get_game_choices(ctx):
+    category = ctx.options["category"]
+    return game_choices[category]
+
+
 @bot.slash_command(name="1v1", description="Start a 1v1 challenge.", force_registration=True)
 async def one_v_one(
     ctx,
     platform: Option(str, "Choose your platform", choices=["PS5", "PC"], required=True),
     category: Option(str, "Choose the game category", choices=["Sports", "Fighting", "Racing"], required=True),
-    game: Option(str, "Choose the game", required=True),
+    game: Option(str, "Choose the game", autocomplete=get_game_choices, required=True),
     match_amount_usd: Option(
         int, "Enter the match amount in USD", required=True)
 ):
