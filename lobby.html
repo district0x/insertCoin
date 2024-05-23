@@ -17,6 +17,10 @@
         <h2>Matching Pool: <span id="matchingPoolAmount"></span></h2>
       </div>
       <div class="header">
+        <h2>Donate to Match</h2>
+        <input type="number" id="donationAmountUsdInput" placeholder="Enter donation amount in USD" step="0.01" />
+        <input type="text" id="donationMatchIdInput" placeholder="Enter Match ID to donate to" />
+        <button id="donateButton" onclick="donateToMatch()">Donate</button>
         <h1>Lobby</h1>
         <p id="userAddress"></p>
       </div>
@@ -53,7 +57,7 @@
 
     <script type="text/javascript">
       // Contract address
-      const contractAddress = "0x5F5e2C2c4d6ef5E879835149547A8360aba537A8";
+      const contractAddress = "0x8d7b8A8ba6f29615810FAd89Fe2F34c359784De9";
 
       // Web3 initialization
       let web3;
@@ -347,6 +351,46 @@
           console.log("Match closed successfully.");
         } catch (error) {
           console.error("Failed to close match:", error);
+        }
+      }
+
+      async function donateToMatch() {
+        const donationAmountUsd = parseFloat(document.getElementById("donationAmountUsdInput").value);
+        const matchId = document.getElementById("donationMatchIdInput").value;
+
+        if (isNaN(donationAmountUsd) || donationAmountUsd <= 0 || !matchId) {
+          console.error("Invalid donation amount or match ID.");
+          return;
+        }
+
+        const donationAmountEth = await getMatchAmountInEth(donationAmountUsd);
+        if (donationAmountEth === "0") {
+          console.error("Invalid USD amount.");
+          return;
+        }
+
+        const donationAmountWei = web3.utils.toWei(donationAmountEth, "ether");
+        const fromAddress = ethereum.selectedAddress;
+
+        try {
+          await contract.methods
+            .donateToMatch(matchId, donationAmountWei)
+            .send({
+              from: fromAddress,
+              value: donationAmountWei,
+            })
+            .on("transactionHash", function (hash) {
+              console.log("Transaction hash:", hash);
+            })
+            .on("receipt", function (receipt) {
+              console.log("Receipt:", receipt);
+              alert("Donation successful!");
+            })
+            .on("error", function (error) {
+              console.error("Error:", error);
+            });
+        } catch (error) {
+          console.error("Failed to donate to match:", error);
         }
       }
 
