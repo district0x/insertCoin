@@ -25,7 +25,6 @@ contract MVPCLR is OwnableUpgradeable {
     event MatchStarted(uint256 matchId, address player1, uint256 matchAmount);
     event MatchJoined(uint256 matchId, address player2);
     event MatchClosed(uint256 matchId, address winner, uint256 winnerAmount, uint256 multisigAmount, uint256 poolAmount);
-    event MatchDonation(uint256 indexed matchId, address indexed donor, uint256 amount);
 
     //Tournament Events
     event TournamentCreated(uint256 indexed tournamentId,uint256 numEntrants,uint8 winnersPercentage,uint8 multisigPercentage);
@@ -42,7 +41,6 @@ contract MVPCLR is OwnableUpgradeable {
     uint256 player1Amount;
     uint256 player2Amount;
     uint256 totalAmount;
-    uint256 donatedAmount; // New field to track donated amount
     bool isOpen;
     }
 
@@ -69,7 +67,6 @@ contract MVPCLR is OwnableUpgradeable {
     mapping(uint256 => mapping(address => WinnerInfo)) public tournamentWinners;
 
     //1V1 MATCH mappings
-    mapping(address => uint256) public matchDonorContributions;
     mapping(uint256 => Match) public matches;
     uint256 public nextMatchId;
     
@@ -107,22 +104,20 @@ contract MVPCLR is OwnableUpgradeable {
 
     /*** 1V1 FUNCTIONS ***/
 
-    function startMatch(uint256 _matchAmount) external payable {
+        function startMatch(uint256 _matchAmount) external {
     require(_matchAmount > 0, "Match amount must be greater than 0");
-    require(msg.value == _matchAmount, "Incorrect match amount sent");
 
     uint256 matchId = nextMatchId++;
     matches[matchId] = Match({
         player1: msg.sender,
         player2: address(0), // Initially no second player
-        player1Amount: msg.value, // Use msg.value instead of _matchAmount
+        player1Amount: _matchAmount,
         player2Amount: 0,
-        totalAmount: msg.value, // Use msg.value instead of _matchAmount
-        donatedAmount: 0, // Initialize donatedAmount to 0
+        totalAmount: _matchAmount,
         isOpen: true
     });
 
-    emit MatchStarted(matchId, msg.sender, msg.value); // Use msg.value instead of _matchAmount
+    emit MatchStarted(matchId, msg.sender, _matchAmount);
     }
 
     
@@ -134,45 +129,26 @@ contract MVPCLR is OwnableUpgradeable {
     matches[_matchId].player2 = msg.sender;
     matches[_matchId].player2Amount = msg.value;
     matches[_matchId].totalAmount += msg.value;
-    matches[_matchId].isOpen = true; // Close the match to further participants
+    matches[_matchId].isOpen = false; // Close the match to further participants
 
     emit MatchJoined(_matchId, msg.sender);
     }
 
     function closeMatch(uint256 _matchId, address _winner) external onlyAdmin {
     Match storage matchInfo = matches[_matchId];
+    require(matchInfo.isOpen == false, "Match is still open");
     require(_winner == matchInfo.player1 || _winner == matchInfo.player2, "Invalid winner address");
 
     // Proceed with distribution
-    uint256 totalAmount = matchInfo.totalAmount;
-    uint256 winnerAmount = totalAmount * 90 / 100;
-    uint256 multisigAmount = totalAmount * 5 / 100;
-    uint256 poolAmount = totalAmount - winnerAmount - multisigAmount;
+    uint256 winnerAmount = matchInfo.totalAmount * 90 / 100; 
+    uint256 multisigAmount = matchInfo.totalAmount * 5 / 100;
+    uint256 poolAmount = matchInfo.totalAmount * 5 / 100;
 
     payable(_winner).transfer(winnerAmount);
     payable(multisigAddress).transfer(multisigAmount);
     matchingPool += poolAmount;
 
-    matchInfo.isOpen = false; // Set isOpen to false when the match is closed
-
     emit MatchClosed(_matchId, _winner, winnerAmount, multisigAmount, poolAmount);
-    }
-
-
-    function donateToMatch(uint256 _matchId, uint256 _amount) external payable {
-    require(_amount > 0, "Donation amount must be greater than 0");
-    require(msg.value == _amount, "Incorrect donation amount sent");
-    require(matches[_matchId].isOpen, "Cannot donate to a closed match");
-
-    matches[_matchId].donatedAmount += _amount;
-    matches[_matchId].totalAmount += _amount;
-    matchDonorContributions[msg.sender] += _amount;
-
-    if (!isPatron[msg.sender]) {
-        isPatron[msg.sender] = true;
-    }
-
-    emit MatchDonation(_matchId, msg.sender, _amount);
     }
 
     /*** TOURNAMENT FUNCTIONS ***/
@@ -357,15 +333,6 @@ contract MVPCLR is OwnableUpgradeable {
     require(address(this).balance >= amount, "Insufficient funds in contract");
     payable(multisigAddress).transfer(amount);
     }
-
-    function getContractBalance() public view returns (uint256) {
-    return address(this).balance;
-    }
-
-    function getMatchDonorContribution(address _donor) external view returns (uint256) {
-    return matchDonorContributions[_donor];
-    }
-
 
     // receive donation for the matching pool
     receive() external payable {
