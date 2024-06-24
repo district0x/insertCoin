@@ -22,13 +22,13 @@ contract MVPCLR is OwnableUpgradeable {
     event RoundClosed(uint256 roundId);
     event MatchingPoolDonation(address sender, uint256 value, uint256 roundId);
 
-    //Match Events
+    // Match Events
     event MatchStarted(uint256 matchId, address player1, uint256 matchAmount);
     event MatchJoined(uint256 matchId, address player2);
     event MatchClosed(uint256 matchId, address winner, uint256 winnerAmount, uint256 multisigAmount, uint256 poolAmount);
     event MatchDonation(uint256 indexed matchId, address indexed donor, uint256 amount);
 
-    //Tournament Events
+    // Tournament Events
     event TournamentCreated(uint256 indexed tournamentId, uint256 numEntrants, uint8 winnersPercentage, uint8 multisigPercentage);
     event TournamentJoined(uint256 tournamentId, address entrant);
     event TournamentStarted(uint256 tournamentId);
@@ -36,7 +36,7 @@ contract MVPCLR is OwnableUpgradeable {
     event Donate(address sender, uint256 value, uint256 tournamentId);
     event FailedDistribute(address receiver, uint256 amount);
 
-    //1V1 Match Details
+    // 1V1 Match Details
     struct Match {
         address player1;
         address player2;
@@ -45,9 +45,11 @@ contract MVPCLR is OwnableUpgradeable {
         uint256 totalAmount;
         uint256 donatedAmount; // New field to track donated amount
         bool isOpen;
+        bool isERC20; // New field to track if match is in ERC20
+        IERC20 token; // Token used for ERC20 match
     }
 
-    //Tournament Details
+    // Tournament Details
     struct Tournament {
         uint256 numEntrants;
         uint256 totalDonations;
@@ -91,9 +93,9 @@ contract MVPCLR is OwnableUpgradeable {
     function initialize() public initializer {
         __Ownable_init(msg.sender);
         multisigAddress = msg.sender;
-        nextTournamentId = 0; // Initialize nextTournamentId
-        nextMatchId = 0; // Initialize nextMatchId
-        roundId = 0;
+        nextTournamentId = 1; // Initialize nextTournamentId
+        nextMatchId = 1; // Initialize nextMatchId
+        roundId = 1;
         lastActiveRoundId = 0;
     }
 
@@ -103,6 +105,7 @@ contract MVPCLR is OwnableUpgradeable {
 
     /*** 1V1 FUNCTIONS ***/
 
+    // Function to start a match with Ether
     function startMatch(uint256 _matchAmount) external payable {
         require(_matchAmount > 0, "Match amount must be greater than 0");
         require(msg.value == _matchAmount, "Incorrect match amount sent");
@@ -115,25 +118,69 @@ contract MVPCLR is OwnableUpgradeable {
             player2Amount: 0,
             totalAmount: msg.value, // Use msg.value instead of _matchAmount
             donatedAmount: 0, // Initialize donatedAmount to 0
-            isOpen: true
+            isOpen: true,
+            isERC20: false, // Match is not using ERC20
+            token: IERC20(address(0)) // No token
         });
 
         emit MatchStarted(matchId, msg.sender, msg.value); // Use msg.value instead of _matchAmount
     }
 
+    // Function to start a match with ERC20 tokens
+    function startMatchERC20(uint256 _matchAmount, IERC20 _token) external {
+        require(_matchAmount > 0, "Match amount must be greater than 0");
+        
+        // Check the allowance
+        uint256 allowance = _token.allowance(msg.sender, address(this));
+        require(allowance >= _matchAmount, "Token allowance too low");
+        
+        // Transfer the tokens to the contract
+        require(_token.transferFrom(msg.sender, address(this), _matchAmount), "Token transfer failed");
+
+        uint256 matchId = nextMatchId++;
+        matches[matchId] = Match({
+            player1: msg.sender,
+            player2: address(0), // Initially no second player
+            player1Amount: _matchAmount,
+            player2Amount: 0,
+            totalAmount: _matchAmount,
+            donatedAmount: 0, // Initialize donatedAmount to 0
+            isOpen: true,
+            isERC20: true, // Match is using ERC20
+            token: _token // Token used for match
+        });
+
+        emit MatchStarted(matchId, msg.sender, _matchAmount);
+    }
+
+
+    // Function to join a match
     function joinMatch(uint256 _matchId) external payable {
         require(matches[_matchId].isOpen, "Match is not open");
         require(msg.sender != matches[_matchId].player1, "Player already in match");
-        require(msg.value == matches[_matchId].player1Amount, "Incorrect match amount");
 
-        matches[_matchId].player2 = msg.sender;
-        matches[_matchId].player2Amount = msg.value;
-        matches[_matchId].totalAmount += msg.value;
+        if (matches[_matchId].isERC20) {
+            // Join match with ERC20
+            require(matches[_matchId].token.transferFrom(msg.sender, address(this), matches[_matchId].player1Amount), "Token transfer failed");
+
+            matches[_matchId].player2 = msg.sender;
+            matches[_matchId].player2Amount = matches[_matchId].player1Amount;
+            matches[_matchId].totalAmount += matches[_matchId].player1Amount;
+        } else {
+            // Join match with Ether
+            require(msg.value == matches[_matchId].player1Amount, "Incorrect match amount");
+
+            matches[_matchId].player2 = msg.sender;
+            matches[_matchId].player2Amount = msg.value;
+            matches[_matchId].totalAmount += msg.value;
+        }
+
         matches[_matchId].isOpen = true; // Close the match to further participants
 
         emit MatchJoined(_matchId, msg.sender);
     }
 
+    // Function to close a match
     function closeMatch(uint256 _matchId, address _winner) external onlyAdmin {
         Match storage matchInfo = matches[_matchId];
         require(_winner == matchInfo.player1 || _winner == matchInfo.player2, "Invalid winner address");
@@ -144,19 +191,34 @@ contract MVPCLR is OwnableUpgradeable {
         uint256 multisigAmount = totalAmount * 5 / 100;
         uint256 poolAmount = totalAmount - winnerAmount - multisigAmount;
 
-        payable(_winner).transfer(winnerAmount);
-        payable(multisigAddress).transfer(multisigAmount);
-        matchingPool += poolAmount;
+        if (matchInfo.isERC20) {
+            // Distribution for ERC20
+            matchInfo.token.transfer(_winner, winnerAmount);
+            matchInfo.token.transfer(multisigAddress, multisigAmount);
+        } else {
+            // Distribution for Ether
+            payable(_winner).transfer(winnerAmount);
+            payable(multisigAddress).transfer(multisigAmount);
+        }
 
+        matchingPool += poolAmount;
         matchInfo.isOpen = false; // Set isOpen to false when the match is closed
 
         emit MatchClosed(_matchId, _winner, winnerAmount, multisigAmount, poolAmount);
     }
 
+    // Function to donate to a match
     function donateToMatch(uint256 _matchId, uint256 _amount) external payable {
         require(_amount > 0, "Donation amount must be greater than 0");
-        require(msg.value == _amount, "Incorrect donation amount sent");
         require(matches[_matchId].isOpen, "Cannot donate to a closed match");
+
+        if (matches[_matchId].isERC20) {
+            // Donation with ERC20
+            require(matches[_matchId].token.transferFrom(msg.sender, address(this), _amount), "Token transfer failed");
+        } else {
+            // Donation with Ether
+            require(msg.value == _amount, "Incorrect donation amount sent");
+        }
 
         matches[_matchId].donatedAmount += _amount;
         matches[_matchId].totalAmount += _amount;
