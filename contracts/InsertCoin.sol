@@ -12,44 +12,35 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract MVPCLR is OwnableUpgradeable {
 
-    event AdminAdded(address _admin);
-    event AdminRemoved(address _admin);
-    event BlacklistedAdded(address _blacklisted);
-    event BlacklistedRemoved(address _blacklisted);
+    event AdminAdded(address indexed _admin);
+    event AdminRemoved(address indexed _admin);
+    event BlacklistedAdded(address indexed _blacklisted);
+    event BlacklistedRemoved(address indexed _blacklisted);
     event MatchingPoolFilled(uint256 amount);
-    event PatronsAdded(address payable[] addresses);
     event RoundStarted(uint256 roundStart, uint256 roundId, uint256 roundDuration);
-    event RoundClosed(uint256 roundId);
-    event MatchingPoolDonation(address sender, uint256 value, uint256 roundId);
-
-    // Match Events
-    event MatchStarted(uint256 matchId, address player1, uint256 matchAmount);
-    event MatchJoined(uint256 matchId, address player2);
-    event MatchClosed(uint256 matchId, address winner, uint256 winnerAmount, uint256 multisigAmount, uint256 poolAmount);
+    event MatchingPoolDonation(address indexed sender, uint256 value, uint256 roundId);
+    event MatchStarted(uint256 indexed matchId, address indexed player1, uint256 matchAmount);
+    event MatchJoined(uint256 indexed matchId, address indexed player2);
+    event MatchClosed(uint256 indexed matchId, address indexed winner, uint256 winnerAmount, uint256 multisigAmount, uint256 poolAmount);
     event MatchDonation(uint256 indexed matchId, address indexed donor, uint256 amount);
-
-    // Tournament Events
     event TournamentCreated(uint256 indexed tournamentId, uint256 numEntrants, uint8 winnersPercentage, uint8 multisigPercentage);
-    event TournamentJoined(uint256 tournamentId, address entrant);
-    event TournamentStarted(uint256 tournamentId);
+    event TournamentJoined(uint256 indexed tournamentId, address indexed entrant);
+    event TournamentStarted(uint256 indexed tournamentId);
     event TournamentEnded(uint256 indexed tournamentId, address[] winners, uint8[] winnersPercentages);
-    event Donate(address sender, uint256 value, uint256 tournamentId);
-    event FailedDistribute(address receiver, uint256 amount);
+    event Donate(address indexed sender, uint256 value, uint256 indexed tournamentId);
 
-    // 1V1 Match Details
     struct Match {
         address player1;
         address player2;
         uint256 player1Amount;
         uint256 player2Amount;
         uint256 totalAmount;
-        uint256 donatedAmount; // New field to track donated amount
+        uint256 donatedAmount;
         bool isOpen;
-        bool isERC20; // New field to track if match is in ERC20
-        IERC20 token; // Token used for ERC20 match
+        bool isERC20;
+        IERC20 token;
     }
 
-    // Tournament Details
     struct Tournament {
         uint256 numEntrants;
         uint256 totalDonations;
@@ -71,17 +62,14 @@ contract MVPCLR is OwnableUpgradeable {
     mapping(uint256 => mapping(address => bool)) public isEntrantInTournament;
     mapping(uint256 => mapping(address => WinnerInfo)) public tournamentWinners;
 
-    // 1V1 MATCH mappings
     mapping(address => uint256) public matchDonorContributions;
     mapping(uint256 => Match) public matches;
     uint256 public nextMatchId;
-
     uint256 public roundStart;
     uint256 public roundDuration;
     uint256 public matchingPool;
     uint256 roundId;
-    uint256 public nextTournamentId; // Added nextTournamentId variable
-    uint256 public lastActiveRoundId;
+    uint256 public nextTournamentId;
     uint256 public totalMultisigCollected;
 
     mapping(address => bool) public isAdmin;
@@ -93,10 +81,9 @@ contract MVPCLR is OwnableUpgradeable {
     function initialize() public initializer {
         __Ownable_init(msg.sender);
         multisigAddress = msg.sender;
-        nextTournamentId = 1; // Initialize nextTournamentId
-        nextMatchId = 1; // Initialize nextMatchId
+        nextTournamentId = 1;
+        nextMatchId = 1;
         roundId = 1;
-        lastActiveRoundId = 0;
     }
 
     function setMultisigAddress(address _multisigAddress) external onlyMultisig {
@@ -105,123 +92,99 @@ contract MVPCLR is OwnableUpgradeable {
 
     /*** 1V1 FUNCTIONS ***/
 
-    // Function to start a match with Ether
     function startMatch(uint256 _matchAmount) external payable {
-        require(_matchAmount > 0, "Match amount must be greater than 0");
-        require(msg.value == _matchAmount, "Incorrect match amount sent");
+        require(_matchAmount > 0, "Amt > 0");
+        require(msg.value == _matchAmount, "Incorrect amt");
 
         uint256 matchId = nextMatchId++;
         matches[matchId] = Match({
             player1: msg.sender,
-            player2: address(0), // Initially no second player
-            player1Amount: msg.value, // Use msg.value instead of _matchAmount
+            player2: address(0),
+            player1Amount: msg.value,
             player2Amount: 0,
-            totalAmount: msg.value, // Use msg.value instead of _matchAmount
-            donatedAmount: 0, // Initialize donatedAmount to 0
+            totalAmount: msg.value,
+            donatedAmount: 0,
             isOpen: true,
-            isERC20: false, // Match is not using ERC20
-            token: IERC20(address(0)) // No token
+            isERC20: false,
+            token: IERC20(address(0))
         });
 
-        emit MatchStarted(matchId, msg.sender, msg.value); // Use msg.value instead of _matchAmount
+        emit MatchStarted(matchId, msg.sender, msg.value);
     }
 
-    // Function to start a match with ERC20 tokens
     function startMatchERC20(uint256 _matchAmount, IERC20 _token) external {
-        require(_matchAmount > 0, "Match amount must be greater than 0");
-        
-        // Check the allowance
-        uint256 allowance = _token.allowance(msg.sender, address(this));
-        require(allowance >= _matchAmount, "Token allowance too low");
-        
-        // Transfer the tokens to the contract
-        require(_token.transferFrom(msg.sender, address(this), _matchAmount), "Token transfer failed");
+        require(_matchAmount > 0, "Amt > 0");
+        require(_token.transferFrom(msg.sender, address(this), _matchAmount), "Transfer failed");
 
         uint256 matchId = nextMatchId++;
         matches[matchId] = Match({
             player1: msg.sender,
-            player2: address(0), // Initially no second player
+            player2: address(0),
             player1Amount: _matchAmount,
             player2Amount: 0,
             totalAmount: _matchAmount,
-            donatedAmount: 0, // Initialize donatedAmount to 0
+            donatedAmount: 0,
             isOpen: true,
-            isERC20: true, // Match is using ERC20
-            token: _token // Token used for match
+            isERC20: true,
+            token: _token
         });
 
         emit MatchStarted(matchId, msg.sender, _matchAmount);
     }
 
-
-    // Function to join a match
     function joinMatch(uint256 _matchId) external payable {
-        require(matches[_matchId].isOpen, "Match is not open");
-        require(msg.sender != matches[_matchId].player1, "Player already in match");
+        Match storage matchInfo = matches[_matchId];
+        require(matchInfo.isOpen, "Closed");
+        require(msg.sender != matchInfo.player1, "Already joined");
 
-        if (matches[_matchId].isERC20) {
-            // Join match with ERC20
-            require(matches[_matchId].token.transferFrom(msg.sender, address(this), matches[_matchId].player1Amount), "Token transfer failed");
-
-            matches[_matchId].player2 = msg.sender;
-            matches[_matchId].player2Amount = matches[_matchId].player1Amount;
-            matches[_matchId].totalAmount += matches[_matchId].player1Amount;
+        if (matchInfo.isERC20) {
+            require(matchInfo.token.transferFrom(msg.sender, address(this), matchInfo.player1Amount), "Transfer failed");
         } else {
-            // Join match with Ether
-            require(msg.value == matches[_matchId].player1Amount, "Incorrect match amount");
-
-            matches[_matchId].player2 = msg.sender;
-            matches[_matchId].player2Amount = msg.value;
-            matches[_matchId].totalAmount += msg.value;
+            require(msg.value == matchInfo.player1Amount, "Incorrect amt");
         }
 
-        matches[_matchId].isOpen = true; // Close the match to further participants
+        matchInfo.player2 = msg.sender;
+        matchInfo.player2Amount = matchInfo.player1Amount;
+        matchInfo.totalAmount += matchInfo.player1Amount;
+        matchInfo.isOpen = false;
 
         emit MatchJoined(_matchId, msg.sender);
     }
 
-    // Function to close a match
     function closeMatch(uint256 _matchId, address _winner) external onlyAdmin {
         Match storage matchInfo = matches[_matchId];
-        require(_winner == matchInfo.player1 || _winner == matchInfo.player2, "Invalid winner address");
+        require(_winner == matchInfo.player1 || _winner == matchInfo.player2, "Invalid winner");
 
-        // Proceed with distribution
         uint256 totalAmount = matchInfo.totalAmount;
-        uint256 winnerAmount = totalAmount * 90 / 100;
-        uint256 multisigAmount = totalAmount * 5 / 100;
+        uint256 winnerAmount = (totalAmount * 90) / 100;
+        uint256 multisigAmount = (totalAmount * 5) / 100;
         uint256 poolAmount = totalAmount - winnerAmount - multisigAmount;
 
         if (matchInfo.isERC20) {
-            // Distribution for ERC20
             matchInfo.token.transfer(_winner, winnerAmount);
             matchInfo.token.transfer(multisigAddress, multisigAmount);
         } else {
-            // Distribution for Ether
             payable(_winner).transfer(winnerAmount);
             payable(multisigAddress).transfer(multisigAmount);
         }
 
         matchingPool += poolAmount;
-        matchInfo.isOpen = false; // Set isOpen to false when the match is closed
 
         emit MatchClosed(_matchId, _winner, winnerAmount, multisigAmount, poolAmount);
     }
 
-    // Function to donate to a match
     function donateToMatch(uint256 _matchId, uint256 _amount) external payable {
-        require(_amount > 0, "Donation amount must be greater than 0");
-        require(matches[_matchId].isOpen, "Cannot donate to a closed match");
+        Match storage matchInfo = matches[_matchId];
+        require(matchInfo.isOpen, "Closed");
 
-        if (matches[_matchId].isERC20) {
-            // Donation with ERC20
-            require(matches[_matchId].token.transferFrom(msg.sender, address(this), _amount), "Token transfer failed");
+        if (matchInfo.isERC20) {
+            require(matchInfo.token.transferFrom(msg.sender, address(this), _amount), "Transfer failed");
         } else {
-            // Donation with Ether
-            require(msg.value == _amount, "Incorrect donation amount sent");
+            require(msg.value == _amount, "Incorrect amt");
         }
 
-        matches[_matchId].donatedAmount += _amount;
-        matches[_matchId].totalAmount += _amount;
+        matchInfo.donatedAmount += _amount;
+        matchInfo.totalAmount += _amount;
         matchDonorContributions[msg.sender] += _amount;
 
         if (!isPatron[msg.sender]) {
@@ -234,13 +197,8 @@ contract MVPCLR is OwnableUpgradeable {
     /*** TOURNAMENT FUNCTIONS ***/
 
     function createTournament(uint256 _numEntrants, uint8 _winnersPercentage, uint8 _multisigPercentage) public onlyAdmin {
-        // Increment the nextTournamentId for each new tournament
         uint256 newTournamentId = nextTournamentId++;
 
-        // Ensure the tournament does not already exist
-        require(!tournaments[newTournamentId].isActive, "Tournament already exists");
-
-        // Create a new tournament with the new ID
         tournaments[newTournamentId] = Tournament({
             numEntrants: _numEntrants,
             totalDonations: 0,
@@ -251,18 +209,17 @@ contract MVPCLR is OwnableUpgradeable {
             hasStarted: false
         });
 
-        // Initialize the current round of the tournament to 1
         currentTournamentRound[newTournamentId] = 1;
 
-        // Emit the TournamentCreated event
         emit TournamentCreated(newTournamentId, _numEntrants, _winnersPercentage, _multisigPercentage);
     }
 
     function joinTournament(uint256 _tournamentId) public {
-        require(tournaments[_tournamentId].isActive, "Tournament is not active");
-        require(!tournaments[_tournamentId].hasStarted, "Tournament has already started");
-        require(tournamentEntrants[_tournamentId].length < tournaments[_tournamentId].numEntrants, "Tournament is full");
-        require(!isEntrantInTournament[_tournamentId][msg.sender], "Already joined the tournament");
+        Tournament storage tournament = tournaments[_tournamentId];
+        require(tournament.isActive, "Not active");
+        require(!tournament.hasStarted, "Started");
+        require(tournamentEntrants[_tournamentId].length < tournament.numEntrants, "Full");
+        require(!isEntrantInTournament[_tournamentId][msg.sender], "Already joined");
 
         isEntrantInTournament[_tournamentId][msg.sender] = true;
         tournamentEntrants[_tournamentId].push(msg.sender);
@@ -271,101 +228,84 @@ contract MVPCLR is OwnableUpgradeable {
     }
 
     function allocateMatchingPoolToTournament(uint256 _tournamentId) public onlyAdmin {
-        // Check that the tournament exists and is in a valid state for allocation
-        require(_tournamentId > 0 && _tournamentId <= nextTournamentId, "Tournament does not exist.");
-        require(tournaments[_tournamentId].isActive, "Tournament is not in a valid state for allocation.");
-        require(matchingPool > 0, "Matching pool is empty.");
+        require(_tournamentId > 0 && _tournamentId <= nextTournamentId, "Doesn't exist");
+        Tournament storage tournament = tournaments[_tournamentId];
+        require(tournament.isActive, "Not active");
+        require(matchingPool > 0, "Empty");
 
-        // Allocate the matching pool to the tournament's total donations
-        tournaments[_tournamentId].totalDonations += matchingPool;
-        
-        // Log the allocation for transparency and auditing
+        tournament.totalDonations += matchingPool;
         emit MatchingPoolDonation(msg.sender, matchingPool, _tournamentId);
-
-        // Reset the matching pool after successful allocation
         matchingPool = 0;
     }
 
     function startTournament(uint256 _tournamentId) public onlyAdmin {
-        require(tournaments[_tournamentId].isActive, "Tournament is not active");
-        require(!tournaments[_tournamentId].hasStarted, "Tournament has already started");
+        Tournament storage tournament = tournaments[_tournamentId];
+        require(tournament.isActive, "Not active");
+        require(!tournament.hasStarted, "Started");
 
-        // Mark the tournament as started
-        tournaments[_tournamentId].hasStarted = true;
-
+        tournament.hasStarted = true;
         emit TournamentStarted(_tournamentId);
     }
 
     function fillUpMatchingPool() public payable onlyAdmin {
-        require(msg.value > 0, "No funds sent");
-        matchingPool += msg.value; // Ensure this line is present and correctly adds the sent value
-        emit MatchingPoolFilled(msg.value); // Adjust event name and parameters as needed
+        require(msg.value > 0, "No funds");
+        matchingPool += msg.value;
+        emit MatchingPoolFilled(msg.value);
     }
 
     function endTournament(uint256 _tournamentId, address[] memory winners, uint8[] memory winnersPercentages) public onlyAdmin {
-        require(tournaments[_tournamentId].isActive, "Tournament is not active");
-        require(tournaments[_tournamentId].hasStarted, "Tournament has not started");
-        require(winners.length == winnersPercentages.length, "Mismatch between winners and percentages");
+        Tournament storage tournament = tournaments[_tournamentId];
+        require(tournament.isActive, "Not active");
+        require(tournament.hasStarted, "Not started");
+        require(winners.length == winnersPercentages.length, "Mismatch");
 
-        // Include matching pool in total donations for distribution
-        uint256 totalDonations = tournaments[_tournamentId].totalDonations + matchingPool;
-        
+        uint256 totalDonations = tournament.totalDonations + matchingPool;
         uint256 totalPayout = 0;
-        uint256 multisigAmount = totalDonations * tournaments[_tournamentId].multisigPercentage / 100;
+        uint256 multisigAmount = (totalDonations * tournament.multisigPercentage) / 100;
 
-        // Calculate and set payouts for each winner, including matching pool funds
         for (uint256 i = 0; i < winners.length; i++) {
-            uint256 winnerPayout = (totalDonations - multisigAmount) * winnersPercentages[i] / 100;
-            tournamentWinners[_tournamentId][winners[i]] = WinnerInfo({
-                amount: winnerPayout,
-                hasClaimed: false
-            });
+            uint256 winnerPayout = ((totalDonations - multisigAmount) * winnersPercentages[i]) / 100;
+            tournamentWinners[_tournamentId][winners[i]] = WinnerInfo({ amount: winnerPayout, hasClaimed: false });
             totalPayout += winnerPayout;
         }
 
-        // Transfer multisig amount
         payable(multisigAddress).transfer(multisigAmount);
         totalMultisigCollected += multisigAmount;
-
-        // Reset matching pool after distribution
         matchingPool = 0;
+        require(totalPayout <= (totalDonations - multisigAmount), "Payout exceeds");
 
-        // Ensure total payouts do not exceed the total donations minus multisig amount
-        require(totalPayout <= (totalDonations - multisigAmount), "Payout exceeds allocated amount for winners");
-
-        // Update tournament status
-        tournaments[_tournamentId].isActive = false;
-        tournaments[_tournamentId].hasStarted = false;
-        tournaments[_tournamentId].remainingBalance = totalDonations - totalPayout - multisigAmount;
-
+        tournament.isActive = false;
+        tournament.hasStarted = false;
+        tournament.remainingBalance = totalDonations - totalPayout - multisigAmount;
         emit TournamentEnded(_tournamentId, winners, winnersPercentages);
     }
 
     function claimReward(uint256 _tournamentId) public {
         WinnerInfo storage winner = tournamentWinners[_tournamentId][msg.sender];
-        require(winner.amount > 0, "No reward available");
-        require(!winner.hasClaimed, "Reward already claimed");
+        require(winner.amount > 0, "No reward");
+        require(!winner.hasClaimed, "Claimed");
 
         winner.hasClaimed = true;
         payable(msg.sender).transfer(winner.amount);
     }
 
     function donate(uint256[] memory amounts, uint256 _tournamentId) public payable {
-        require(amounts.length > 0, "CLR:donate - No amounts provided");
-        require(tournaments[_tournamentId].isActive, "Tournament not active");
+        require(amounts.length > 0, "No amounts");
+        Tournament storage tournament = tournaments[_tournamentId];
+        require(tournament.isActive, "Not active");
 
         uint256 totalAmount = 0;
         uint256 tournamentRoundId = currentTournamentRound[_tournamentId];
-        
+
         for (uint256 i = 0; i < amounts.length; i++) {
             uint256 amount = amounts[i];
             totalAmount += amount;
-            require(!isBlacklisted[_msgSender()], "Sender address is blacklisted");
-            emit Donate(_msgSender(), amount, tournamentRoundId);
+            require(!isBlacklisted[msg.sender], "Blacklisted");
+            emit Donate(msg.sender, amount, tournamentRoundId);
         }
 
-        require(totalAmount == msg.value, "CLR:donate - Total amount donated does not match the value sent");
-        tournaments[_tournamentId].totalDonations += totalAmount;
+        require(totalAmount == msg.value, "Incorrect amount");
+        tournament.totalDonations += totalAmount;
     }
 
     function addAdmin(address _admin) public onlyOwner {
@@ -374,13 +314,9 @@ contract MVPCLR is OwnableUpgradeable {
     }
 
     function removeAdmin(address _admin) public onlyOwner {
-        require(isAdmin[_admin], "Admin not found"); // check if the address is an admin
+        require(isAdmin[_admin], "Not found");
         delete isAdmin[_admin];
         emit AdminRemoved(_admin);
-    }
-
-    function getBlockTimestamp() public view returns (uint256) {
-        return block.timestamp;
     }
 
     function addBlacklisted(address _address) public onlyAdmin {
@@ -389,23 +325,13 @@ contract MVPCLR is OwnableUpgradeable {
     }
 
     function removeBlacklisted(address _address) public onlyAdmin {
-        require(isBlacklisted[_address], "Address not blacklisted");
+        require(isBlacklisted[_address], "Not blacklisted");
         delete isBlacklisted[_address];
         emit BlacklistedRemoved(_address);
     }
 
-    function addPatrons(address payable[] calldata addresses) public onlyAdmin {
-        for (uint256 i = 0; i < addresses.length; i++) {
-            address addr = addresses[i];
-            require(!isBlacklisted[addr], "Patron address is blacklisted");
-            isPatron[addr] = true;
-        }
-        emit PatronsAdded(addresses);
-    }
-
-    // Only designated multisig address can call this function
     function withdrawFunds(uint256 amount) external onlyMultisig {
-        require(address(this).balance >= amount, "Insufficient funds in contract");
+        require(address(this).balance >= amount, "Insufficient funds");
         payable(multisigAddress).transfer(amount);
     }
 
@@ -417,14 +343,13 @@ contract MVPCLR is OwnableUpgradeable {
         return matchDonorContributions[_donor];
     }
 
-    // Receive donation for the matching pool
     receive() external payable {
-        require(roundStart == 0 || getBlockTimestamp() < roundStart + roundDuration, "CLR:receive closed");
-        emit MatchingPoolDonation(_msgSender(), msg.value, roundId);
+        require(roundStart == 0 || block.timestamp < roundStart + roundDuration, "Closed");
+        emit MatchingPoolDonation(msg.sender, msg.value, roundId);
     }
 
     modifier onlyAdmin() {
-        require(isAdmin[msg.sender] == true, "Not an admin");
+        require(isAdmin[msg.sender], "Not admin");
         _;
     }
 
