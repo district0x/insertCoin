@@ -6,9 +6,9 @@ import { ThirdwebProvider } from "thirdweb/react";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Tournament App",
+  title: "onevone App",
   description:
-    "A decentralized application for creating and managing tournaments on the blockchain.",
+    "A decentralized application for creating and managing onevone on the blockchain.",
 };
 
 const activeChain = "goerli";
