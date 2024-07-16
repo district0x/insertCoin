@@ -32,7 +32,6 @@ const CurrentMatches = () => {
 
   useEffect(() => {
     if (!isLoading && matchData && !error && index < 10) {
-      console.log(matchData);
       const details = {
         player1: matchData[0],
         player2: matchData[1],

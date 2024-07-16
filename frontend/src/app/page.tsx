@@ -6,6 +6,7 @@ import StartMatch from "../components/StartMatch";
 import CloseMatch from "@/components/CloseMatch";
 import CurrentMatches from "../components/CurrentMatches";
 import DonateToMatch from "@/components/DonateToMatch";
+import JoinMatch from "@/components/JoinMatch";
 // import WalletAddressComponent from "@/components/test";
 
 export default function Home() {
@@ -25,9 +26,10 @@ export default function Home() {
         </div>
 
         {/* Donation Component with full width in a dedicated section */}
-        <section className="mt-8">
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
           <DonateToMatch />
-        </section>
+          <JoinMatch />
+        </div>
 
         {/* List of Tournaments displayed below */}
         <section className="mt-8">
