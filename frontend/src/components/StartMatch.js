@@ -30,6 +30,14 @@ const StartMatch = () => {
     setMatchAmount(cleanedValue);
   };
 
+  const getEthPriceInUsd = async () => {
+    const response = await fetch(
+      "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd",
+    );
+    const data = await response.json();
+    return data.ethereum.usd;
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     const amount = parseFloat(matchAmount);
@@ -43,26 +51,38 @@ const StartMatch = () => {
       return;
     }
 
-    // Assuming the amount is entered in Wei directly
-    console.log("Match Amount in Wei: ", matchAmount);
+    try {
+      const ethPriceInUsd = await getEthPriceInUsd();
+      const matchAmountEth = (amount / ethPriceInUsd).toFixed(18);
+      const matchAmountWei = (matchAmountEth * 1e18).toString(); // Convert ETH to Wei
 
-    const config = prepareContractCall({
-      contract,
-      method: "startMatch",
-      params: [matchAmount],
-      value: matchAmount, // Make sure to pass the value for the payable function
-    });
+      console.log("Match Amount in Wei: ", matchAmountWei);
 
-    sendTransaction(config, {
-      onSuccess: () =>
-        setToast({
-          show: true,
-          message: "Match started successfully!",
-          type: "success",
-        }),
-      onError: (error) =>
-        setToast({ show: true, message: error.message, type: "error" }),
-    });
+      const config = prepareContractCall({
+        contract,
+        method: "startMatch",
+        params: [matchAmountWei],
+        value: matchAmountWei, // Make sure to pass the value for the payable function
+      });
+
+      sendTransaction(config, {
+        onSuccess: () =>
+          setToast({
+            show: true,
+            message: "Match started successfully!",
+            type: "success",
+          }),
+        onError: (error) =>
+          setToast({ show: true, message: error.message, type: "error" }),
+      });
+    } catch (error) {
+      setToast({
+        show: true,
+        message: "Failed to convert USD to ETH.",
+        type: "error",
+      });
+      console.error("Conversion error:", error);
+    }
   };
 
   return (
@@ -76,7 +96,7 @@ const StartMatch = () => {
             htmlFor="matchAmount"
             className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
           >
-            Match Amount (Wei)
+            Match Amount (USD)
           </label>
           <input
             type="number"
@@ -84,7 +104,7 @@ const StartMatch = () => {
             id="matchAmount"
             value={matchAmount}
             onChange={handleChange}
-            placeholder="Enter match amount in Wei"
+            placeholder="Enter match amount in USD"
             required
             className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
           />
