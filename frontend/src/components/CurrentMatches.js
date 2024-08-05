@@ -49,7 +49,7 @@ const CurrentMatches = () => {
   }, []);
 
   useEffect(() => {
-    if (!isLoading && matchData && !error && index < 10) {
+    if (!isLoading && matchData && !error && index < 27) {
       const details = {
         player1: matchData[0],
         player2: matchData[1],
