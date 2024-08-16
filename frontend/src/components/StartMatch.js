@@ -1,11 +1,40 @@
 import React, { useState } from "react";
 import { getContract, prepareContractCall } from "thirdweb";
+import { ethers } from 'ethers';
 import { useSendTransaction } from "thirdweb/react";
 import { client, chain as chainl } from "../app/client";
 import ABI from "../lib/contractABI.json";
 import Toast from "./Toast";
 
 const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
+
+const processTransactionReceipt = (receipt) => {
+  const gasUsed = ethers.utils.formatUnits(receipt.gasUsed, 'wei');
+  const effectiveGasPrice = ethers.utils.formatUnits(receipt.effectiveGasPrice, 'gwei');
+  const totalGasCost = ethers.utils.formatEther(receipt.gasUsed.mul(receipt.effectiveGasPrice));
+
+  const eventLog = receipt.logs[0];
+  const eventData = ethers.utils.defaultAbiCoder.decode(
+    ['uint256', 'address', 'uint256'],
+    eventLog.data
+  );
+
+  return {
+    transactionHash: receipt.transactionHash,
+    blockNumber: receipt.blockNumber,
+    from: receipt.from,
+    to: receipt.to,
+    status: receipt.status === 1 ? 'Success' : 'Failure',
+    gasUsed: `${gasUsed} wei`,
+    effectiveGasPrice: `${effectiveGasPrice} gwei`,
+    totalGasCost: `${totalGasCost} ETH`,
+    eventData: {
+      matchId: eventData[0].toString(),
+      player: eventData[1],
+      amount: ethers.utils.formatEther(eventData[2]) + ' ETH'
+    }
+  };
+};
 
 const StartMatch = () => {
   const [matchAmount, setMatchAmount] = useState("");
@@ -25,23 +54,25 @@ const StartMatch = () => {
   const { mutate: sendTransaction, isLoading } = useSendTransaction();
 
   const handleChange = (event) => {
-    // Remove leading and trailing spaces and convert to string
     const cleanedValue = event.target.value.trim();
     setMatchAmount(cleanedValue);
   };
 
   const getEthPriceInUsd = async () => {
-    const response = await fetch(
-      "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd",
-    );
-    const data = await response.json();
-    return data.ethereum.usd;
+    try {
+      const response = await fetch("/api/eth-price");
+      const data = await response.json();
+      return data.ethereum.usd;
+    } catch (error) {
+      console.error("Failed to fetch ETH price:", error);
+      throw error;
+    }
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     const amount = parseFloat(matchAmount);
-
+  
     if (isNaN(amount) || amount <= 0) {
       setToast({
         show: true,
@@ -50,38 +81,98 @@ const StartMatch = () => {
       });
       return;
     }
-
+  
     try {
       const ethPriceInUsd = await getEthPriceInUsd();
       const matchAmountEth = (amount / ethPriceInUsd).toFixed(18);
-      const matchAmountWei = (matchAmountEth * 1e18).toString(); // Convert ETH to Wei
-
+      const matchAmountWei = ethers.utils.parseEther(matchAmountEth).toString();
+  
       console.log("Match Amount in Wei: ", matchAmountWei);
-
+  
       const config = prepareContractCall({
         contract,
         method: "startMatch",
         params: [matchAmountWei],
-        value: matchAmountWei, // Make sure to pass the value for the payable function
+        value: matchAmountWei,
+      });
+  
+      sendTransaction(config, {
+        onSuccess: async (result) => {
+          console.log("Transaction Result:", result);
+          
+          try {
+            const provider = new ethers.providers.JsonRpcProvider("https://sepolia.base.org");            
+            const network = await provider.getNetwork();
+            console.log("Connected to network:", network);
+  
+            const receipt = await provider.getTransactionReceipt(result.transactionHash);
+            console.log("Transaction Receipt:", receipt);
+  
+            if (receipt) {
+              const processedReceipt = processTransactionReceipt(receipt);
+              console.log("Processed Transaction Receipt:", processedReceipt);
+              
+              // Post match info to Discord
+              try {
+                const discordResponse = await fetch('/api/postMatchToDiscord', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ matchId: processedReceipt.eventData.matchId }),
+                });
+  
+                if (!discordResponse.ok) {
+                  const errorData = await discordResponse.json();
+                  throw new Error(errorData.error || "Failed to post match info to Discord");
+                }
+  
+                const discordResult = await discordResponse.json();
+                console.log("Match info posted to Discord successfully:", discordResult);
+              } catch (discordError) {
+                console.error("Error posting to Discord:", discordError);
+                // You might want to set a toast here to inform the user
+              }
+  
+              setToast({
+                show: true,
+                message: `Match started successfully! Match ID: ${processedReceipt.eventData.matchId}`,
+                type: "success",
+              });
+            } else {
+              console.log("Receipt not available immediately. It might take a few moments.");
+              setToast({
+                show: true,
+                message: "Match started. Waiting for confirmation...",
+                type: "success",
+              });
+            }
+          } catch (receiptError) {
+            console.error("Failed to fetch transaction receipt:", receiptError);
+            console.log("Transaction hash for manual checking:", result.transactionHash);
+            setToast({
+              show: true,
+              message: "Match started, but failed to fetch details. Transaction hash: " + result.transactionHash,
+              type: "warning",
+            });
+          }
+        },
+        onError: (error) => {
+          console.error("Transaction Error:", error);
+          setToast({ 
+            show: true, 
+            message: `Failed to start match: ${error.message}`, 
+            type: "error" 
+          });
+        },
       });
 
-      sendTransaction(config, {
-        onSuccess: () =>
-          setToast({
-            show: true,
-            message: "Match started successfully!",
-            type: "success",
-          }),
-        onError: (error) =>
-          setToast({ show: true, message: error.message, type: "error" }),
-      });
+      
     } catch (error) {
+      console.error("Error starting match:", error);
       setToast({
         show: true,
-        message: "Failed to convert USD to ETH.",
+        message: "Failed to start the match: " + error.message,
         type: "error",
       });
-      console.error("Conversion error:", error);
     }
   };
 
@@ -111,9 +202,10 @@ const StartMatch = () => {
         </div>
         <button
           type="submit"
-          className="w-full text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+          disabled={isLoading}
+          className="w-full text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800 disabled:opacity-50"
         >
-          Start Match
+          {isLoading ? "Starting Match..." : "Start Match"}
         </button>
       </form>
       {toast.show && (
