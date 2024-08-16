@@ -156,7 +156,7 @@ class AcceptButton(Button):
 
             # Send a message asking Player 1 to start the match
             await channel.send(
-                f"{challenge_creator.mention}, please start the match on the 1v1 frontpage and post the match ID in this chat."
+                f"{challenge_creator.mention}, please start the match on the 1v1 frontpage."
             )
 
             # Use followup.send instead of response.send_message
@@ -293,7 +293,7 @@ async def one_v_one(
         f"Category: {category}\n"
         f"Game: {game}\n"
         f"Match Amount: ${match_amount_usd}\n\n"
-        f"{ctx.author.mention}, please start the match and post the match ID in this chat.\n"
+        f"{ctx.author.mention}, please start the match"
         f"1v1 Frontpage: {frontpage_link}"
     )
 
