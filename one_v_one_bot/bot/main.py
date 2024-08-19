@@ -128,39 +128,58 @@ class AcceptButton(Button):
         self.channel = channel
         self.transaction_data = transaction_data
 
-    async def callback(self, interaction):
-        # Find the channel and the challenger from stored data
-        guild = interaction.guild
-        challenge_creator = guild.get_member(self.challenge_creator_id)
-        channel = guild.get_channel(self.channel)
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            # Defer the response immediately
+            await interaction.response.defer(ephemeral=True)
 
-        # Set up permissions to make the channel private
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            guild.me: discord.PermissionOverwrite(read_messages=True),
-            challenge_creator: discord.PermissionOverwrite(read_messages=True),
-            interaction.user: discord.PermissionOverwrite(read_messages=True),
-        }
+            guild = interaction.guild
+            challenge_creator = guild.get_member(self.challenge_creator_id)
+            channel = guild.get_channel(self.channel)
 
-        # Modify the existing channel's permissions to make it private
-        await channel.edit(overwrites=overwrites)
-        await channel.send(
-            f"{challenge_creator.mention} and {interaction.user.mention}, your private match channel is ready!"
-        )
+            # Set up permissions to make the channel private
+            overwrites = {
+                guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                guild.me: discord.PermissionOverwrite(read_messages=True),
+                challenge_creator: discord.PermissionOverwrite(read_messages=True),
+                interaction.user: discord.PermissionOverwrite(read_messages=True),
+            }
 
-        # Update the transaction_data with player2 information
-        self.transaction_data["player2_name"] = str(interaction.user.display_name)
+            # Modify the existing channel's permissions to make it private
+            await channel.edit(overwrites=overwrites)
+            await channel.send(
+                f"{challenge_creator.mention} and {interaction.user.mention}, your private match channel is ready!"
+            )
 
-        # Generate the link to the lobby page with match details and transaction data
-        lobby_url = generate_transaction_url(self.transaction_data)
+            # Update the transaction_data with player2 information
+            self.transaction_data["player2_name"] = str(interaction.user.display_name) 
 
-        # Send the link in the private channel
-        await channel.send(f"To start the match, please visit: {lobby_url}")
+            # Send a message asking Player 1 to start the match
+            await channel.send(
+                f"{challenge_creator.mention}, please start the match on the 1v1 frontpage."
+            )
 
-        await interaction.response.send_message(
-            f"Your private match channel {channel.mention} is ready!", ephemeral=True
-        )
+            # Use followup.send instead of response.send_message
+            await interaction.followup.send(
+                f"Your private match channel {channel.mention} is ready!",
+                ephemeral=True
+            )
 
+        except discord.errors.NotFound:
+            logging.error("Interaction not found. It may have expired.")
+            # Optionally, you can try to send a message to the channel directly
+            try:
+                await channel.send(f"{interaction.user.mention}, there was an issue processing your request. The match has been accepted, but there might be some delays.")
+            except:
+                logging.error("Failed to send fallback message to the channel.")
+
+        except Exception as e:
+            logging.error(f"An error occurred in AcceptButton callback: {str(e)}")
+            # Optionally, you can try to send an error message to the channel
+            try:
+                await channel.send(f"An error occurred while processing the match acceptance. Please try again or contact an administrator.")
+            except:
+                logging.error("Failed to send error message to the channel.")
 
 @bot.event
 async def on_private_channel_created(channel, player1, player2, transaction_data):
@@ -219,7 +238,6 @@ async def get_game_choices(ctx):
     category = ctx.options["category"]
     return game_choices[category]
 
-
 @bot.slash_command(
     name="1v1", description="Start a 1v1 challenge.", force_registration=True
 )
@@ -235,6 +253,9 @@ async def one_v_one(
     game: Option(str, "Choose the game", autocomplete=get_game_choices, required=True),
     match_amount_usd: Option(int, "Enter the match amount in USD", required=True),
 ):
+    # Defer the response immediately
+    await ctx.defer()
+
     channel = await ctx.guild.create_text_channel(
         name=f"1v1-{ctx.author.display_name}-{platform}-{game}"
     )
@@ -244,7 +265,10 @@ async def one_v_one(
         match_id = "12345"  # Use default if there's an error
 
     # Insert match data into Supabase
-    insert_match_data(supabase, match_id, str(channel.id))
+    insert_result = insert_match_data(supabase, match_id, str(channel.id))
+    if insert_result is None:
+        await ctx.followup.send("There was an error creating the match. Please try again later.")
+        return
 
     transaction_data = {
         "player1_name": str(ctx.author.display_name),
@@ -259,6 +283,20 @@ async def one_v_one(
         "channel_id": str(channel.id)
     }
 
+    # Create a link to the 1v1 frontpage
+    frontpage_link = "https://1v1-three.vercel.app/"
+
+    # Send the message with parameters and link
+    await channel.send(
+        f"1v1 Match Parameters:\n"
+        f"Platform: {platform}\n"
+        f"Category: {category}\n"
+        f"Game: {game}\n"
+        f"Match Amount: ${match_amount_usd}\n\n"
+        f"{ctx.author.mention}, please start the match"
+        f"1v1 Frontpage: {frontpage_link}"
+    )
+
     view = View()
     button = AcceptButton(
         "Accept Challenge",
@@ -269,11 +307,12 @@ async def one_v_one(
         transaction_data,
     )
     view.add_item(button)
-    await ctx.respond(
+    
+    # Use followup.send instead of respond
+    await ctx.followup.send(
         f"{ctx.author.mention} has initiated a 1v1 challenge for {game} on {platform} with a match amount of ${match_amount_usd}. Waiting for an opponent!",
         view=view,
     )
-
 
 @bot.slash_command(name="record", description="Fetch your post history.")
 async def record(ctx):
