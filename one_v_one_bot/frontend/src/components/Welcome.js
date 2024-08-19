@@ -1,4 +1,5 @@
 import Image from "next/image";
+import MatchingPoolDisplay from "./MatchingPool"; // Adjust the import path as needed
 
 const Welcome = () => {
   return (
@@ -12,15 +13,15 @@ const Welcome = () => {
             Manage your gaming tournaments with ease. Create, organize, and
             track your events all in one place.
           </p>
+          <MatchingPoolDisplay />
         </div>
         <div className="hidden lg:mt-0 lg:col-span-5 lg:flex">
-          {/* Using next/image for optimized image handling */}
           <Image
             src="/gaming_tournament.webp"
             alt="Gaming Tournament"
-            width={500} // Adjust width as needed
-            height={300} // Adjust height as needed
-            layout="responsive" // This can be adjusted based on your design needs
+            width={500}
+            height={300}
+            layout="responsive"
           />
         </div>
       </div>
