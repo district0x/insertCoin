@@ -12,10 +12,10 @@ export async function GET() {
     return new Response(JSON.stringify(cachedData), {
       status: 200,
       headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=1800', // Tell clients to cache for 30 minutes
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        "Content-Type": "application/json",
+        "Cache-Control": "public, max-age=1800", // Tell clients to cache for 30 minutes
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       },
     });
   }
@@ -38,10 +38,10 @@ export async function GET() {
     return new Response(JSON.stringify(data), {
       status: 200,
       headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=1800', // Tell clients to cache for 30 minutes
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        "Content-Type": "application/json",
+        "Cache-Control": "public, max-age=1800", // Tell clients to cache for 30 minutes
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       },
     });
   } catch (error) {
@@ -49,13 +49,11 @@ export async function GET() {
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
       },
     });
   }
 }
 
-export const config = {
-  runtime: 'edge',
-};
+export const runtime = "edge";
