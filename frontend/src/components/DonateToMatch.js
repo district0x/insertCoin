@@ -4,12 +4,14 @@ import { useSendTransaction } from "thirdweb/react";
 import { client, chain as chainl } from "../app/client";
 import ABI from "../lib/contractABI.json";
 import Toast from "./Toast";
+import { Loader2 } from "lucide-react";
 
 const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
 
 const DonateToMatch = () => {
   const [donationAmount, setDonationAmount] = useState(0);
   const [matchId, setMatchId] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState({
     show: false,
     message: "",
@@ -23,28 +25,37 @@ const DonateToMatch = () => {
     abi: ABI,
   });
 
-  const { mutate: sendTransaction, isLoading } = useSendTransaction();
+  const { mutate: sendTransaction } = useSendTransaction();
 
   const handleDonationAmountChange = (event) =>
     setDonationAmount(Number(event.target.value));
   const handleMatchIdChange = (event) => setMatchId(event.target.value);
 
   const getMatchAmountInEth = async (matchAmountUsd) => {
-    const response = await fetch(
-      "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd",
-    );
-    const data = await response.json();
-    const ethPriceInUsd = data.ethereum.usd;
-    const matchAmountEth = (matchAmountUsd / ethPriceInUsd).toFixed(18);
-    return matchAmountEth;
+    try {
+      const response = await fetch("/api/eth-price");
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch ETH price");
+      }
+
+      const ethPriceInUsd = data.ethereum.usd;
+      const matchAmountEth = (matchAmountUsd / ethPriceInUsd).toFixed(18);
+      return matchAmountEth;
+    } catch (error) {
+      console.error("Error fetching ETH price:", error);
+      throw error;
+    }
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setIsLoading(true);
 
     try {
       const donationAmountEth = await getMatchAmountInEth(donationAmount);
-      const donationAmountWei = (donationAmountEth * 1e18).toString(); // Convert ETH to Wei
+      const donationAmountWei = Number(donationAmountEth * 1e18); // Convert ETH to Wei
 
       console.log("Donation Amount in Wei: ", donationAmountWei);
 
@@ -56,14 +67,18 @@ const DonateToMatch = () => {
       });
 
       sendTransaction(config, {
-        onSuccess: () =>
+        onSuccess: () => {
           setToast({
             show: true,
             message: "Donation successful!",
             type: "success",
-          }),
-        onError: (error) =>
-          setToast({ show: true, message: error.message, type: "error" }),
+          });
+          setIsLoading(false);
+        },
+        onError: (error) => {
+          setToast({ show: true, message: error.message, type: "error" });
+          setIsLoading(false);
+        },
       });
     } catch (error) {
       setToast({
@@ -72,6 +87,7 @@ const DonateToMatch = () => {
         type: "error",
       });
       console.error("Conversion error:", error);
+      setIsLoading(false);
     }
   };
 
@@ -119,9 +135,16 @@ const DonateToMatch = () => {
         </div>
         <button
           type="submit"
-          className="w-full text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+          disabled={isLoading}
+          className="w-full text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Donate
+          {isLoading ? (
+            <span className="flex items-center justify-center">
+              <Loader2 className="animate-spin mr-2 h-5 w-5" />
+            </span>
+          ) : (
+            "Donate"
+          )}
         </button>
       </form>
       {toast.show && (

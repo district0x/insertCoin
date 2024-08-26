@@ -25,10 +25,13 @@ const MatchingPoolDisplay = () => {
 
   const fetchEthPrice = async () => {
     try {
-      const response = await fetch(
-        "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
-      );
+      const response = await fetch('/api/eth-price');
       const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch ETH price");
+      }
+
       return data.ethereum.usd;
     } catch (error) {
       console.error("Failed to fetch ETH price:", error);

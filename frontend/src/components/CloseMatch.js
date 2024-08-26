@@ -4,23 +4,37 @@ import { useSendTransaction } from "thirdweb/react";
 import { client, chain as chainl } from "../app/client";
 import ABI from "../lib/contractABI.json";
 import Toast from "./Toast";
+import { Loader2 } from "lucide-react";
 
 const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
 
 const CloseMatch = () => {
   const [matchId, setMatchId] = useState("");
   const [winnerAddress, setWinnerAddress] = useState("");
-  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [toast, setToast] = useState({
+    show: false,
+    message: "",
+    type: "success",
+  });
 
-  const contract = getContract({ client, chain: chainl, address: contractAddress, abi: ABI });
+  const contract = getContract({
+    client,
+    chain: chainl,
+    address: contractAddress,
+    abi: ABI,
+  });
 
-  const { mutate: sendTransaction, isLoading } = useSendTransaction();
+  const { mutate: sendTransaction } = useSendTransaction();
 
   const handleMatchIdChange = (event) => setMatchId(event.target.value);
-  const handleWinnerAddressChange = (event) => setWinnerAddress(event.target.value);
+  const handleWinnerAddressChange = (event) =>
+    setWinnerAddress(event.target.value);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setIsProcessing(true);
+
     const config = prepareContractCall({
       contract,
       method: "closeMatch",
@@ -28,17 +42,34 @@ const CloseMatch = () => {
     });
 
     sendTransaction(config, {
-      onSuccess: () => setToast({ show: true, message: "Match closed successfully!", type: "success" }),
-      onError: (error) => setToast({ show: true, message: error.message, type: "error" }),
+      onSuccess: () => {
+        setToast({
+          show: true,
+          message: "Match closed successfully!",
+          type: "success",
+        });
+        setIsProcessing(false);
+      },
+      onError: (error) => {
+        setToast({ show: true, message: error.message, type: "error" });
+        setIsProcessing(false);
+      },
     });
   };
 
   return (
     <div className="w-full max-w-md p-6 bg-white border border-gray-200 rounded-lg shadow-md sm:p-8 dark:bg-gray-800 dark:border-gray-700 mx-auto">
-      <h2 className="text-xl font-bold mb-6 text-gray-900 dark:text-white">Close a Match</h2>
+      <h2 className="text-xl font-bold mb-6 text-gray-900 dark:text-white">
+        Close a Match
+      </h2>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label htmlFor="matchId" className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Match ID</label>
+          <label
+            htmlFor="matchId"
+            className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
+          >
+            Match ID
+          </label>
           <input
             type="text"
             name="matchId"
@@ -51,7 +82,12 @@ const CloseMatch = () => {
           />
         </div>
         <div>
-          <label htmlFor="winnerAddress" className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Winner Address</label>
+          <label
+            htmlFor="winnerAddress"
+            className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
+          >
+            Winner Address
+          </label>
           <input
             type="text"
             name="winnerAddress"
@@ -63,13 +99,29 @@ const CloseMatch = () => {
             className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
           />
         </div>
-        <button type="submit" className="w-full text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
-          Close Match
+        <button
+          type="submit"
+          disabled={isProcessing}
+          className="w-full text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isProcessing ? (
+            <span className="flex items-center justify-center">
+              <Loader2 className="animate-spin mr-2 h-5 w-5" />
+            </span>
+          ) : (
+            "Close Match"
+          )}
         </button>
       </form>
       {toast.show && (
         <div className="fixed top-4 right-4 z-50 w-96">
-          <Toast type={toast.type} message={toast.message} onClose={() => setToast({ show: false, message: "", type: "success" })} />
+          <Toast
+            type={toast.type}
+            message={toast.message}
+            onClose={() =>
+              setToast({ show: false, message: "", type: "success" })
+            }
+          />
         </div>
       )}
     </div>
