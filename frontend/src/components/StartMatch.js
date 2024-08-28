@@ -76,6 +76,30 @@ const StartMatch = () => {
     }
   };
 
+  const MAX_RETRIES = 10;
+  const RETRY_DELAY = 3000; // 3 seconds
+
+  const getReceiptWithRetry = async (provider, txHash, retries = 0) => {
+    try {
+      const receipt = await provider.getTransactionReceipt(txHash);
+      if (receipt) {
+        return receipt;
+      } else if (retries < MAX_RETRIES) {
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+        return getReceiptWithRetry(provider, txHash, retries + 1);
+      } else {
+        throw new Error("Max retries reached. Receipt not available.");
+      }
+    } catch (error) {
+      if (retries < MAX_RETRIES) {
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+        return getReceiptWithRetry(provider, txHash, retries + 1);
+      } else {
+        throw error;
+      }
+    }
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     const amount = parseFloat(matchAmount);
@@ -116,7 +140,9 @@ const StartMatch = () => {
             const network = await provider.getNetwork();
             console.log("Connected to network:", network);
 
-            const receipt = await provider.getTransactionReceipt(
+            console.log("Waiting for transaction receipt...");
+            const receipt = await getReceiptWithRetry(
+              provider,
               result.transactionHash
             );
             console.log("Transaction Receipt:", receipt);
@@ -155,15 +181,6 @@ const StartMatch = () => {
               setToast({
                 show: true,
                 message: `Match started successfully! Match ID: ${processedReceipt.eventData.matchId}`,
-                type: "success",
-              });
-            } else {
-              console.log(
-                "Receipt not available immediately. It might take a few moments."
-              );
-              setToast({
-                show: true,
-                message: "Match started. Waiting for confirmation...",
                 type: "success",
               });
             }
