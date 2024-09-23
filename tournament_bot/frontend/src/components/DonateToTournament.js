@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { getContract, prepareContractCall } from "thirdweb";
 import { useSendTransaction } from "thirdweb/react";
 import { ethers } from "ethers";
-import Toast from "./Toast"; // Assuming Toast is in the same directory
+import Toast from "./Toast";
+import { Loader2 } from "lucide-react";
 
 import { client, chain as chainl } from "../app/client";
 import ABI from "../lib/contractABI.json";
@@ -19,6 +20,7 @@ const DonateToTournament = () => {
     message: "",
     type: "success",
   });
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const contract = getContract({
     client,
@@ -27,7 +29,7 @@ const DonateToTournament = () => {
     abi: ABI,
   });
 
-  const { mutate: sendTransaction, isLoading } = useSendTransaction();
+  const { mutate: sendTransaction } = useSendTransaction();
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -54,13 +56,14 @@ const DonateToTournament = () => {
     const ethAmount = usdAmount / ethPriceInUsd;
     const weiAmount = ethers.utils.parseUnits(ethAmount.toFixed(18), "ether");
     console.log(
-      `USD Amount: ${usdAmount} => ETH Amount: ${ethAmount} => Wei Amount: ${weiAmount.toString()}`,
+      `USD Amount: ${usdAmount} => ETH Amount: ${ethAmount} => Wei Amount: ${weiAmount.toString()}`
     );
     return weiAmount;
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setIsProcessing(true);
     try {
       const amountsArray = donationData.amounts
         .split(",")
@@ -69,14 +72,14 @@ const DonateToTournament = () => {
       console.log("Amounts Array in USD:", amountsArray);
 
       const amountsArrayInWei = await Promise.all(
-        amountsArray.map((amount) => convertUsdToWei(amount)),
+        amountsArray.map((amount) => convertUsdToWei(amount))
       );
 
       console.log("Amounts Array in Wei:", amountsArrayInWei);
 
       const totalAmountInWei = amountsArrayInWei.reduce(
         (a, b) => a.add(b),
-        ethers.BigNumber.from(0),
+        ethers.BigNumber.from(0)
       );
 
       console.log("Total Amount in Wei:", totalAmountInWei.toString());
@@ -102,6 +105,7 @@ const DonateToTournament = () => {
             message: "Donation made successfully!",
             type: "success",
           });
+          setIsProcessing(false);
         },
         onError: (error) => {
           console.error("Failed to donate to tournament:", error);
@@ -110,6 +114,7 @@ const DonateToTournament = () => {
             message: `An error occurred: ${error.message}`,
             type: "error",
           });
+          setIsProcessing(false);
         },
       });
     } catch (error) {
@@ -119,6 +124,7 @@ const DonateToTournament = () => {
         message: `An error occurred during conversion: ${error.message}`,
         type: "error",
       });
+      setIsProcessing(false);
     }
   };
 
@@ -162,9 +168,17 @@ const DonateToTournament = () => {
         />
         <button
           type="submit"
-          className="w-full text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+          disabled={isProcessing}
+          className="w-full text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
         >
-          Donate
+          {isProcessing ? (
+            <>
+              <Loader2 className="animate-spin mr-2 h-5 w-5" />
+              Processing Donation...
+            </>
+          ) : (
+            "Donate"
+          )}
         </button>
       </form>
       {toast.show && (
