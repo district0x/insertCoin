@@ -45,7 +45,7 @@ export default function Home() {
       </main>
       {/* Footer could be added here with similar styling */}
       <footer className="bg-gray-800 text-white text-center p-4">
-        © 2024 Your Company
+        © 2024
       </footer>
     </div>
   );
