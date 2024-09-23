@@ -16,7 +16,7 @@ def initialize_supabase():
 # Web3 configuration
 WEB3_PROVIDER = os.getenv("WEB3_PROVIDER", "https://sepolia.base.org")
 CONTRACT_ADDRESS = os.getenv(
-    "CONTRACT_ADDRESS", "0xF01c34A37b37E7834dAC7e4EabE597996F3ADbf3"
+    "CONTRACT_ADDRESS", "0xA4dd8C402331721f7912AFA26793e00bBA3458B7"
 )
 CONTRACT_ABI_PATH = os.getenv("CONTRACT_ABI_PATH", "contractABI.json")
 
@@ -42,6 +42,7 @@ def get_next_tournament_id():
     if web3.is_connected():
         try:
             next_tournament_id = contract.functions.nextTournamentId().call()
+            print(f"Next tournament ID: {next_tournament_id}")
             return next_tournament_id
         except Exception as e:
             return f"Contract logic error: {e}"
