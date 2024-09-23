@@ -13,6 +13,8 @@ from lib import (
     insert_tournament_channel,
 )
 
+get_next_tournament_id()
+
 # Load environment variables
 load_dotenv()
 TOKEN = os.getenv("TOURNAMENT_GPT_TOKEN")
@@ -59,7 +61,7 @@ class AcceptButton(discord.ui.Button):
             # Insert the channel and tournament ID into the new table
             insert_tournament_channel(supabase, self.tournament_id, channel.id)
 
-            demo_link = "https://example.com"  # Put your external website link here
+            demo_link = "https://tournament-bot.vercel.app/"  # Put your external website link here
             await channel.send(
                 f"Welcome to your private tournament channel! Here is a demo link: {demo_link}"
             )
