@@ -49,6 +49,7 @@ const Tournaments = () => {
 
   useEffect(() => {
     if (!isLoading && tournamentData && !error && index < 10) {
+      console.log("Tournament Data:", tournamentData);
       const details = {
         numEntrants: tournamentData[0],
         totalDonations: ethers.utils.formatEther(tournamentData[1]),
@@ -115,8 +116,8 @@ const Tournaments = () => {
                         ? "Yes"
                         : "No"
                       : key === "totalDonations" || key === "remainingBalance"
-                        ? `$${(parseFloat(value) * ethPrice).toFixed(2)}`
-                        : value.toString()}
+                      ? `$${(parseFloat(value) * ethPrice).toFixed(2)}`
+                      : value.toString()}
                   </td>
                 ))}
               </tr>
