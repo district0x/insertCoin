@@ -4,6 +4,7 @@ import { useSendTransaction } from "thirdweb/react";
 import { client, chain as chainl } from "../app/client";
 import ABI from "../lib/contractABI.json";
 import Toast from "./Toast";
+import { Loader2 } from "lucide-react";
 
 const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
 
@@ -14,6 +15,7 @@ const ClaimReward = () => {
     message: "",
     type: "success",
   });
+  const [isClaiming, setIsClaiming] = useState(false);
 
   const contract = getContract({
     client,
@@ -22,13 +24,14 @@ const ClaimReward = () => {
     abi: ABI,
   });
 
-  const { mutate: sendTransaction, isLoading } = useSendTransaction();
+  const { mutate: sendTransaction } = useSendTransaction();
 
   const handleTournamentIdChange = (event) =>
     setTournamentId(event.target.value);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setIsClaiming(true);
 
     const config = prepareContractCall({
       contract,
@@ -37,14 +40,18 @@ const ClaimReward = () => {
     });
 
     sendTransaction(config, {
-      onSuccess: () =>
+      onSuccess: () => {
         setToast({
           show: true,
           message: "Reward claimed successfully!",
           type: "success",
-        }),
-      onError: (error) =>
-        setToast({ show: true, message: error.message, type: "error" }),
+        });
+        setIsClaiming(false);
+      },
+      onError: (error) => {
+        setToast({ show: true, message: error.message, type: "error" });
+        setIsClaiming(false);
+      },
     });
   };
 
@@ -74,9 +81,17 @@ const ClaimReward = () => {
         </div>
         <button
           type="submit"
-          className="w-full text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+          disabled={isClaiming}
+          className="w-full text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
         >
-          Claim Reward
+          {isClaiming ? (
+            <>
+              <Loader2 className="animate-spin mr-2 h-5 w-5" />
+              Claiming Reward...
+            </>
+          ) : (
+            "Claim Reward"
+          )}
         </button>
       </form>
       {toast.show && (
