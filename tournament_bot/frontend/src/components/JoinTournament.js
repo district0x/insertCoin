@@ -4,6 +4,7 @@ import { useSendTransaction } from "thirdweb/react";
 import { client, chain as chainl } from "../app/client";
 import ABI from "../lib/contractABI.json";
 import Toast from "./Toast";
+import { Loader2 } from "lucide-react";
 
 const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
 
@@ -14,6 +15,7 @@ const JoinTournament = () => {
     message: "",
     type: "success",
   });
+  const [isJoining, setIsJoining] = useState(false);
 
   const contract = getContract({
     client,
@@ -22,13 +24,14 @@ const JoinTournament = () => {
     abi: ABI,
   });
 
-  const { mutate: sendTransaction, isLoading } = useSendTransaction();
+  const { mutate: sendTransaction } = useSendTransaction();
 
   const handleTournamentIdChange = (event) =>
     setTournamentId(event.target.value);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setIsJoining(true);
 
     const config = prepareContractCall({
       contract,
@@ -37,14 +40,18 @@ const JoinTournament = () => {
     });
 
     sendTransaction(config, {
-      onSuccess: () =>
+      onSuccess: () => {
         setToast({
           show: true,
           message: "Tournament joined successfully!",
           type: "success",
-        }),
-      onError: (error) =>
-        setToast({ show: true, message: error.message, type: "error" }),
+        });
+        setIsJoining(false);
+      },
+      onError: (error) => {
+        setToast({ show: true, message: error.message, type: "error" });
+        setIsJoining(false);
+      },
     });
   };
 
@@ -74,9 +81,17 @@ const JoinTournament = () => {
         </div>
         <button
           type="submit"
-          className="w-full text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+          disabled={isJoining}
+          className="w-full text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
         >
-          Join Tournament
+          {isJoining ? (
+            <>
+              <Loader2 className="animate-spin mr-2 h-5 w-5" />
+              Joining Tournament...
+            </>
+          ) : (
+            "Join Tournament"
+          )}
         </button>
       </form>
       {toast.show && (
