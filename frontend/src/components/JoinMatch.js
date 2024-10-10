@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { getContract, prepareContractCall } from "thirdweb";
+import { getContract, prepareContractCall, toWei } from "thirdweb";
 import { useSendTransaction } from "thirdweb/react";
 import { client, chain as chainl } from "../app/client";
 import ABI from "../lib/contractABI.json";
@@ -56,15 +56,15 @@ const JoinMatch = () => {
 
     try {
       const matchAmountEth = await getMatchAmountInEth(matchAmount);
-      const matchAmountWei = Number(ethers.utils.parseEther(matchAmountEth));
+      // const matchAmountWei = Number(ethers.utils.parseEther(matchAmountEth));
 
-      console.log("Match Amount in Wei: ", matchAmountWei);
+      console.log("Match Amount in Wei: ", toWei(matchAmountEth));
 
       const config = prepareContractCall({
         contract,
         method: "joinMatch",
         params: [Number(matchId)],
-        value: Number(matchAmountWei),
+        value: toWei(matchAmountEth),
       });
 
       sendTransaction(config, {

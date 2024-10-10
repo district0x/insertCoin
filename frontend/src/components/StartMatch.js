@@ -6,6 +6,7 @@ import { client, chain as chainl } from "../app/client";
 import ABI from "../lib/contractABI.json";
 import Toast from "./Toast";
 import { Loader2 } from "lucide-react";
+import { toWei } from "thirdweb/utils";
 
 const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
 
@@ -118,15 +119,15 @@ const StartMatch = () => {
     try {
       const ethPriceInUsd = await getEthPriceInUsd();
       const matchAmountEth = (amount / ethPriceInUsd).toFixed(18);
-      const matchAmountWei = Number(ethers.utils.parseEther(matchAmountEth));
+      // const matchAmountWei = Math.floor(matchAmountEth * 1e18).toString();
 
-      console.log("Match Amount in Wei: ", typeof matchAmountWei);
+      console.log("Match Amount in Wei: ", toWei(matchAmountEth));
 
       const config = prepareContractCall({
         contract,
         method: "startMatch",
-        params: [matchAmountWei],
-        value: matchAmountWei,
+        params: [toWei(matchAmountEth)],
+        value: toWei(matchAmountEth),
       });
 
       sendTransaction(config, {
@@ -158,6 +159,7 @@ const StartMatch = () => {
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
                     matchId: processedReceipt.eventData.matchId,
+                    content: `Match started successfully with Match ID: ${processedReceipt.eventData.matchId}`,
                   }),
                 });
 
@@ -176,6 +178,11 @@ const StartMatch = () => {
               } catch (discordError) {
                 console.error("Error posting to Discord:", discordError);
                 // You might want to set a toast here to inform the user
+                setToast({
+                  show: true,
+                  message: `Failed to post match info to Discord: ${discordError.message}`,
+                  type: "error",
+                });
               }
 
               setToast({

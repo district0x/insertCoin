@@ -25,9 +25,9 @@ const MatchingPoolDisplay = () => {
 
   const fetchEthPrice = async () => {
     try {
-      const response = await fetch('/api/eth-price');
+      const response = await fetch("/api/eth-price");
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || "Failed to fetch ETH price");
       }
@@ -43,9 +43,13 @@ const MatchingPoolDisplay = () => {
     const updateMatchingPoolUsd = async () => {
       if (!isContractLoading && matchingPoolData !== undefined) {
         const ethPrice = await fetchEthPrice();
+        console.log("ethPrice", ethPrice);
         const amountInWei = BigInt(matchingPoolData).toString();
+        console.log("amountInWei", amountInWei);
         const amountInEth = parseFloat(ethers.utils.formatEther(amountInWei));
+        console.log("amountInEth", amountInEth);
         const usdValue = (amountInEth * ethPrice).toFixed(2);
+        console.log("usdValue", usdValue);
         setMatchingPoolUsd(usdValue);
       }
     };
