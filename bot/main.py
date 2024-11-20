@@ -9,6 +9,10 @@ from lib import (
     initialize_supabase,
     insert_match_data,
     get_channel_id_by_match_id,
+    get_player_wallet,
+    get_player_stats,
+    get_recent_matches,
+    get_opponents_stats,
 )
 
 # Configure logging
@@ -17,12 +21,21 @@ logger = logging.getLogger("iscoin_gpt")
 
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
 
 intents = discord.Intents.default()
 intents.messages = True
 intents.guilds = True
 intents.message_content = True
-bot = commands.Bot(command_prefix="!", intents=intents)
+
+# Create the bot with default_guild_id for faster testing
+TEST_GUILD_ID = 752821474028552255  # Replace with your server ID
+bot = commands.Bot(
+    command_prefix="!",
+    intents=intents,
+    application_id=DISCORD_CLIENT_ID,
+    debug_guilds=[TEST_GUILD_ID],
+)
 
 supabase = initialize_supabase()
 
@@ -82,13 +95,21 @@ class AcceptButton(discord.ui.Button):
         )
 
         self.transaction_data["player2_name"] = str(interaction.user.display_name)
+        self.transaction_data["player2_discord_id"] = str(interaction.user.id)
 
         # Update the database with player2 information
         supabase = initialize_supabase()
         try:
             update_response = (
                 supabase.table("matches")
-                .update({"player2_name": self.transaction_data["player2_name"]})
+                .update(
+                    {
+                        "player2_name": self.transaction_data["player2_name"],
+                        "player2_discord_id": self.transaction_data[
+                            "player2_discord_id"
+                        ],
+                    }
+                )
                 .eq("match_id", self.transaction_data["match_id"])
                 .execute()
             )
@@ -127,74 +148,216 @@ async def one_v_one(
     game: Option(str, "Choose the game", autocomplete=get_game_choices, required=True),
     match_amount_usd: Option(int, "Enter the match amount in USD", required=True),
 ):
-    await ctx.defer()
+    try:
+        await ctx.defer()  # Defer the response
 
-    channel = await ctx.guild.create_text_channel(
-        name=f"1v1-{ctx.author.display_name}-{platform}-{game}"
-    )
-
-    match_id = get_next_match_id()
-    logger.info(f"Received match_id: {match_id}")
-
-    if match_id is None:
-        await ctx.followup.send(
-            "There was an error getting the match ID. Please try again later."
+        channel = await ctx.guild.create_text_channel(
+            name=f"1v1-{ctx.author.display_name}-{platform}-{game}"
         )
-        await channel.delete()
-        return
 
-    transaction_data = {
-        "match_id": str(match_id),  # Convert to string for database insertion
-        "channel_id": str(channel.id),
-        "player1_name": str(ctx.author.display_name),
-        "player2_name": None,
-        "match_amount_usd": int(match_amount_usd),
-        "category": category,
-        "platform": platform,
-        "game": game,
-    }
+        match_id = get_next_match_id()
+        logger.info(f"Received match_id: {match_id}")
 
-    supabase = initialize_supabase()
-    insert_result = insert_match_data(supabase, transaction_data)
-    if insert_result is None:
-        logger.error(f"Failed to insert match data for match_id: {match_id}")
-        await ctx.followup.send(
-            "There was an error creating the match. Please try again later."
+        if match_id is None:
+            await ctx.followup.send(
+                "There was an error getting the match ID. Please try again later."
+            )
+            await channel.delete()
+            return
+
+        transaction_data = {
+            "match_id": str(match_id),  # Convert to string for database insertion
+            "channel_id": str(channel.id),
+            "player1_name": str(ctx.author.display_name),
+            "player2_name": None,
+            "match_amount_usd": int(match_amount_usd),
+            "category": category,
+            "platform": platform,
+            "game": game,
+            "discord_id": str(ctx.author.id),  # Capture the Discord ID
+        }
+
+        supabase = initialize_supabase()
+        insert_result = insert_match_data(supabase, transaction_data)
+        if insert_result is None:
+            logger.error(f"Failed to insert match data for match_id: {match_id}")
+            await ctx.followup.send(
+                "There was an error creating the match. Please try again later."
+            )
+            await channel.delete()
+            return
+
+        logger.info(f"Successfully inserted match data for match_id: {match_id}")
+
+        frontpage_link = "https://1v1-three.vercel.app/"
+
+        await channel.send(
+            f"1v1 Match Parameters:\n"
+            f"Match ID: {match_id}\n"
+            f"Platform: {platform}\n"
+            f"Category: {category}\n"
+            f"Game: {game}\n"
+            f"Match Amount: ${match_amount_usd}\n\n"
+            f"{ctx.author.mention}, please start the match\n"
+            f"1v1 Frontpage: {frontpage_link}"
         )
-        await channel.delete()
-        return
 
-    logger.info(f"Successfully inserted match data for match_id: {match_id}")
+        view = discord.ui.View()
+        button = AcceptButton(ctx.author.id, channel.id, transaction_data)
+        view.add_item(button)
 
-    frontpage_link = "https://1v1-three.vercel.app/"
+        await ctx.followup.send(
+            f"{ctx.author.mention} has initiated a 1v1 challenge (ID: {match_id}) for {game} ({category}) on {platform} with a match amount of ${match_amount_usd}. Waiting for an opponent!",
+            view=view,
+        )
+    except Exception as e:
+        logger.error(f"Error in one_v_one command: {e}")
+        await ctx.followup.send("An unexpected error occurred. Please try again later.")
 
-    await channel.send(
-        f"1v1 Match Parameters:\n"
-        f"Match ID: {match_id}\n"
-        f"Platform: {platform}\n"
-        f"Category: {category}\n"
-        f"Game: {game}\n"
-        f"Match Amount: ${match_amount_usd}\n\n"
-        f"{ctx.author.mention}, please start the match\n"
-        f"1v1 Frontpage: {frontpage_link}"
-    )
 
-    view = discord.ui.View()
-    button = AcceptButton(ctx.author.id, channel.id, transaction_data)
-    view.add_item(button)
+@bot.event
+async def on_application_command_error(ctx, error):
+    if isinstance(error, commands.errors.CommandOnCooldown):
+        await ctx.respond(
+            f"This command is on cooldown. Try again in {error.retry_after:.2f}s"
+        )
+    else:
+        logger.error(f"Command error: {error}")
+        await ctx.respond("An error occurred while executing the command.")
 
-    await ctx.followup.send(
-        f"{ctx.author.mention} has initiated a 1v1 challenge (ID: {match_id}) for {game} ({category}) on {platform} with a match amount of ${match_amount_usd}. Waiting for an opponent!",
-        view=view,
-    )
+
+async def sync_commands():
+    try:
+        logger.info("Syncing commands...")
+        await bot.sync_commands()
+        logger.info("Commands synced successfully!")
+    except Exception as e:
+        logger.error(f"Error syncing commands: {e}")
 
 
 @bot.event
 async def on_ready():
-    print(f"Logged in as {bot.user}!")
-    print("Registered commands:")
+    logger.info(f"Logged in as {bot.user}!")
+    await sync_commands()
+    logger.info("Registered commands:")
     for cmd in bot.application_commands:
-        print(cmd.name)
+        logger.info(f"- {cmd.name}")
+
+
+@bot.slash_command(
+    name="stats", description="View your gaming statistics", guild_ids=[TEST_GUILD_ID]
+)
+async def stats(ctx):
+    try:
+        await ctx.defer()
+        supabase = initialize_supabase()
+        discord_id = str(ctx.author.id)
+
+        # Get player's wallet address
+        player_data = get_player_wallet(supabase, discord_id)
+        if not player_data:
+            await ctx.followup.send("You haven't linked a wallet address yet!")
+            return
+
+        # Get player's stats
+        stats = get_player_stats(supabase, discord_id)
+
+        # Create embed for stats display
+        embed = discord.Embed(
+            title=f"Stats for {ctx.author.display_name}", color=discord.Color.blue()
+        )
+
+        embed.add_field(
+            name="Wallet Address",
+            value=f"`{player_data['wallet_address']}`",
+            inline=False,
+        )
+        embed.add_field(
+            name="Total Matches",
+            value=f"Won: {stats['wins']} | Lost: {stats['losses']}",
+            inline=True,
+        )
+        embed.add_field(name="Win Rate", value=f"{stats['win_rate']}%", inline=True)
+        embed.add_field(
+            name="Total Earnings",
+            value=f"${stats['total_earnings_usd']:.2f}",
+            inline=True,
+        )
+
+        await ctx.followup.send(embed=embed)
+    except Exception as e:
+        logger.error(f"Error in stats command: {e}")
+        await ctx.followup.send("An error occurred while fetching your stats.")
+
+
+@bot.slash_command(name="matchhistory", description="View your recent matches")
+async def matchhistory(
+    ctx, limit: Option(int, "Number of matches to show", required=False, default=5)
+):
+    try:
+        await ctx.defer()
+        supabase = initialize_supabase()
+        discord_id = str(ctx.author.id)
+
+        matches = get_recent_matches(supabase, discord_id, limit)
+
+        if not matches:
+            await ctx.followup.send("No match history found!")
+            return
+
+        embed = discord.Embed(
+            title=f"Recent Matches for {ctx.author.display_name}",
+            color=discord.Color.blue(),
+        )
+
+        for match in matches:
+            result = "Won" if match["winner_discord_id"] == discord_id else "Lost"
+            opponent = match["opponent_name"]
+            embed.add_field(
+                name=f"{match['game']} - {match['platform']}",
+                value=f"Result: {result}\nOpponent: {opponent}\nAmount: ${match['amount_won_usd']}\nDate: {match['created_at'].strftime('%Y-%m-%d')}",
+                inline=False,
+            )
+
+        await ctx.followup.send(embed=embed)
+    except Exception as e:
+        logger.error(f"Error in matchhistory command: {e}")
+        await ctx.followup.send("An error occurred while fetching your match history.")
+
+
+@bot.slash_command(
+    name="opponents", description="View your record against specific opponents"
+)
+async def opponents(
+    ctx, limit: Option(int, "Number of opponents to show", required=False, default=5)
+):
+    try:
+        await ctx.defer()
+        supabase = initialize_supabase()
+        discord_id = str(ctx.author.id)
+
+        opponents_stats = get_opponents_stats(supabase, discord_id, limit)
+
+        if not opponents_stats:
+            await ctx.followup.send("No opponent statistics found!")
+            return
+
+        embed = discord.Embed(
+            title=f"Opponent Statistics for {ctx.author.display_name}",
+            color=discord.Color.blue(),
+        )
+
+        for opponent in opponents_stats:
+            embed.add_field(
+                name=opponent["opponent_name"],
+                value=f"Wins: {opponent['wins']} | Losses: {opponent['losses']}\nWin Rate: {opponent['win_rate']}%",
+                inline=False,
+            )
+
+        await ctx.followup.send(embed=embed)
+    except Exception as e:
+        logger.error(f"Error in opponents command: {e}")
+        await ctx.followup.send("An error occurred while fetching opponent statistics.")
 
 
 bot.run(DISCORD_TOKEN)
