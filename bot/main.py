@@ -22,14 +22,14 @@ logger = logging.getLogger("iscoin_gpt")
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
+TEST_GUILD_ID = int(os.getenv("TEST_GUILD_ID"))
 
 intents = discord.Intents.default()
 intents.messages = True
 intents.guilds = True
 intents.message_content = True
 
-# Create the bot with default_guild_id for faster testing
-TEST_GUILD_ID = 752821474028552255  # Replace with your server ID
+
 bot = commands.Bot(
     command_prefix="!",
     intents=intents,
