@@ -74,14 +74,28 @@ export async function linkWalletToDiscord(
       return existingPlayer;
     }
 
-    // If wallet doesn't exist, insert new record
-    console.log("No existing player found, inserting new record...");
+    // If wallet doesn't exist, get discord_id from matches first
+    console.log("No existing player found, getting discord_id from matches...");
+
+    const discordIdField = isPlayer2 ? "player2_discord_id" : "discord_id";
+    const { data: matchData, error: matchError } = await supabase
+      .from("matches")
+      .select(discordIdField)
+      .eq("match_id", matchId)
+      .single();
+
+    if (matchError) {
+      console.error("Error fetching match data:", matchError);
+      throw matchError;
+    }
+
+    // Insert new player with discord_id from matches
     const { data, error } = await supabase
       .from("players")
       .insert({
         wallet_address: walletAddress,
         created_at: new Date().toISOString(),
-        discord_id: null,
+        discord_id: matchData[discordIdField], // Use discord_id from matches
       })
       .select()
       .single();
