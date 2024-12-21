@@ -1,0 +1,15 @@
+# Project ID from your Supabase project settings
+project_id = "lyjimsetpystcpprjxac"
+
+[global]
+# Global function settings
+runtime = "deno"
+entrypoint = "index.ts"
+verify_jwt = false
+
+[global.env]
+SUPABASE_URL = "https://lyjimsetpystcpprjxac.supabase.co"
+
+[functions.twitter-events]
+# Twitter events function settings
+verify_jwt = false

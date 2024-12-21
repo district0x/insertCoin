@@ -8,3 +8,6 @@ openai
 py-cord
 python-dotenv
 web3
+sqlalchemy>=2.0.0
+psycopg2-binary
+alembic

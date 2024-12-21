@@ -6,7 +6,6 @@ from discord.ext import commands
 from dotenv import load_dotenv
 from lib import (
     get_next_match_id,
-    initialize_supabase,
     insert_match_data,
     get_channel_id_by_match_id,
     get_player_wallet,
@@ -14,6 +13,8 @@ from lib import (
     get_recent_matches,
     get_opponents_stats,
 )
+from database import get_db
+from models import Match
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -29,15 +30,12 @@ intents.messages = True
 intents.guilds = True
 intents.message_content = True
 
-
 bot = commands.Bot(
     command_prefix="!",
     intents=intents,
     application_id=DISCORD_CLIENT_ID,
     debug_guilds=[TEST_GUILD_ID],
 )
-
-supabase = initialize_supabase()
 
 game_choices = {
     "Sports": ["FIFA 23", "NBA 2K23", "Madden NFL 23"],
@@ -98,32 +96,27 @@ class AcceptButton(discord.ui.Button):
         self.transaction_data["player2_discord_id"] = str(interaction.user.id)
 
         # Update the database with player2 information
-        supabase = initialize_supabase()
         try:
-            update_response = (
-                supabase.table("matches")
-                .update(
-                    {
-                        "player2_name": self.transaction_data["player2_name"],
-                        "player2_discord_id": self.transaction_data[
-                            "player2_discord_id"
-                        ],
-                    }
+            with get_db() as db:
+                match = (
+                    db.query(Match)
+                    .filter(Match.match_id == self.transaction_data["match_id"])
+                    .first()
                 )
-                .eq("match_id", self.transaction_data["match_id"])
-                .execute()
-            )
-
-            logger.info(f"Update response: {update_response}")
-            if update_response.data:
-                await channel.send(
-                    f"{challenge_creator.mention}, please start the match on the 1v1 frontpage."
-                )
-            else:
-                logger.error(f"Error updating player2 information: No data returned")
-                await channel.send(
-                    "There was an error updating the match information. Please contact an administrator."
-                )
+                if match:
+                    match.player2_name = self.transaction_data["player2_name"]
+                    match.player2_discord_id = self.transaction_data[
+                        "player2_discord_id"
+                    ]
+                    db.flush()
+                    await channel.send(
+                        f"{challenge_creator.mention}, please start the match on the 1v1 frontpage."
+                    )
+                else:
+                    logger.error(f"Error updating player2 information: Match not found")
+                    await channel.send(
+                        "There was an error updating the match information. Please contact an administrator."
+                    )
         except Exception as e:
             logger.error(f"Exception when updating player2 information: {str(e)}")
             await channel.send(
@@ -149,8 +142,10 @@ async def one_v_one(
     match_amount_usd: Option(int, "Enter the match amount in USD", required=True),
 ):
     try:
-        await ctx.defer()  # Defer the response
+        # Acknowledge the interaction first
+        await ctx.response.defer(ephemeral=True)
 
+        # Create the channel
         channel = await ctx.guild.create_text_channel(
             name=f"1v1-{ctx.author.display_name}-{platform}-{game}"
         )
@@ -160,13 +155,14 @@ async def one_v_one(
 
         if match_id is None:
             await ctx.followup.send(
-                "There was an error getting the match ID. Please try again later."
+                "There was an error getting the match ID. Please try again later.",
+                ephemeral=True,
             )
             await channel.delete()
             return
 
         transaction_data = {
-            "match_id": str(match_id),  # Convert to string for database insertion
+            "match_id": str(match_id),
             "channel_id": str(channel.id),
             "player1_name": str(ctx.author.display_name),
             "player2_name": None,
@@ -174,15 +170,15 @@ async def one_v_one(
             "category": category,
             "platform": platform,
             "game": game,
-            "discord_id": str(ctx.author.id),  # Capture the Discord ID
+            "discord_id": str(ctx.author.id),
         }
 
-        supabase = initialize_supabase()
-        insert_result = insert_match_data(supabase, transaction_data)
+        insert_result = insert_match_data(None, transaction_data)
         if insert_result is None:
             logger.error(f"Failed to insert match data for match_id: {match_id}")
             await ctx.followup.send(
-                "There was an error creating the match. Please try again later."
+                "There was an error creating the match. Please try again later.",
+                ephemeral=True,
             )
             await channel.delete()
             return
@@ -191,6 +187,7 @@ async def one_v_one(
 
         frontpage_link = "https://1v1-three.vercel.app/"
 
+        # Send match parameters to the new channel
         await channel.send(
             f"1v1 Match Parameters:\n"
             f"Match ID: {match_id}\n"
@@ -202,17 +199,38 @@ async def one_v_one(
             f"1v1 Frontpage: {frontpage_link}"
         )
 
-        view = discord.ui.View()
+        # Create and send the button view
+        view = discord.ui.View(timeout=None)  # No timeout for the button
         button = AcceptButton(ctx.author.id, channel.id, transaction_data)
         view.add_item(button)
 
-        await ctx.followup.send(
+        # Send the challenge announcement
+        await ctx.channel.send(
             f"{ctx.author.mention} has initiated a 1v1 challenge (ID: {match_id}) for {game} ({category}) on {platform} with a match amount of ${match_amount_usd}. Waiting for an opponent!",
             view=view,
         )
+
+        # Send a confirmation to the user
+        await ctx.followup.send(
+            f"Your 1v1 challenge has been created! Check {channel.mention} for details.",
+            ephemeral=True,
+        )
+
     except Exception as e:
         logger.error(f"Error in one_v_one command: {e}")
-        await ctx.followup.send("An unexpected error occurred. Please try again later.")
+        try:
+            if not ctx.response.is_done():
+                await ctx.response.send_message(
+                    "An unexpected error occurred. Please try again later.",
+                    ephemeral=True,
+                )
+            else:
+                await ctx.followup.send(
+                    "An unexpected error occurred. Please try again later.",
+                    ephemeral=True,
+                )
+        except Exception as e2:
+            logger.error(f"Error sending error message: {e2}")
 
 
 @bot.event
@@ -250,17 +268,16 @@ async def on_ready():
 async def stats(ctx):
     try:
         await ctx.defer()
-        supabase = initialize_supabase()
         discord_id = str(ctx.author.id)
 
         # Get player's wallet address
-        player_data = get_player_wallet(supabase, discord_id)
+        player_data = get_player_wallet(None, discord_id)
         if not player_data:
             await ctx.followup.send("You haven't linked a wallet address yet!")
             return
 
         # Get player's stats
-        stats = get_player_stats(supabase, discord_id)
+        stats = get_player_stats(None, discord_id)
 
         # Create embed for stats display
         embed = discord.Embed(
@@ -296,10 +313,9 @@ async def matchhistory(
 ):
     try:
         await ctx.defer()
-        supabase = initialize_supabase()
         discord_id = str(ctx.author.id)
 
-        matches = get_recent_matches(supabase, discord_id, limit)
+        matches = get_recent_matches(None, discord_id, limit)
 
         if not matches:
             await ctx.followup.send("No match history found!")
@@ -333,10 +349,9 @@ async def opponents(
 ):
     try:
         await ctx.defer()
-        supabase = initialize_supabase()
         discord_id = str(ctx.author.id)
 
-        opponents_stats = get_opponents_stats(supabase, discord_id, limit)
+        opponents_stats = get_opponents_stats(None, discord_id, limit)
 
         if not opponents_stats:
             await ctx.followup.send("No opponent statistics found!")
