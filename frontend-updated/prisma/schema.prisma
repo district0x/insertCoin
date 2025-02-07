@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model
+model User {
+  id            String    @id @default(uuid())
+  address       String?   @unique // Ethereum address
+  discordId     String?   @unique // Discord user ID
+  username      String?   @unique
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Stats and profile
+  totalMatches  Int       @default(0)
+  totalWins     Int       @default(0)
+  totalLosses   Int       @default(0)
+  
+  // Relations
+  matchesCreated    Match[]    @relation("Creator")
+  matchesJoined     Match[]    @relation("Participant")
+  tournamentsJoined Tournament[] @relation("TournamentParticipant")
+  teams             Team[]      @relation("TeamMember")
+}
+
+// Match model
+model Match {
+  id            String    @id @default(uuid())
+  matchId       Int       @unique // On-chain match ID
+  matchType     MatchType
+  status        MatchStatus @default(PENDING)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Creator details
+  creatorId     String?
+  creator       User?      @relation("Creator", fields: [creatorId], references: [id])
+  creatorDiscordId String? // Discord ID of creator when created through bot
+  
+  // Match details
+  stake         Float
+  tokenAddress  String?   // null for ETH
+  totalPrize    Float
+  winnerAddress String?
+  
+  // Team related
+  teams         Team[]
+  participants  User[]    @relation("Participant")
+  
+  @@index([matchId])
+  @@index([creatorDiscordId])
+}
+
+// Tournament model
+model Tournament {
+  id              String    @id @default(uuid())
+  tournamentId    Int       @unique // On-chain tournament ID
+  status          TournamentStatus
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Tournament details
+  entryFee       Float
+  tokenAddress   String?   // null for ETH
+  totalPrize     Float
+  maxParticipants Int
+  
+  // Participants
+  participants    User[]    @relation("TournamentParticipant")
+  
+  @@index([tournamentId])
+}
+
+// Team model
+model Team {
+  id            String    @id @default(uuid())
+  matchId       String
+  match         Match     @relation(fields: [matchId], references: [id])
+  isTeamA       Boolean   // true for Team A, false for Team B
+  
+  // Team members
+  members       User[]    @relation("TeamMember")
+  
+  @@unique([matchId, isTeamA])
+}
+
+enum MatchType {
+  ONE_V_ONE
+  TWO_V_TWO
+  FIVE_V_FIVE
+}
+
+enum MatchStatus {
+  PENDING   // Created by Discord bot, waiting for on-chain creation
+  OPEN      // Created on-chain, waiting for players
+  FILLED    // All players joined
+  COMPLETED // Match finished
+  CANCELLED // Match cancelled
+}
+
+enum TournamentStatus {
+  CREATED
+  FILLING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+} 
