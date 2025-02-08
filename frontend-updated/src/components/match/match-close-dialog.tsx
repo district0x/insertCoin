@@ -18,6 +18,7 @@ interface MatchCloseDialogProps {
   onClose: () => Promise<void>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  convertToUsd: (ethAmount: bigint) => number;
 }
 
 export function MatchCloseDialog({
@@ -28,6 +29,7 @@ export function MatchCloseDialog({
   onClose,
   open,
   onOpenChange,
+  convertToUsd,
 }: MatchCloseDialogProps) {
   const truncateAddress = (address: string) => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -43,8 +45,14 @@ export function MatchCloseDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Close Match #{match.id.toString()}</DialogTitle>
-          <DialogDescription>
-            Select the winner of this match. This action cannot be undone.
+          <DialogDescription className="space-y-2">
+            <p>
+              Select the winner of this match. This action cannot be undone.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Prize Pool: {match.totalAmount} ETH ($
+              {convertToUsd(match.totalAmount).toFixed(2)})
+            </p>
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">

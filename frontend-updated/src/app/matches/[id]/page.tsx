@@ -32,6 +32,7 @@ import {
   donateToMatch,
   closeMatch,
 } from "@/lib/match/actions";
+import { useEthPrice } from "@/lib/hooks/useEthPrice";
 
 export default function MatchPage() {
   const params = useParams();
@@ -56,6 +57,7 @@ export default function MatchPage() {
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
   const { address } = useWalletConnection();
+  const { convertEthToUsd } = useEthPrice();
 
   console.log("[MatchPage] Initial render:", {
     matchId,
@@ -402,8 +404,10 @@ export default function MatchPage() {
                 {match.matchType} Match #{match.id.toString()}
               </CardTitle>
               <CardDescription>
-                Prize Pool:{" "}
-                {match.totalAmount ? formatEther(match.totalAmount) : "0"} ETH
+                Prize Pool: {formatEther(match.totalAmount)} ETH
+                <span className="text-muted-foreground ml-1">
+                  (≈${convertEthToUsd(match.totalAmount).toFixed(2)})
+                </span>
               </CardDescription>
             </div>
             <MatchStatusBadge match={match} />
@@ -417,12 +421,14 @@ export default function MatchPage() {
                 stake={match.player1Amount}
                 label="Team A"
                 maxPlayers={getMaxPlayers(match.matchType)}
+                convertToUsd={convertEthToUsd}
               />
               <MatchPlayerInfo
                 addresses={match.teamB}
                 stake={match.player2Amount}
                 label="Team B"
                 maxPlayers={getMaxPlayers(match.matchType)}
+                convertToUsd={convertEthToUsd}
               />
             </div>
 
@@ -431,6 +437,9 @@ export default function MatchPage() {
                 <h3 className="font-medium mb-2">Donations</h3>
                 <p className="text-sm">
                   {formatEther(match.donatedAmount)} ETH
+                  <span className="text-muted-foreground ml-1">
+                    (≈${convertEthToUsd(match.donatedAmount).toFixed(2)})
+                  </span>
                 </p>
               </div>
             )}
@@ -444,6 +453,7 @@ export default function MatchPage() {
                   onJoin={handleJoinMatch}
                   open={showJoinConfirmation}
                   onOpenChange={setShowJoinConfirmation}
+                  convertToUsd={convertEthToUsd}
                 />
               )}
 
@@ -453,6 +463,7 @@ export default function MatchPage() {
                 donationEthAmount={donationEthAmount}
                 onDonationEthChange={setDonationEthAmount}
                 onDonate={handleDonateToMatch}
+                convertToUsd={convertEthToUsd}
               />
 
               {match.isOpen && match.teamB.length > 0 && (
@@ -464,6 +475,7 @@ export default function MatchPage() {
                   onClose={handleCloseMatch}
                   open={showCloseConfirmation}
                   onOpenChange={setShowCloseConfirmation}
+                  convertToUsd={convertEthToUsd}
                 />
               )}
             </div>
@@ -476,6 +488,7 @@ export default function MatchPage() {
         lastDonationAmount={lastDonationAmount}
         open={showSuccessDialog}
         onOpenChange={setShowSuccessDialog}
+        convertToUsd={convertEthToUsd}
       />
     </div>
   );

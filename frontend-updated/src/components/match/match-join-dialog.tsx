@@ -19,6 +19,7 @@ interface MatchJoinDialogProps {
   onJoin: (isTeamA: boolean) => Promise<void>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  convertToUsd: (ethAmount: bigint) => number;
 }
 
 export function MatchJoinDialog({
@@ -28,6 +29,7 @@ export function MatchJoinDialog({
   onJoin,
   open,
   onOpenChange,
+  convertToUsd,
 }: MatchJoinDialogProps) {
   const [selectedTeam, setSelectedTeam] = useState<"A" | "B" | null>(null);
 
@@ -69,11 +71,9 @@ export function MatchJoinDialog({
       return "Teams Full";
     }
 
-    if (match.matchType === "ONE_V_ONE") {
-      return `Join Match with ${formatEther(match.player1Amount)} ETH`;
-    }
-
-    return `Join Match with ${formatEther(match.player1Amount)} ETH`;
+    const ethAmount = formatEther(match.player1Amount);
+    const usdAmount = convertToUsd(match.player1Amount).toFixed(2);
+    return `Join Match with ${ethAmount} ETH (≈$${usdAmount})`;
   };
 
   const isJoinButtonDisabled = () => {
@@ -159,10 +159,12 @@ export function MatchJoinDialog({
             {match.matchType === "ONE_V_ONE"
               ? `You are about to join this match with ${formatEther(
                   match.player1Amount
-                )} ETH.`
+                )} ETH (≈$${convertToUsd(match.player1Amount).toFixed(2)}).`
               : `Select a team to join with ${formatEther(
                   match.player1Amount
-                )} ETH stake.`}
+                )} ETH (≈$${convertToUsd(match.player1Amount).toFixed(
+                  2
+                )}) stake.`}
             This action cannot be undone.
           </DialogDescription>
         </DialogHeader>
@@ -200,9 +202,15 @@ export function MatchJoinDialog({
               </div>
               <p className="text-sm">
                 Stake Amount: {formatEther(match.player1Amount)} ETH
+                <span className="text-muted-foreground ml-1">
+                  (≈${convertToUsd(match.player1Amount).toFixed(2)})
+                </span>
               </p>
               <p className="text-sm">
                 Total Prize Pool: {formatEther(match.totalAmount)} ETH
+                <span className="text-muted-foreground ml-1">
+                  (≈${convertToUsd(match.totalAmount).toFixed(2)})
+                </span>
               </p>
             </div>
           </div>

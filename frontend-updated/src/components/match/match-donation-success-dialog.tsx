@@ -14,6 +14,7 @@ interface MatchDonationSuccessDialogProps {
   lastDonationAmount: bigint;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  convertToUsd: (ethAmount: bigint) => number;
 }
 
 export function MatchDonationSuccessDialog({
@@ -21,6 +22,7 @@ export function MatchDonationSuccessDialog({
   lastDonationAmount,
   open,
   onOpenChange,
+  convertToUsd,
 }: MatchDonationSuccessDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -28,20 +30,30 @@ export function MatchDonationSuccessDialog({
         <DialogHeader>
           <DialogTitle>Donation Successful!</DialogTitle>
           <DialogDescription>
-            Your donation of {formatEther(lastDonationAmount)} ETH has been
-            added to the match.
-            <div className="mt-4 p-4 bg-muted rounded-lg">
-              <p className="font-medium">
-                Match #{match.id.toString()} Details:
-              </p>
-              <div className="mt-2 space-y-1 text-sm">
-                <p>Total Prize Pool: {formatEther(match.totalAmount)} ETH</p>
-                <p>Total Donations: {formatEther(match.donatedAmount)} ETH</p>
-              </div>
-            </div>
+            Thank you for your donation to Match #{match.id.toString()}
           </DialogDescription>
         </DialogHeader>
-        <Button onClick={() => onOpenChange(false)}>Close</Button>
+        <div className="space-y-4">
+          <div className="p-4 bg-muted rounded-lg space-y-2">
+            <p className="text-sm">
+              <span className="font-medium">Your Donation:</span>{" "}
+              {formatEther(lastDonationAmount)} ETH
+              <span className="text-muted-foreground ml-1">
+                (≈${convertToUsd(lastDonationAmount).toFixed(2)})
+              </span>
+            </p>
+            <p className="text-sm">
+              <span className="font-medium">New Prize Pool:</span>{" "}
+              {formatEther(match.totalAmount)} ETH
+              <span className="text-muted-foreground ml-1">
+                (≈${convertToUsd(match.totalAmount).toFixed(2)})
+              </span>
+            </p>
+          </div>
+          <Button className="w-full" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
