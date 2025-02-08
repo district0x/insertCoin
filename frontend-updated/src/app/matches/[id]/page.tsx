@@ -221,6 +221,16 @@ export default function MatchPage() {
       return;
     }
 
+    // Check if match is open before proceeding
+    if (!match.isOpen) {
+      toast({
+        variant: "destructive",
+        title: "Match Closed",
+        description: "This match is no longer accepting donations.",
+      });
+      return;
+    }
+
     try {
       setIsProcessing(true);
 
@@ -240,7 +250,12 @@ export default function MatchPage() {
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
       if (receipt.status === "success") {
         // Get the updated match data to confirm the donation amount
-        const updatedMatch = await contract.read.matches([match.id]);
+        const updatedMatch = await publicClient.readContract({
+          address: contract.address,
+          abi: contract.abi,
+          functionName: "matches",
+          args: [match.id],
+        });
         const newDonationAmount = updatedMatch[5] - match.donatedAmount;
 
         setLastDonationAmount(newDonationAmount);
@@ -250,14 +265,32 @@ export default function MatchPage() {
       }
     } catch (error) {
       console.error("Error donating to match:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Failed to donate. Please try again.",
-      });
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to donate. Please try again.";
+
+      // Handle specific error cases
+      if (errorMessage.includes("Match is closed")) {
+        toast({
+          variant: "destructive",
+          title: "Match Closed",
+          description: "This match is no longer accepting donations.",
+        });
+      } else if (errorMessage.includes("insufficient funds")) {
+        toast({
+          variant: "destructive",
+          title: "Insufficient Funds",
+          description:
+            "You don't have enough ETH to cover the donation amount and gas fees.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: errorMessage,
+        });
+      }
     } finally {
       setIsProcessing(false);
     }

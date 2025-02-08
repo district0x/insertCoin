@@ -9,8 +9,9 @@ import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import useSWR from "swr";
 import { fetchMatches } from "@/lib/match";
+import { OnChainMatch } from "@/types/match";
 
-// Fetch matches with a 30-second polling interval
+const INITIAL_MATCHES_COUNT = 7;
 const POLLING_INTERVAL = 30000;
 let lastFetchTime = 0;
 
@@ -18,21 +19,27 @@ export default function MatchesPage() {
   const { toast } = useToast();
   const contract = useContract();
   const publicClient = usePublicClient();
+  const [allMatches, setAllMatches] = React.useState<OnChainMatch[]>([]);
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
+  const [hasLoadedAll, setHasLoadedAll] = React.useState(false);
 
-  // Fetch matches using SWR for caching and revalidation
-  const fetchMatchesCallback = React.useCallback(async () => {
+  // Fetch initial matches using SWR for caching and revalidation
+  const fetchInitialMatches = React.useCallback(async () => {
     if (!contract || !publicClient) return [];
 
     // Rate limiting protection
     const now = Date.now();
     if (now - lastFetchTime < 1000) {
-      // Minimum 1 second between requests
       throw new Error("Rate limit: Please wait before fetching again");
     }
     lastFetchTime = now;
 
     try {
-      return await fetchMatches(contract, publicClient);
+      const matches = await fetchMatches(contract, publicClient, {
+        limit: INITIAL_MATCHES_COUNT,
+      });
+      setAllMatches(matches);
+      return matches;
     } catch (error) {
       console.error("Error fetching matches:", error);
       if (error instanceof Error && error.message.includes("429")) {
@@ -48,21 +55,59 @@ export default function MatchesPage() {
   }, [contract, publicClient, toast]);
 
   const {
-    data: matches = [],
+    data: initialMatches = [],
     error,
     isLoading,
-  } = useSWR("matches", fetchMatchesCallback, {
+  } = useSWR("initial-matches", fetchInitialMatches, {
     refreshInterval: POLLING_INTERVAL,
     revalidateOnFocus: false,
     shouldRetryOnError: false,
   });
+
+  // Load remaining matches in the background
+  React.useEffect(() => {
+    const loadRemainingMatches = async () => {
+      if (!contract || !publicClient || isLoadingMore || hasLoadedAll) return;
+
+      try {
+        setIsLoadingMore(true);
+        const remainingMatches = await fetchMatches(contract, publicClient, {
+          offset: INITIAL_MATCHES_COUNT,
+        });
+
+        // Only update if we got new matches
+        if (remainingMatches.length > 0) {
+          setAllMatches((prev) => {
+            // Create a Set of existing match IDs for quick lookup
+            const existingIds = new Set(prev.map((m) => m.id.toString()));
+
+            // Filter out any matches that we already have
+            const newMatches = remainingMatches.filter(
+              (match) => !existingIds.has(match.id.toString())
+            );
+
+            return [...prev, ...newMatches];
+          });
+        } else {
+          setHasLoadedAll(true);
+        }
+      } catch (error) {
+        console.error("Error loading remaining matches:", error);
+      } finally {
+        setIsLoadingMore(false);
+      }
+    };
+
+    if (initialMatches.length > 0 && !hasLoadedAll) {
+      loadRemainingMatches();
+    }
+  }, [contract, publicClient, initialMatches, isLoadingMore, hasLoadedAll]);
 
   // Show error toast when fetch fails
   React.useEffect(() => {
     if (error) {
       console.error("Error in SWR:", error);
       if (!error.message?.includes("Rate limit")) {
-        // Don't show for intentional rate limiting
         toast({
           variant: "destructive",
           title: "Error",
@@ -92,6 +137,8 @@ export default function MatchesPage() {
         </div>
       );
     }
+
+    const matches = allMatches.length > 0 ? allMatches : initialMatches;
 
     if (!matches || matches.length === 0) {
       return (
@@ -174,18 +221,20 @@ export default function MatchesPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Matches</h1>
-        <Link
-          href="/matches/create"
-          className="inline-block px-4 py-2 bg-primary text-primary-foreground rounded-md"
-        >
-          Create Match
-        </Link>
-      </div>
+    <div className="container mx-auto px-4 py-8">
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Matches</h1>
+          <Link
+            href="/matches/create"
+            className="inline-block px-4 py-2 bg-primary text-primary-foreground rounded-md"
+          >
+            Create Match
+          </Link>
+        </div>
 
-      {renderContent()}
+        {renderContent()}
+      </div>
     </div>
   );
 }

@@ -94,6 +94,82 @@ export async function donateToMatch(
     throw new Error("No wallet account connected");
   }
 
+  // Check match state in all match types to determine if it's open
+  const [match1v1, match2v2, match5v5] = await Promise.all([
+    // Check 1v1 match
+    publicClient.readContract({
+      address: contract.address,
+      abi: contract.abi,
+      functionName: "matches",
+      args: [matchId],
+    }) as Promise<
+      readonly [
+        `0x${string}`, // player1
+        `0x${string}`, // player2
+        bigint, // player1Amount
+        bigint, // player2Amount
+        bigint, // totalAmount
+        bigint, // donatedAmount
+        boolean, // isOpen
+        boolean, // isERC20
+        `0x${string}` // token
+      ]
+    >,
+    // Check 2v2 match
+    publicClient.readContract({
+      address: contract.address,
+      abi: contract.abi,
+      functionName: "matches2v2",
+      args: [matchId],
+    }) as Promise<
+      readonly [
+        `0x${string}`, // player1
+        `0x${string}`, // player2
+        `0x${string}`, // teamAPlayer2
+        `0x${string}`, // teamBPlayer2
+        bigint, // player1Amount
+        bigint, // player2Amount
+        bigint, // totalAmount
+        bigint, // donatedAmount
+        boolean, // isOpen
+        boolean, // isERC20
+        `0x${string}` // token
+      ]
+    >,
+    // Check 5v5 match
+    publicClient.readContract({
+      address: contract.address,
+      abi: contract.abi,
+      functionName: "matches5v5",
+      args: [matchId],
+    }) as Promise<
+      readonly [
+        `0x${string}`, // player1
+        `0x${string}`, // player2
+        `0x${string}`, // teamAPlayer2
+        `0x${string}`, // teamAPlayer3
+        `0x${string}`, // teamAPlayer4
+        `0x${string}`, // teamAPlayer5
+        `0x${string}`, // teamBPlayer2
+        `0x${string}`, // teamBPlayer3
+        `0x${string}`, // teamBPlayer4
+        `0x${string}`, // teamBPlayer5
+        bigint, // player1Amount
+        bigint, // totalAmount
+        `0x${string}`, // token
+        boolean, // isERC20
+        boolean // isOpen
+      ]
+    >,
+  ]);
+
+  // Check if any of the match types are open
+  const isMatchOpen = match1v1[6] || match2v2[8] || match5v5[14];
+
+  if (!isMatchOpen) {
+    throw new Error("This match is closed and no longer accepting donations");
+  }
+
   const { request } = await publicClient.simulateContract({
     address: contract.address,
     abi: contract.abi,

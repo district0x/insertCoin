@@ -222,7 +222,11 @@ export async function fetchMatch(
 
 export async function fetchMatches(
   contract: GetContractReturnType<typeof ONEVONE_ABI>,
-  publicClient: PublicClient
+  publicClient: PublicClient,
+  options?: {
+    limit?: number;
+    offset?: number;
+  }
 ): Promise<OnChainMatch[]> {
   if (!contract || !publicClient) return [];
 
@@ -233,13 +237,20 @@ export async function fetchMatches(
       functionName: "nextMatchId",
     });
 
+    // Create array of match IDs in reverse order (latest first)
+    const totalMatches = Number(nextMatchId) - 1;
     const matchIds = Array.from(
-      { length: Number(nextMatchId) - 1 },
-      (_, i) => i + 1
+      { length: totalMatches },
+      (_, i) => totalMatches - i
     );
 
-    // Fetch all matches
-    const matchPromises = matchIds.map((id) =>
+    // Apply pagination if options are provided
+    const start = options?.offset || 0;
+    const end = options?.limit ? start + options?.limit : matchIds.length;
+    const paginatedIds = matchIds.slice(start, end);
+
+    // Fetch paginated matches
+    const matchPromises = paginatedIds.map((id) =>
       fetchMatch(contract, publicClient, id.toString())
     );
 
