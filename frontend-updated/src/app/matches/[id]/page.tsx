@@ -33,6 +33,7 @@ import {
   closeMatch,
 } from "@/lib/match/actions";
 import { useEthPrice } from "@/lib/hooks/useEthPrice";
+import { useVisibilityChange } from "@/lib/hooks/useVisibilityChange";
 
 export default function MatchPage() {
   const params = useParams();
@@ -58,6 +59,7 @@ export default function MatchPage() {
   const { data: walletClient } = useWalletClient();
   const { address } = useWalletConnection();
   const { convertEthToUsd } = useEthPrice();
+  const isVisible = useVisibilityChange();
 
   console.log("[MatchPage] Initial render:", {
     matchId,
@@ -69,7 +71,9 @@ export default function MatchPage() {
 
   // Fetch match data
   const { data: match, error } = useSWR(
-    matchId && contract && publicClient ? `match-${matchId}` : null,
+    matchId && contract && publicClient && isVisible
+      ? `match-${matchId}`
+      : null,
     async () => {
       console.log("[MatchPage] SWR fetcher starting...");
       if (!contract || !publicClient || !matchId) {
@@ -91,7 +95,8 @@ export default function MatchPage() {
       }
     },
     {
-      refreshInterval: 5000,
+      refreshInterval: isVisible ? 30000 : 0,
+      revalidateOnFocus: false,
       onSuccess: (data) => {
         console.log("[MatchPage] SWR success:", data);
       },

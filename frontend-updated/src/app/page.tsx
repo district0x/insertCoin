@@ -12,7 +12,7 @@ import { fetchMatches } from "@/lib/match";
 import { OnChainMatch } from "@/types/match";
 
 const INITIAL_MATCHES_COUNT = 7;
-const POLLING_INTERVAL = 30000;
+const POLLING_INTERVAL = 30000; // 30 seconds
 let lastFetchTime = 0;
 
 export default function Home() {

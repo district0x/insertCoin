@@ -1,9 +1,17 @@
 "use client";
 
 import { useEffect, useCallback, useRef } from "react";
-import { useAccount, useConnect, useDisconnect } from "wagmi";
+import { useAccount, useConnect, useDisconnect, usePublicClient } from "wagmi";
 import { useToast } from "@/lib/hooks/use-toast";
 import { saveWalletToDb } from "@/lib/actions/wallet";
+
+// MTK Token details
+const MTK_TOKEN = {
+  address: "0x29Cf44155892ba0A811daace8a45dba4205df2Fb" as `0x${string}`,
+  symbol: "MTK",
+  decimals: 18,
+  name: "Match Token",
+} as const;
 
 export function useWalletConnection() {
   const { address, isConnected, status } = useAccount();
@@ -13,6 +21,78 @@ export function useWalletConnection() {
   const hasShownToastRef = useRef(false);
   const { connect } = useConnect();
   const { disconnect } = useDisconnect();
+  const publicClient = usePublicClient();
+
+  const addTokenToWallet = useCallback(async () => {
+    if (!window.ethereum) {
+      console.warn("MetaMask not found");
+      return;
+    }
+
+    try {
+      // Request to add the token to the user's wallet
+      await window.ethereum.request({
+        method: "wallet_watchAsset",
+        params: {
+          type: "ERC20",
+          options: {
+            address: MTK_TOKEN.address,
+            symbol: MTK_TOKEN.symbol,
+            decimals: MTK_TOKEN.decimals,
+            name: MTK_TOKEN.name,
+          },
+        },
+      });
+
+      toast({
+        title: "Token Added",
+        description: "MTK token has been added to your wallet.",
+      });
+    } catch (error) {
+      console.error("Error adding token to wallet:", error);
+      if (error instanceof Error && error.message.includes("User rejected")) {
+        // User rejected the token addition
+        return;
+      }
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description:
+          "Failed to add MTK token to your wallet. You can add it manually.",
+      });
+    }
+  }, [toast]);
+
+  const checkAndAddToken = useCallback(async () => {
+    if (!address || !publicClient) return;
+
+    try {
+      // Check if the user already has MTK token balance or allowance
+      const tokenBalance = await publicClient.readContract({
+        address: MTK_TOKEN.address,
+        abi: [
+          {
+            name: "balanceOf",
+            type: "function",
+            stateMutability: "view",
+            inputs: [{ name: "account", type: "address" }],
+            outputs: [{ name: "", type: "uint256" }],
+          },
+        ],
+        functionName: "balanceOf",
+        args: [address],
+      });
+
+      // If user has no balance, prompt to add token
+      if (tokenBalance === 0n) {
+        await addTokenToWallet();
+      }
+    } catch (error) {
+      console.error("Error checking token balance:", error);
+      // If there's an error reading the balance, still try to add the token
+      await addTokenToWallet();
+    }
+  }, [address, publicClient, addTokenToWallet]);
 
   const saveWallet = useCallback(async (address: string) => {
     try {
@@ -49,6 +129,9 @@ export function useWalletConnection() {
         await saveWallet(address);
         savedAddressRef.current = address;
 
+        // Check and add MTK token after successful wallet connection
+        await checkAndAddToken();
+
         // Only show toast if we haven't shown it before for this session
         if (!hasShownToastRef.current) {
           toast({
@@ -71,7 +154,7 @@ export function useWalletConnection() {
     };
 
     handleWalletConnection();
-  }, [address, isConnected, status, toast, saveWallet]);
+  }, [address, isConnected, status, toast, saveWallet, checkAndAddToken]);
 
   return {
     address,
