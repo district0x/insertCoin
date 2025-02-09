@@ -248,7 +248,7 @@ export default function Home() {
 			</section> */}
 
 			<div className="space-y-6 max-w-7xl mx-auto px-2 mb-10">
-				<div className="flex justify-between items-center">
+				<div className="flex justify-between items-center py-10">
 					<h2 className="text-3xl font-bold">Active Matches</h2>
 					<Link
 						href="/matches/create"
