@@ -20,13 +20,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="en" className="h-full">
+      <body className={`${inter.className} min-h-screen flex flex-col`}>
         <Providers>
           <WalletGuardProvider>
-            <Navbar />
-            <main>{children}</main>
-            <Footer />
+            <div className="flex flex-col min-h-screen">
+              <Navbar />
+              <main className="flex-1">{children}</main>
+              <Footer />
+            </div>
             <Toaster />
           </WalletGuardProvider>
         </Providers>
