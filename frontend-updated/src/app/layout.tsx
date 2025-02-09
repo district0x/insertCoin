@@ -5,6 +5,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { WalletGuardProvider } from "@/providers/WalletGuardProvider";
 import { Toaster } from "@/components/ui/toaster";
+import Footer from "@/components/layout/footer";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -24,7 +25,8 @@ export default function RootLayout({
         <Providers>
           <WalletGuardProvider>
             <Navbar />
-            <main className="container mx-auto px-4 py-8">{children}</main>
+            <main>{children}</main>
+            <Footer />
             <Toaster />
           </WalletGuardProvider>
         </Providers>
