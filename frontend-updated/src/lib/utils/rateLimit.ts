@@ -1,5 +1,5 @@
 // Global request queue
-let requestQueue: (() => Promise<any>)[] = [];
+const requestQueue: Array<() => Promise<unknown>> = [];
 let isProcessing = false;
 const RATE_LIMIT_DELAY = 500; // 500ms between requests
 
