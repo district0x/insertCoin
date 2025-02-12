@@ -1,0 +1,1783 @@
+{
+  "manifestVersion": "3.2",
+  "proxies": [
+    {
+      "address": "0xF64814d76D85fa68C1404bC05C7d2eEeB3c9016A",
+      "txHash": "0x78c73d08281a2b7d9e8f12cf5b3be5be8fde12ff3d61da41b96754038708946d",
+      "kind": "transparent"
+    },
+    {
+      "address": "0x26D6F3Cf5B65b762e86e7cbb835484dA43d81d42",
+      "txHash": "0x8ce02088768c6dea835dc8f2aa444af005c39688da78063ebe845f4434d313c3",
+      "kind": "transparent"
+    },
+    {
+      "address": "0xB34319688b2e161516175675A1460f8f3CD387E3",
+      "txHash": "0xbc53c248a860c0084f1965bb0bcb4aac324bbf9b4f91662caec4df6ce26f4f89",
+      "kind": "transparent"
+    },
+    {
+      "address": "0xfe4FA572645198e1b63BbD0CeFc95E4237B0280a",
+      "txHash": "0xdf4a451fb66a80e29ccf58f57452d36df9880bbf2a09458b4db884341b1b0f25",
+      "kind": "transparent"
+    },
+    {
+      "address": "0x0eEcA2a1395e792694b9F52DFAded07916a8B938",
+      "txHash": "0x648646185d66c62491d707fe6f8a82dc3bf5ec77b667f3930bcc6a432274d659",
+      "kind": "transparent"
+    },
+    {
+      "address": "0x58442c7f27890a26897c0041F852a9772510a305",
+      "txHash": "0x4833586a45abd9d30cb7c4e89d2e67c6da90eb186ca8e69fc44e19a03f1bc0f3",
+      "kind": "transparent"
+    },
+    {
+      "address": "0x98B624E9fb40f5CaA05D5fB31bB72E2B821c0877",
+      "txHash": "0x616b8214a87f0dc3091fbd92e349b4576e20a977c00aeb968501b432482d0e35",
+      "kind": "transparent"
+    },
+    {
+      "address": "0x96AA1f73a0Ca44fd83a71fCF8f2Ba2Dc2aA22ED4",
+      "txHash": "0xd1129dbb17694a6e8d4c276ec3c29a21643b450e50bdd1799e560f852d3f7157",
+      "kind": "transparent"
+    },
+    {
+      "address": "0x8e63BFbd7D418FeD297523D3CDa9DA08528B2368",
+      "txHash": "0x317f653f46ad1fd4349b599c324bff82a555ef10e1671070800d053d15a4d1f7",
+      "kind": "transparent"
+    }
+  ],
+  "impls": {
+    "204de4b98f99b14742b55c22c26b68e85ca43f55a4ae02462f27af5491d94e6e": {
+      "address": "0xdCbbEC6534491566750e7dE3073fD8C85DF1fDf8",
+      "txHash": "0xe24a2c72f542059f7ef426a5d91786fa94012c2a2e3f216cc9328d69d4d45890",
+      "layout": {
+        "solcVersion": "0.8.20",
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\Initializable.sol:63",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\Initializable.sol:68"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\utils\\ContextUpgradeable.sol:40"
+          },
+          {
+            "label": "_owner",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_address",
+            "contract": "OwnableUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\access\\OwnableUpgradeable.sol:22"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "OwnableUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\access\\OwnableUpgradeable.sol:94"
+          },
+          {
+            "label": "matchingPool",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_uint256",
+            "contract": "ICBase",
+            "src": "contracts\\ICBase.sol:10"
+          },
+          {
+            "label": "multisigAddress",
+            "offset": 0,
+            "slot": "102",
+            "type": "t_address",
+            "contract": "ICBase",
+            "src": "contracts\\ICBase.sol:11"
+          },
+          {
+            "label": "approvedTokens",
+            "offset": 0,
+            "slot": "103",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "ICBase",
+            "src": "contracts\\ICBase.sol:12"
+          },
+          {
+            "label": "isAdmin",
+            "offset": 0,
+            "slot": "104",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "ICAdmin",
+            "src": "contracts\\ICAdmin.sol:7"
+          },
+          {
+            "label": "isBlacklisted",
+            "offset": 0,
+            "slot": "105",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "ICAdmin",
+            "src": "contracts\\ICAdmin.sol:8"
+          },
+          {
+            "label": "nextMatchId",
+            "offset": 0,
+            "slot": "106",
+            "type": "t_uint256",
+            "contract": "ICAdmin",
+            "src": "contracts\\ICAdmin.sol:9"
+          },
+          {
+            "label": "matches",
+            "offset": 0,
+            "slot": "107",
+            "type": "t_mapping(t_uint256,t_struct(Match)1919_storage)",
+            "contract": "ICMatch",
+            "src": "contracts\\ICMatch.sol:20"
+          },
+          {
+            "label": "matchDonorContributions",
+            "offset": 0,
+            "slot": "108",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "ICMatch",
+            "src": "contracts\\ICMatch.sol:21"
+          },
+          {
+            "label": "isPatron",
+            "offset": 0,
+            "slot": "109",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "ICMatch",
+            "src": "contracts\\ICMatch.sol:22"
+          },
+          {
+            "label": "matches2v2",
+            "offset": 0,
+            "slot": "110",
+            "type": "t_mapping(t_uint256,t_struct(Match2v2)986_storage)",
+            "contract": "IC2v2Match",
+            "src": "contracts\\IC2v2Match.sol:22"
+          },
+          {
+            "label": "_status",
+            "offset": 0,
+            "slot": "111",
+            "type": "t_uint256",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\security\\ReentrancyGuardUpgradeable.sol:38"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "112",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\security\\ReentrancyGuardUpgradeable.sol:88"
+          },
+          {
+            "label": "tournaments",
+            "offset": 0,
+            "slot": "161",
+            "type": "t_mapping(t_uint256,t_struct(Tournament)2424_storage)",
+            "contract": "ICTournament",
+            "src": "contracts\\ICTournament.sol:30"
+          },
+          {
+            "label": "currentTournamentRound",
+            "offset": 0,
+            "slot": "162",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "ICTournament",
+            "src": "contracts\\ICTournament.sol:31"
+          },
+          {
+            "label": "tournamentMatchingPools",
+            "offset": 0,
+            "slot": "163",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "ICTournament",
+            "src": "contracts\\ICTournament.sol:32"
+          },
+          {
+            "label": "tournamentEntrants",
+            "offset": 0,
+            "slot": "164",
+            "type": "t_mapping(t_uint256,t_array(t_address)dyn_storage)",
+            "contract": "ICTournament",
+            "src": "contracts\\ICTournament.sol:33"
+          },
+          {
+            "label": "isEntrantInTournament",
+            "offset": 0,
+            "slot": "165",
+            "type": "t_mapping(t_uint256,t_mapping(t_address,t_bool))",
+            "contract": "ICTournament",
+            "src": "contracts\\ICTournament.sol:34"
+          },
+          {
+            "label": "tournamentWinners",
+            "offset": 0,
+            "slot": "166",
+            "type": "t_mapping(t_uint256,t_mapping(t_address,t_struct(WinnerInfo)2429_storage))",
+            "contract": "ICTournament",
+            "src": "contracts\\ICTournament.sol:35"
+          },
+          {
+            "label": "nextTournamentId",
+            "offset": 0,
+            "slot": "167",
+            "type": "t_uint256",
+            "contract": "ICTournament",
+            "src": "contracts\\ICTournament.sol:37"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_address)dyn_storage": {
+            "label": "address[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_contract(IERC20)845": {
+            "label": "contract IERC20",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_struct(WinnerInfo)2429_storage)": {
+            "label": "mapping(address => struct ICTournament.WinnerInfo)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_array(t_address)dyn_storage)": {
+            "label": "mapping(uint256 => address[])",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_mapping(t_address,t_bool))": {
+            "label": "mapping(uint256 => mapping(address => bool))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_mapping(t_address,t_struct(WinnerInfo)2429_storage))": {
+            "label": "mapping(uint256 => mapping(address => struct ICTournament.WinnerInfo))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Match)1919_storage)": {
+            "label": "mapping(uint256 => struct ICMatch.Match)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Match2v2)986_storage)": {
+            "label": "mapping(uint256 => struct IC2v2Match.Match2v2)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Tournament)2424_storage)": {
+            "label": "mapping(uint256 => struct ICTournament.Tournament)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_uint256)": {
+            "label": "mapping(uint256 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Match)1919_storage": {
+            "label": "struct ICMatch.Match",
+            "members": [
+              {
+                "label": "player1",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "player2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "player1Amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "player2Amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "totalAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "donatedAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "isOpen",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "isERC20",
+                "type": "t_bool",
+                "offset": 1,
+                "slot": "6"
+              },
+              {
+                "label": "token",
+                "type": "t_contract(IERC20)845",
+                "offset": 2,
+                "slot": "6"
+              }
+            ],
+            "numberOfBytes": "224"
+          },
+          "t_struct(Match2v2)986_storage": {
+            "label": "struct IC2v2Match.Match2v2",
+            "members": [
+              {
+                "label": "player1",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "player2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "teamAPlayer2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "teamBPlayer2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "player1Amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "player2Amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "totalAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "donatedAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "isOpen",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "isERC20",
+                "type": "t_bool",
+                "offset": 1,
+                "slot": "8"
+              },
+              {
+                "label": "token",
+                "type": "t_contract(IERC20)845",
+                "offset": 2,
+                "slot": "8"
+              }
+            ],
+            "numberOfBytes": "288"
+          },
+          "t_struct(Tournament)2424_storage": {
+            "label": "struct ICTournament.Tournament",
+            "members": [
+              {
+                "label": "winnersPercentage",
+                "type": "t_uint8",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "multisigPercentage",
+                "type": "t_uint8",
+                "offset": 1,
+                "slot": "0"
+              },
+              {
+                "label": "isActive",
+                "type": "t_bool",
+                "offset": 2,
+                "slot": "0"
+              },
+              {
+                "label": "hasStarted",
+                "type": "t_bool",
+                "offset": 3,
+                "slot": "0"
+              },
+              {
+                "label": "isERC20",
+                "type": "t_bool",
+                "offset": 4,
+                "slot": "0"
+              },
+              {
+                "label": "hasEntryFee",
+                "type": "t_bool",
+                "offset": 5,
+                "slot": "0"
+              },
+              {
+                "label": "numEntrants",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "totalDonations",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "totalTokenDonations",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "remainingBalance",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "entryFee",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "token",
+                "type": "t_contract(IERC20)845",
+                "offset": 0,
+                "slot": "6"
+              }
+            ],
+            "numberOfBytes": "224"
+          },
+          "t_struct(WinnerInfo)2429_storage": {
+            "label": "struct ICTournament.WinnerInfo",
+            "members": [
+              {
+                "label": "amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "hasClaimed",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {}
+      }
+    },
+    "080a1a6585bb127e71edd71bae838a3e16dac53cd22897b25a6caf6487b88d55": {
+      "address": "0x059a86840883d209072390E92b29dde5B3A31c25",
+      "txHash": "0x780898c65373403f877d0265b8bd553d3c9db9c095c16be7536d20a9413f8d1b",
+      "layout": {
+        "solcVersion": "0.8.20",
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\Initializable.sol:63",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\Initializable.sol:68"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\utils\\ContextUpgradeable.sol:40"
+          },
+          {
+            "label": "_owner",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_address",
+            "contract": "OwnableUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\access\\OwnableUpgradeable.sol:22"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "OwnableUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\access\\OwnableUpgradeable.sol:94"
+          },
+          {
+            "label": "matchingPool",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_uint256",
+            "contract": "ICBase",
+            "src": "contracts\\ICBase.sol:17"
+          },
+          {
+            "label": "multisigAddress",
+            "offset": 0,
+            "slot": "102",
+            "type": "t_address",
+            "contract": "ICBase",
+            "src": "contracts\\ICBase.sol:18"
+          },
+          {
+            "label": "approvedTokens",
+            "offset": 0,
+            "slot": "103",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "ICBase",
+            "src": "contracts\\ICBase.sol:19"
+          },
+          {
+            "label": "isAdmin",
+            "offset": 0,
+            "slot": "104",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "ICAdmin",
+            "src": "contracts\\ICAdmin.sol:7"
+          },
+          {
+            "label": "isBlacklisted",
+            "offset": 0,
+            "slot": "105",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "ICAdmin",
+            "src": "contracts\\ICAdmin.sol:8"
+          },
+          {
+            "label": "nextMatchId",
+            "offset": 0,
+            "slot": "106",
+            "type": "t_uint256",
+            "contract": "ICAdmin",
+            "src": "contracts\\ICAdmin.sol:9"
+          },
+          {
+            "label": "matches",
+            "offset": 0,
+            "slot": "107",
+            "type": "t_mapping(t_uint256,t_struct(Match)3283_storage)",
+            "contract": "ICMatch",
+            "src": "contracts\\ICMatch.sol:20"
+          },
+          {
+            "label": "matchDonorContributions",
+            "offset": 0,
+            "slot": "108",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "ICMatch",
+            "src": "contracts\\ICMatch.sol:21"
+          },
+          {
+            "label": "isPatron",
+            "offset": 0,
+            "slot": "109",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "ICMatch",
+            "src": "contracts\\ICMatch.sol:22"
+          },
+          {
+            "label": "matches2v2",
+            "offset": 0,
+            "slot": "110",
+            "type": "t_mapping(t_uint256,t_struct(Match2v2)1212_storage)",
+            "contract": "IC2v2Match",
+            "src": "contracts\\IC2v2Match.sol:22"
+          },
+          {
+            "label": "_status",
+            "offset": 0,
+            "slot": "111",
+            "type": "t_uint256",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\security\\ReentrancyGuardUpgradeable.sol:38"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "112",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\security\\ReentrancyGuardUpgradeable.sol:88"
+          },
+          {
+            "label": "tournaments",
+            "offset": 0,
+            "slot": "161",
+            "type": "t_mapping(t_uint256,t_struct(Tournament)3788_storage)",
+            "contract": "ICTournament",
+            "src": "contracts\\ICTournament.sol:30"
+          },
+          {
+            "label": "currentTournamentRound",
+            "offset": 0,
+            "slot": "162",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "ICTournament",
+            "src": "contracts\\ICTournament.sol:31"
+          },
+          {
+            "label": "tournamentMatchingPools",
+            "offset": 0,
+            "slot": "163",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "ICTournament",
+            "src": "contracts\\ICTournament.sol:32"
+          },
+          {
+            "label": "tournamentEntrants",
+            "offset": 0,
+            "slot": "164",
+            "type": "t_mapping(t_uint256,t_array(t_address)dyn_storage)",
+            "contract": "ICTournament",
+            "src": "contracts\\ICTournament.sol:33"
+          },
+          {
+            "label": "isEntrantInTournament",
+            "offset": 0,
+            "slot": "165",
+            "type": "t_mapping(t_uint256,t_mapping(t_address,t_bool))",
+            "contract": "ICTournament",
+            "src": "contracts\\ICTournament.sol:34"
+          },
+          {
+            "label": "tournamentWinners",
+            "offset": 0,
+            "slot": "166",
+            "type": "t_mapping(t_uint256,t_mapping(t_address,t_struct(WinnerInfo)3793_storage))",
+            "contract": "ICTournament",
+            "src": "contracts\\ICTournament.sol:35"
+          },
+          {
+            "label": "nextTournamentId",
+            "offset": 0,
+            "slot": "167",
+            "type": "t_uint256",
+            "contract": "ICTournament",
+            "src": "contracts\\ICTournament.sol:37"
+          },
+          {
+            "label": "matches5v5",
+            "offset": 0,
+            "slot": "168",
+            "type": "t_mapping(t_uint256,t_struct(Match5v5)1792_storage)",
+            "contract": "IC5v5Match",
+            "src": "contracts\\IC5v5Match.sol:28"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_address)dyn_storage": {
+            "label": "address[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_contract(IERC20)845": {
+            "label": "contract IERC20",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_struct(WinnerInfo)3793_storage)": {
+            "label": "mapping(address => struct ICTournament.WinnerInfo)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_array(t_address)dyn_storage)": {
+            "label": "mapping(uint256 => address[])",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_mapping(t_address,t_bool))": {
+            "label": "mapping(uint256 => mapping(address => bool))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_mapping(t_address,t_struct(WinnerInfo)3793_storage))": {
+            "label": "mapping(uint256 => mapping(address => struct ICTournament.WinnerInfo))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Match)3283_storage)": {
+            "label": "mapping(uint256 => struct ICMatch.Match)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Match2v2)1212_storage)": {
+            "label": "mapping(uint256 => struct IC2v2Match.Match2v2)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Match5v5)1792_storage)": {
+            "label": "mapping(uint256 => struct IC5v5Match.Match5v5)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Tournament)3788_storage)": {
+            "label": "mapping(uint256 => struct ICTournament.Tournament)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_uint256)": {
+            "label": "mapping(uint256 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Match)3283_storage": {
+            "label": "struct ICMatch.Match",
+            "members": [
+              {
+                "label": "player1",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "player2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "player1Amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "player2Amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "totalAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "donatedAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "isOpen",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "isERC20",
+                "type": "t_bool",
+                "offset": 1,
+                "slot": "6"
+              },
+              {
+                "label": "token",
+                "type": "t_contract(IERC20)845",
+                "offset": 2,
+                "slot": "6"
+              }
+            ],
+            "numberOfBytes": "224"
+          },
+          "t_struct(Match2v2)1212_storage": {
+            "label": "struct IC2v2Match.Match2v2",
+            "members": [
+              {
+                "label": "player1",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "player2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "teamAPlayer2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "teamBPlayer2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "player1Amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "player2Amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "totalAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "donatedAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "isOpen",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "isERC20",
+                "type": "t_bool",
+                "offset": 1,
+                "slot": "8"
+              },
+              {
+                "label": "token",
+                "type": "t_contract(IERC20)845",
+                "offset": 2,
+                "slot": "8"
+              }
+            ],
+            "numberOfBytes": "288"
+          },
+          "t_struct(Match5v5)1792_storage": {
+            "label": "struct IC5v5Match.Match5v5",
+            "members": [
+              {
+                "label": "player1",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "teamAPlayer2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "teamAPlayer3",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "teamAPlayer4",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "teamAPlayer5",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "player2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "teamBPlayer2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "teamBPlayer3",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "teamBPlayer4",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "teamBPlayer5",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "9"
+              },
+              {
+                "label": "player1Amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "10"
+              },
+              {
+                "label": "totalAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "11"
+              },
+              {
+                "label": "token",
+                "type": "t_contract(IERC20)845",
+                "offset": 0,
+                "slot": "12"
+              },
+              {
+                "label": "isERC20",
+                "type": "t_bool",
+                "offset": 20,
+                "slot": "12"
+              },
+              {
+                "label": "isOpen",
+                "type": "t_bool",
+                "offset": 21,
+                "slot": "12"
+              }
+            ],
+            "numberOfBytes": "416"
+          },
+          "t_struct(Tournament)3788_storage": {
+            "label": "struct ICTournament.Tournament",
+            "members": [
+              {
+                "label": "winnersPercentage",
+                "type": "t_uint8",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "multisigPercentage",
+                "type": "t_uint8",
+                "offset": 1,
+                "slot": "0"
+              },
+              {
+                "label": "isActive",
+                "type": "t_bool",
+                "offset": 2,
+                "slot": "0"
+              },
+              {
+                "label": "hasStarted",
+                "type": "t_bool",
+                "offset": 3,
+                "slot": "0"
+              },
+              {
+                "label": "isERC20",
+                "type": "t_bool",
+                "offset": 4,
+                "slot": "0"
+              },
+              {
+                "label": "hasEntryFee",
+                "type": "t_bool",
+                "offset": 5,
+                "slot": "0"
+              },
+              {
+                "label": "numEntrants",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "totalDonations",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "totalTokenDonations",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "remainingBalance",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "entryFee",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "token",
+                "type": "t_contract(IERC20)845",
+                "offset": 0,
+                "slot": "6"
+              }
+            ],
+            "numberOfBytes": "224"
+          },
+          "t_struct(WinnerInfo)3793_storage": {
+            "label": "struct ICTournament.WinnerInfo",
+            "members": [
+              {
+                "label": "amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "hasClaimed",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {}
+      }
+    },
+    "6f668b424ddcdf5f06986f73a31a012212f6cd8f4edf15599c298b4e79baf504": {
+      "address": "0x052E7926f7B0C892Ef953EcC709d3c6e3D17268b",
+      "txHash": "0x0f07d7dbcf892ea571f0db1ee6e078000ec0bc3a2738a07cde25fd88f4a3cc87",
+      "layout": {
+        "solcVersion": "0.8.20",
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\Initializable.sol:63",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\Initializable.sol:68"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\utils\\ContextUpgradeable.sol:40"
+          },
+          {
+            "label": "_owner",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_address",
+            "contract": "OwnableUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\access\\OwnableUpgradeable.sol:22"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "OwnableUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\access\\OwnableUpgradeable.sol:94"
+          },
+          {
+            "label": "matchingPool",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_uint256",
+            "contract": "ICBase",
+            "src": "contracts\\ICBase.sol:17"
+          },
+          {
+            "label": "multisigAddress",
+            "offset": 0,
+            "slot": "102",
+            "type": "t_address",
+            "contract": "ICBase",
+            "src": "contracts\\ICBase.sol:18"
+          },
+          {
+            "label": "approvedTokens",
+            "offset": 0,
+            "slot": "103",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "ICBase",
+            "src": "contracts\\ICBase.sol:19"
+          },
+          {
+            "label": "isAdmin",
+            "offset": 0,
+            "slot": "104",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "ICAdmin",
+            "src": "contracts\\ICAdmin.sol:7"
+          },
+          {
+            "label": "isBlacklisted",
+            "offset": 0,
+            "slot": "105",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "ICAdmin",
+            "src": "contracts\\ICAdmin.sol:8"
+          },
+          {
+            "label": "nextMatchId",
+            "offset": 0,
+            "slot": "106",
+            "type": "t_uint256",
+            "contract": "ICAdmin",
+            "src": "contracts\\ICAdmin.sol:9"
+          },
+          {
+            "label": "matches",
+            "offset": 0,
+            "slot": "107",
+            "type": "t_mapping(t_uint256,t_struct(Match)3060_storage)",
+            "contract": "ICMatch",
+            "src": "contracts\\ICMatch.sol:20"
+          },
+          {
+            "label": "matchDonorContributions",
+            "offset": 0,
+            "slot": "108",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "ICMatch",
+            "src": "contracts\\ICMatch.sol:21"
+          },
+          {
+            "label": "isPatron",
+            "offset": 0,
+            "slot": "109",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "ICMatch",
+            "src": "contracts\\ICMatch.sol:22"
+          },
+          {
+            "label": "matches2v2",
+            "offset": 0,
+            "slot": "110",
+            "type": "t_mapping(t_uint256,t_struct(Match2v2)989_storage)",
+            "contract": "IC2v2Match",
+            "src": "contracts\\IC2v2Match.sol:22"
+          },
+          {
+            "label": "_status",
+            "offset": 0,
+            "slot": "111",
+            "type": "t_uint256",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\security\\ReentrancyGuardUpgradeable.sol:38"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "112",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\security\\ReentrancyGuardUpgradeable.sol:88"
+          },
+          {
+            "label": "tournaments",
+            "offset": 0,
+            "slot": "161",
+            "type": "t_mapping(t_uint256,t_struct(Tournament)3565_storage)",
+            "contract": "ICTournament",
+            "src": "contracts\\ICTournament.sol:30"
+          },
+          {
+            "label": "currentTournamentRound",
+            "offset": 0,
+            "slot": "162",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "ICTournament",
+            "src": "contracts\\ICTournament.sol:31"
+          },
+          {
+            "label": "tournamentMatchingPools",
+            "offset": 0,
+            "slot": "163",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "ICTournament",
+            "src": "contracts\\ICTournament.sol:32"
+          },
+          {
+            "label": "tournamentEntrants",
+            "offset": 0,
+            "slot": "164",
+            "type": "t_mapping(t_uint256,t_array(t_address)dyn_storage)",
+            "contract": "ICTournament",
+            "src": "contracts\\ICTournament.sol:33"
+          },
+          {
+            "label": "isEntrantInTournament",
+            "offset": 0,
+            "slot": "165",
+            "type": "t_mapping(t_uint256,t_mapping(t_address,t_bool))",
+            "contract": "ICTournament",
+            "src": "contracts\\ICTournament.sol:34"
+          },
+          {
+            "label": "tournamentWinners",
+            "offset": 0,
+            "slot": "166",
+            "type": "t_mapping(t_uint256,t_mapping(t_address,t_struct(WinnerInfo)3570_storage))",
+            "contract": "ICTournament",
+            "src": "contracts\\ICTournament.sol:35"
+          },
+          {
+            "label": "nextTournamentId",
+            "offset": 0,
+            "slot": "167",
+            "type": "t_uint256",
+            "contract": "ICTournament",
+            "src": "contracts\\ICTournament.sol:37"
+          },
+          {
+            "label": "matches5v5",
+            "offset": 0,
+            "slot": "168",
+            "type": "t_mapping(t_uint256,t_struct(Match5v5)1569_storage)",
+            "contract": "IC5v5Match",
+            "src": "contracts\\IC5v5Match.sol:28"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_address)dyn_storage": {
+            "label": "address[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_contract(IERC20)845": {
+            "label": "contract IERC20",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_struct(WinnerInfo)3570_storage)": {
+            "label": "mapping(address => struct ICTournament.WinnerInfo)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_array(t_address)dyn_storage)": {
+            "label": "mapping(uint256 => address[])",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_mapping(t_address,t_bool))": {
+            "label": "mapping(uint256 => mapping(address => bool))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_mapping(t_address,t_struct(WinnerInfo)3570_storage))": {
+            "label": "mapping(uint256 => mapping(address => struct ICTournament.WinnerInfo))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Match)3060_storage)": {
+            "label": "mapping(uint256 => struct ICMatch.Match)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Match2v2)989_storage)": {
+            "label": "mapping(uint256 => struct IC2v2Match.Match2v2)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Match5v5)1569_storage)": {
+            "label": "mapping(uint256 => struct IC5v5Match.Match5v5)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Tournament)3565_storage)": {
+            "label": "mapping(uint256 => struct ICTournament.Tournament)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_uint256)": {
+            "label": "mapping(uint256 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Match)3060_storage": {
+            "label": "struct ICMatch.Match",
+            "members": [
+              {
+                "label": "player1",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "player2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "player1Amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "player2Amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "totalAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "donatedAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "isOpen",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "isERC20",
+                "type": "t_bool",
+                "offset": 1,
+                "slot": "6"
+              },
+              {
+                "label": "token",
+                "type": "t_contract(IERC20)845",
+                "offset": 2,
+                "slot": "6"
+              }
+            ],
+            "numberOfBytes": "224"
+          },
+          "t_struct(Match2v2)989_storage": {
+            "label": "struct IC2v2Match.Match2v2",
+            "members": [
+              {
+                "label": "player1",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "player2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "teamAPlayer2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "teamBPlayer2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "player1Amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "player2Amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "totalAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "donatedAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "isOpen",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "isERC20",
+                "type": "t_bool",
+                "offset": 1,
+                "slot": "8"
+              },
+              {
+                "label": "token",
+                "type": "t_contract(IERC20)845",
+                "offset": 2,
+                "slot": "8"
+              }
+            ],
+            "numberOfBytes": "288"
+          },
+          "t_struct(Match5v5)1569_storage": {
+            "label": "struct IC5v5Match.Match5v5",
+            "members": [
+              {
+                "label": "player1",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "teamAPlayer2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "teamAPlayer3",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "teamAPlayer4",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "teamAPlayer5",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "player2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "teamBPlayer2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "teamBPlayer3",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "teamBPlayer4",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "teamBPlayer5",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "9"
+              },
+              {
+                "label": "player1Amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "10"
+              },
+              {
+                "label": "totalAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "11"
+              },
+              {
+                "label": "token",
+                "type": "t_contract(IERC20)845",
+                "offset": 0,
+                "slot": "12"
+              },
+              {
+                "label": "isERC20",
+                "type": "t_bool",
+                "offset": 20,
+                "slot": "12"
+              },
+              {
+                "label": "isOpen",
+                "type": "t_bool",
+                "offset": 21,
+                "slot": "12"
+              }
+            ],
+            "numberOfBytes": "416"
+          },
+          "t_struct(Tournament)3565_storage": {
+            "label": "struct ICTournament.Tournament",
+            "members": [
+              {
+                "label": "winnersPercentage",
+                "type": "t_uint8",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "multisigPercentage",
+                "type": "t_uint8",
+                "offset": 1,
+                "slot": "0"
+              },
+              {
+                "label": "isActive",
+                "type": "t_bool",
+                "offset": 2,
+                "slot": "0"
+              },
+              {
+                "label": "hasStarted",
+                "type": "t_bool",
+                "offset": 3,
+                "slot": "0"
+              },
+              {
+                "label": "isERC20",
+                "type": "t_bool",
+                "offset": 4,
+                "slot": "0"
+              },
+              {
+                "label": "hasEntryFee",
+                "type": "t_bool",
+                "offset": 5,
+                "slot": "0"
+              },
+              {
+                "label": "numEntrants",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "totalDonations",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "totalTokenDonations",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "remainingBalance",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "entryFee",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "token",
+                "type": "t_contract(IERC20)845",
+                "offset": 0,
+                "slot": "6"
+              }
+            ],
+            "numberOfBytes": "224"
+          },
+          "t_struct(WinnerInfo)3570_storage": {
+            "label": "struct ICTournament.WinnerInfo",
+            "members": [
+              {
+                "label": "amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "hasClaimed",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {}
+      }
+    }
+  }
+}
