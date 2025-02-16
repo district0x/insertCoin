@@ -4,10 +4,11 @@ import { defineChain } from "viem";
 const getRpcUrls = () => {
   const urls = [
     process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL,
-    "https://sepolia.base.org",
-    "https://1rpc.io/base-sepolia",
-    "https://base-sepolia.blockpi.network/v1/rpc/public",
   ].filter(Boolean) as string[];
+
+  if (urls.length === 0) {
+    throw new Error('No RPC URL configured. Please set NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL in .env');
+  }
 
   return {
     http: urls,

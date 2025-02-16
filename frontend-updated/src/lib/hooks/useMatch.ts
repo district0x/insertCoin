@@ -14,11 +14,18 @@ export function useMatch() {
         {
           account: walletClient.account.address,
           value: amount,
+          gas: await contract.estimateGas.startMatch(
+            [amount, "0x0000000000000000000000000000000000000000"],
+            { account: walletClient.account.address, value: amount }
+          ),
         }
       );
       return walletClient.writeContract(request);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating match:", error);
+      if (error.message?.includes('CORS')) {
+        throw new Error('Network connection issue. Please try again.');
+      }
       throw error;
     }
   };
@@ -32,11 +39,18 @@ export function useMatch() {
         {
           account: walletClient.account.address,
           value: amount,
+          gas: await contract.estimateGas.start2v2Match(
+            [amount, "0x0000000000000000000000000000000000000000"],
+            { account: walletClient.account.address, value: amount }
+          ),
         }
       );
       return walletClient.writeContract(request);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating 2v2 match:", error);
+      if (error.message?.includes('CORS')) {
+        throw new Error('Network connection issue. Please try again.');
+      }
       throw error;
     }
   };
@@ -50,11 +64,18 @@ export function useMatch() {
         {
           account: walletClient.account.address,
           value: amount,
+          gas: await contract.estimateGas.start5v5Match(
+            [amount, "0x0000000000000000000000000000000000000000"],
+            { account: walletClient.account.address, value: amount }
+          ),
         }
       );
       return walletClient.writeContract(request);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating 5v5 match:", error);
+      if (error.message?.includes('CORS')) {
+        throw new Error('Network connection issue. Please try again.');
+      }
       throw error;
     }
   };
