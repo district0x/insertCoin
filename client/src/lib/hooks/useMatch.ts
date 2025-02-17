@@ -1,5 +1,6 @@
 import { useContract } from "./useContract";
 import { useWalletClient } from "wagmi";
+import { BaseError } from "viem";
 
 export function useMatch() {
   const contract = useContract();
@@ -21,9 +22,9 @@ export function useMatch() {
         }
       );
       return walletClient.writeContract(request);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error creating match:", error);
-      if (error.message?.includes('CORS')) {
+      if (error instanceof BaseError && error.message?.includes('CORS')) {
         throw new Error('Network connection issue. Please try again.');
       }
       throw error;
@@ -46,9 +47,9 @@ export function useMatch() {
         }
       );
       return walletClient.writeContract(request);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error creating 2v2 match:", error);
-      if (error.message?.includes('CORS')) {
+      if (error instanceof BaseError && error.message?.includes('CORS')) {
         throw new Error('Network connection issue. Please try again.');
       }
       throw error;
@@ -71,9 +72,9 @@ export function useMatch() {
         }
       );
       return walletClient.writeContract(request);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error creating 5v5 match:", error);
-      if (error.message?.includes('CORS')) {
+      if (error instanceof BaseError && error.message?.includes('CORS')) {
         throw new Error('Network connection issue. Please try again.');
       }
       throw error;

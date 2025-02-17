@@ -11,18 +11,72 @@ import { throttleRequest } from "../utils/rateLimit";
 
 // Simple in-memory cache
 const matchCache = new Map<string, { data: OnChainMatch; timestamp: number }>();
-const CACHE_DURATION = 10000; // 10 seconds
+
+// Cache durations based on match state
+const CACHE_DURATIONS = {
+  COMPLETED: 5 * 60 * 1000, // 5 minutes for completed matches
+  IN_PROGRESS: 30 * 1000,   // 30 seconds for in-progress matches
+  OPEN: 60 * 1000,          // 1 minute for open matches
+  DEFAULT: 30 * 1000        // 30 seconds default
+};
+
+function getCacheExpiry(match: OnChainMatch): number {
+  if (!match.isOpen) return CACHE_DURATIONS.COMPLETED;
+  if (match.player2 !== "0x0000000000000000000000000000000000000000") return CACHE_DURATIONS.IN_PROGRESS;
+  return CACHE_DURATIONS.OPEN;
+}
 
 function getCachedMatch(matchId: string): OnChainMatch | null {
   const cached = matchCache.get(matchId);
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return cached.data;
+  if (cached) {
+    const cacheExpiry = getCacheExpiry(cached.data);
+    if (Date.now() - cached.timestamp < cacheExpiry) {
+      return cached.data;
+    }
   }
   return null;
 }
 
 function cacheMatch(matchId: string, data: OnChainMatch) {
   matchCache.set(matchId, { data, timestamp: Date.now() });
+}
+
+// Prefetch cache for quick access
+const prefetchCache = new Map<string, Promise<OnChainMatch | null>>();
+
+export function prefetchMatch(
+  contract: GetContractReturnType<typeof ONEVONE_ABI>,
+  publicClient: PublicClient,
+  matchId: string
+): Promise<OnChainMatch | null> {
+  // Check if already prefetching
+  const existing = prefetchCache.get(matchId);
+  if (existing) return existing;
+
+  // Start new prefetch
+  const promise = fetchMatch(contract, publicClient, matchId);
+  prefetchCache.set(matchId, promise);
+  
+  // Clean up after prefetch completes
+  promise.finally(() => {
+    setTimeout(() => {
+      prefetchCache.delete(matchId);
+    }, 30000); // Clear after 30 seconds
+  });
+
+  return promise;
+}
+
+// Batch prefetch multiple matches
+export async function prefetchMatches(
+  contract: GetContractReturnType<typeof ONEVONE_ABI>,
+  publicClient: PublicClient,
+  matchIds: string[]
+): Promise<void> {
+  const promises = matchIds.map(id => 
+    prefetchMatch(contract, publicClient, id)
+  );
+  await Promise.all(promises);
 }
 
 export async function fetchMatch(

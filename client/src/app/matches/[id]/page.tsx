@@ -16,7 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import useSWR, { mutate } from "swr";
+import useSWR from "swr";
 import { MatchStatusBadge } from "@/components/match/match-status-badge";
 import { MatchPlayerInfo } from "@/components/match/match-player-info";
 import { MatchJoinDialog } from "@/components/match/match-join-dialog";
@@ -34,6 +34,7 @@ import {
 } from "@/lib/match/actions";
 import { useEthPrice } from "@/lib/hooks/useEthPrice";
 import { useVisibilityChange } from "@/lib/hooks/useVisibilityChange";
+import { OnChainMatch } from "@/types/match";
 
 export default function MatchPage() {
   const params = useParams();
@@ -53,6 +54,7 @@ export default function MatchPage() {
   const [selectedWinner, setSelectedWinner] = React.useState<
     `0x${string}` | null
   >(null);
+  const [optimisticMatch, setOptimisticMatch] = React.useState<OnChainMatch | null>(null);
 
   const contract = useContract();
   const publicClient = usePublicClient();
@@ -69,8 +71,8 @@ export default function MatchPage() {
     userAddress: address,
   });
 
-  // Fetch match data
-  const { data: match, error } = useSWR(
+  // Fetch match data with optimistic updates
+  const { data: match, error, mutate } = useSWR(
     matchId && contract && publicClient && isVisible
       ? `match-${matchId}`
       : null,
@@ -88,6 +90,8 @@ export default function MatchPage() {
           console.log("[MatchPage] No match data returned");
           return null;
         }
+        // Update optimistic state with real data
+        setOptimisticMatch(null);
         return data;
       } catch (err) {
         console.error("[MatchPage] Error in SWR fetcher:", err);
@@ -97,19 +101,17 @@ export default function MatchPage() {
     {
       refreshInterval: isVisible ? 30000 : 0,
       revalidateOnFocus: false,
-      onSuccess: (data) => {
-        console.log("[MatchPage] SWR success:", data);
-      },
-      onError: (err) => {
-        console.error("[MatchPage] SWR error:", err);
-      },
+      keepPreviousData: true, // Keep showing old data while loading new data
     }
   );
 
+  // Use optimistic data if available, otherwise use fetched data
+  const displayMatch = optimisticMatch || match;
+
   // Log state changes
   React.useEffect(() => {
-    console.log("[MatchPage] Match data updated:", match);
-  }, [match]);
+    console.log("[MatchPage] Match data updated:", displayMatch);
+  }, [displayMatch]);
 
   React.useEffect(() => {
     if (error) {
@@ -118,7 +120,7 @@ export default function MatchPage() {
   }, [error]);
 
   const handleJoinMatch = async () => {
-    if (!contract || !walletClient || !address || !publicClient || !match) {
+    if (!contract || !walletClient || !address || !publicClient || !displayMatch) {
       toast({
         variant: "destructive",
         title: "Error",
@@ -130,34 +132,36 @@ export default function MatchPage() {
     try {
       setIsProcessing(true);
 
-      // Determine which team to join
-      const requiredPlayers = getMaxPlayers(match.matchType);
-      const teamASpots = requiredPlayers - match.teamA.length;
-      const teamBSpots = requiredPlayers - match.teamB.length;
-
-      // Validate team spots
-      if (teamASpots === 0 && teamBSpots === 0) {
-        toast({
-          variant: "destructive",
-          title: "Teams Full",
-          description: "This match is already full.",
-        });
-        return;
-      }
-
-      // Determine which team to join for team matches
+      // Create optimistic update
+      const optimisticUpdate = { ...displayMatch };
+      const requiredPlayers = getMaxPlayers(displayMatch.matchType);
+      const teamASpots = requiredPlayers - displayMatch.teamA.length;
+      const teamBSpots = requiredPlayers - displayMatch.teamB.length;
       const isTeamA =
         teamASpots > 0 && (teamBSpots === 0 || teamASpots >= teamBSpots);
 
+      // Update teams optimistically
+      if (displayMatch.matchType === "ONE_V_ONE") {
+        optimisticUpdate.player2 = address;
+        optimisticUpdate.teamB = [address];
+      } else if (isTeamA) {
+        optimisticUpdate.teamA = [...displayMatch.teamA, address];
+      } else {
+        optimisticUpdate.teamB = [...displayMatch.teamB, address];
+      }
+
+      // Apply optimistic update
+      setOptimisticMatch(optimisticUpdate);
+
       let hash;
-      switch (match.matchType) {
+      switch (displayMatch.matchType) {
         case "ONE_V_ONE":
           hash = await joinMatch(
             contract,
             publicClient,
             walletClient,
-            match.id,
-            match.player1Amount
+            displayMatch.id,
+            displayMatch.player1Amount
           );
           break;
         case "TWO_V_TWO":
@@ -165,9 +169,9 @@ export default function MatchPage() {
             contract,
             publicClient,
             walletClient,
-            match.id,
+            displayMatch.id,
             isTeamA,
-            match.player1Amount
+            displayMatch.player1Amount
           );
           break;
         case "FIVE_V_FIVE":
@@ -175,9 +179,9 @@ export default function MatchPage() {
             contract,
             publicClient,
             walletClient,
-            match.id,
+            displayMatch.id,
             isTeamA,
-            match.player1Amount
+            displayMatch.player1Amount
           );
           break;
       }
@@ -193,10 +197,12 @@ export default function MatchPage() {
           title: "Success",
           description: "Successfully joined match!",
         });
-        mutate(`match-${matchId}`);
+        mutate(); // Refresh data
       }
     } catch (error) {
       console.error("Error joining match:", error);
+      // Revert optimistic update on error
+      setOptimisticMatch(null);
       toast({
         variant: "destructive",
         title: "Error",
@@ -217,7 +223,7 @@ export default function MatchPage() {
       !walletClient ||
       !address ||
       !donationEthAmount ||
-      !match ||
+      !displayMatch ||
       !publicClient
     ) {
       toast({
@@ -229,7 +235,7 @@ export default function MatchPage() {
     }
 
     // Check if match is open before proceeding
-    if (!match.isOpen) {
+    if (!displayMatch.isOpen) {
       toast({
         variant: "destructive",
         title: "Match Closed",
@@ -245,7 +251,7 @@ export default function MatchPage() {
         contract,
         publicClient,
         walletClient,
-        match.id,
+        displayMatch.id,
         donationEthAmount
       );
 
@@ -261,14 +267,14 @@ export default function MatchPage() {
           address: contract.address,
           abi: contract.abi,
           functionName: "matches",
-          args: [match.id],
+          args: [displayMatch.id],
         });
-        const newDonationAmount = updatedMatch[5] - match.donatedAmount;
+        const newDonationAmount = updatedMatch[5] - displayMatch.donatedAmount;
 
         setLastDonationAmount(newDonationAmount);
         setShowSuccessDialog(true);
         setDonationEthAmount(BigInt(0));
-        mutate(`match-${matchId}`);
+        mutate();
       }
     } catch (error) {
       console.error("Error donating to match:", error);
@@ -309,7 +315,7 @@ export default function MatchPage() {
       !walletClient ||
       !address ||
       !publicClient ||
-      !match ||
+      !displayMatch ||
       !selectedWinner
     ) {
       toast({
@@ -327,7 +333,7 @@ export default function MatchPage() {
         contract,
         publicClient,
         walletClient,
-        match.id,
+        displayMatch.id,
         selectedWinner
       );
 
@@ -342,7 +348,7 @@ export default function MatchPage() {
           title: "Success",
           description: "Successfully closed match!",
         });
-        mutate(`match-${matchId}`);
+        mutate();
       }
     } catch (error) {
       console.error("Error closing match:", error);
@@ -372,11 +378,18 @@ export default function MatchPage() {
     );
   }
 
-  if (!match) {
+  if (!displayMatch) {
     console.log("[MatchPage] Rendering loading state");
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center">
+        <Link
+          href="/matches"
+          className="flex items-center text-sm text-muted-foreground mb-6 hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Matches
+        </Link>
+        <div className="flex items-center justify-center min-h-[400px]">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
       </div>
@@ -384,11 +397,11 @@ export default function MatchPage() {
   }
 
   console.log("[MatchPage] Rendering match data:", {
-    id: match.id.toString(),
-    type: match.matchType,
-    totalAmount: match.totalAmount.toString(),
-    teamA: match.teamA,
-    teamB: match.teamB,
+    id: displayMatch.id.toString(),
+    type: displayMatch.matchType,
+    totalAmount: displayMatch.totalAmount.toString(),
+    teamA: displayMatch.teamA,
+    teamB: displayMatch.teamB,
   });
 
   return (
@@ -406,53 +419,53 @@ export default function MatchPage() {
           <div className="flex justify-between items-center">
             <div>
               <CardTitle>
-                {match.matchType} Match #{match.id.toString()}
+                {displayMatch.matchType} Match #{displayMatch.id.toString()}
               </CardTitle>
               <CardDescription>
-                Prize Pool: {formatEther(match.totalAmount)} ETH
+                Prize Pool: {formatEther(displayMatch.totalAmount)} ETH
                 <span className="text-muted-foreground ml-1">
-                  (≈${convertEthToUsd(match.totalAmount).toFixed(2)})
+                  (≈${convertEthToUsd(displayMatch.totalAmount).toFixed(2)})
                 </span>
               </CardDescription>
             </div>
-            <MatchStatusBadge match={match} />
+            <MatchStatusBadge match={displayMatch} />
           </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <MatchPlayerInfo
-                addresses={match.teamA}
-                stake={match.player1Amount}
+                addresses={displayMatch.teamA}
+                stake={displayMatch.player1Amount}
                 label="Team A"
-                maxPlayers={getMaxPlayers(match.matchType)}
+                maxPlayers={getMaxPlayers(displayMatch.matchType)}
                 convertToUsd={convertEthToUsd}
               />
               <MatchPlayerInfo
-                addresses={match.teamB}
-                stake={match.player2Amount}
+                addresses={displayMatch.teamB}
+                stake={displayMatch.player2Amount}
                 label="Team B"
-                maxPlayers={getMaxPlayers(match.matchType)}
+                maxPlayers={getMaxPlayers(displayMatch.matchType)}
                 convertToUsd={convertEthToUsd}
               />
             </div>
 
-            {match.donatedAmount > BigInt(0) && (
+            {displayMatch.donatedAmount > BigInt(0) && (
               <div>
                 <h3 className="font-medium mb-2">Donations</h3>
                 <p className="text-sm">
-                  {formatEther(match.donatedAmount)} ETH
+                  {formatEther(displayMatch.donatedAmount)} ETH
                   <span className="text-muted-foreground ml-1">
-                    (≈${convertEthToUsd(match.donatedAmount).toFixed(2)})
+                    (≈${convertEthToUsd(displayMatch.donatedAmount).toFixed(2)})
                   </span>
                 </p>
               </div>
             )}
 
             <div className="space-y-2">
-              {match.isOpen && (
+              {displayMatch.isOpen && (
                 <MatchJoinDialog
-                  match={match}
+                  match={displayMatch}
                   isProcessing={isProcessing}
                   userAddress={address}
                   onJoin={handleJoinMatch}
@@ -463,7 +476,7 @@ export default function MatchPage() {
               )}
 
               <MatchDonationDialog
-                match={match}
+                match={displayMatch}
                 isProcessing={isProcessing}
                 donationEthAmount={donationEthAmount}
                 onDonationEthChange={setDonationEthAmount}
@@ -471,9 +484,9 @@ export default function MatchPage() {
                 convertToUsd={convertEthToUsd}
               />
 
-              {match.isOpen && match.teamB.length > 0 && (
+              {displayMatch.isOpen && displayMatch.teamB.length > 0 && (
                 <MatchCloseDialog
-                  match={match}
+                  match={displayMatch}
                   isProcessing={isProcessing}
                   selectedWinner={selectedWinner}
                   onSelectWinner={setSelectedWinner}
@@ -489,7 +502,7 @@ export default function MatchPage() {
       </Card>
 
       <MatchDonationSuccessDialog
-        match={match}
+        match={displayMatch}
         lastDonationAmount={lastDonationAmount}
         open={showSuccessDialog}
         onOpenChange={setShowSuccessDialog}
