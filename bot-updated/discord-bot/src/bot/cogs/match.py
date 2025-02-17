@@ -67,7 +67,8 @@ class MatchCog(commands.Cog):
                 "status": "PENDING",
                 "stake": amount or 0.0,
                 "creatorDiscordId": str(interaction.user.id),
-                "totalPrize": amount or 0.0
+                "totalPrize": amount or 0.0,
+                "discordChannelId": str(channel.id)  # Save the channel ID
             }
             logger.info(f"Match data to be created: {match_data}")
             

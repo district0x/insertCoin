@@ -21,54 +21,76 @@ class ContractClient:
             cls._instance = super().__new__(cls)
             cls._instance._contract = None
             cls._instance._w3 = None
+            cls._instance._abi = None
         return cls._instance
         
     def connect(self):
         """Connect to the blockchain and initialize contract."""
-        if self._w3 is None:
-            try:
-                logger.info(f"Connecting to RPC endpoint: {config.RPC_URL}")
-                self._w3 = Web3(Web3.HTTPProvider(config.RPC_URL))
-                if not self._w3.is_connected():
-                    raise ConnectionError("Failed to connect to RPC endpoint")
-                logger.info("Successfully connected to RPC endpoint")
-                    
-                # Load contract ABI
+        try:
+            logger.info(f"Connecting to RPC endpoint: {config.RPC_URL}")
+            self._w3 = Web3(Web3.HTTPProvider(config.RPC_URL))
+            if not self._w3.is_connected():
+                raise ConnectionError("Failed to connect to RPC endpoint")
+            logger.info("Successfully connected to RPC endpoint")
+                
+            # Load contract ABI if not already loaded
+            if self._abi is None:
                 abi_path = Path(__file__).parent / 'abi.json'
                 logger.info(f"Loading ABI from: {abi_path}")
                 with open(abi_path) as f:
-                    abi = json.load(f)
+                    self._abi = json.load(f)
                 logger.info("ABI loaded successfully")
-                    
-                # Initialize contract
-                logger.info(f"Initializing contract at address: {config.CONTRACT_ADDRESS}")
-                self._contract = self._w3.eth.contract(
-                    address=config.CONTRACT_ADDRESS,
-                    abi=abi
-                )
                 
-                # Test contract connection
-                try:
-                    next_match_id = self._contract.functions.nextMatchId().call()
-                    logger.info(f"Contract initialized successfully. Next match ID: {next_match_id}")
-                except Exception as e:
-                    logger.error(f"Failed to call nextMatchId: {e}")
-                    raise
-                
+            # Initialize contract
+            logger.info(f"Initializing contract at address: {config.CONTRACT_ADDRESS}")
+            self._contract = self._w3.eth.contract(
+                address=config.CONTRACT_ADDRESS,
+                abi=self._abi
+            )
+            
+            # Test contract connection
+            try:
+                next_match_id = self._contract.functions.nextMatchId().call()
+                logger.info(f"Contract initialized successfully. Next match ID: {next_match_id}")
             except Exception as e:
-                logger.error(f"Failed to initialize Web3 contract: {e}", exc_info=True)
+                logger.error(f"Failed to call nextMatchId: {e}")
                 raise
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize Web3 contract: {e}", exc_info=True)
+            self._w3 = None
+            self._contract = None
+            raise
+
+    def ensure_connection(self):
+        """Ensure we have a valid connection, reconnect if necessary."""
+        try:
+            if self._w3 is None or not self._w3.is_connected():
+                logger.info("No active connection, reconnecting...")
+                self.connect()
+            else:
+                # Test connection with a simple call
+                try:
+                    self._w3.eth.block_number
+                except Exception:
+                    logger.info("Connection stale, reconnecting...")
+                    self.connect()
+        except Exception as e:
+            logger.error(f"Error ensuring connection: {e}")
+            raise
                 
     @property
     def contract(self) -> Contract:
-        """Get the Web3 contract instance."""
+        """Get the Web3 contract instance, ensuring connection is active."""
+        self.ensure_connection()
         if self._contract is None:
             raise RuntimeError("Contract not initialized. Call connect() first.")
         return self._contract
         
     @property
     def w3(self) -> Web3:
-        """Get the Web3 instance."""
+        """Get the Web3 instance, ensuring connection is active."""
+        self.ensure_connection()
         if self._w3 is None:
             raise RuntimeError("Web3 not initialized. Call connect() first.")
         return self._w3
@@ -76,6 +98,7 @@ class ContractClient:
     def verify_wallet(self, address: str, signature: str) -> bool:
         """Verify wallet ownership using signature."""
         try:
+            self.ensure_connection()
             # Create message hash
             message = f"Link Discord account to wallet {address}"
             message_hash = encode_defunct(text=message)
@@ -95,6 +118,7 @@ class ContractClient:
     async def create_match(self, match_type: str, stake: float = 0) -> int:
         """Create a match on the blockchain."""
         try:
+            self.ensure_connection()
             # Convert match type to contract enum
             type_mapping = {
                 "1v1": 0,
@@ -131,6 +155,7 @@ class ContractClient:
     async def get_match_status(self, match_id: int) -> dict:
         """Get match status from the blockchain."""
         try:
+            self.ensure_connection()
             match_data = await self.contract.functions.matches(match_id).call()
             return {
                 'status': match_data[0],

@@ -24,54 +24,54 @@ model User {
   
   // Relations
   matchesCreated    Match[]    @relation("Creator")
-  matchesJoined     Match[]    @relation("Participant")
+  participatedMatches Match[]  @relation("Participant")
   tournamentsJoined Tournament[] @relation("TournamentParticipant")
-  teams             Team[]      @relation("TeamMember")
+  teamMemberships   TeamMember[]
 }
 
 // Match model
 model Match {
-  id            String    @id @default(uuid())
-  matchId       Int       @unique // On-chain match ID
-  matchType     MatchType
-  status        MatchStatus @default(PENDING)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id               String        @id @default(uuid())
+  matchId          Int           @unique
+  matchType        MatchType
+  status           MatchStatus   @default(PENDING)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
   
   // Creator details
-  creatorId     String?
-  creator       User?      @relation("Creator", fields: [creatorId], references: [id])
-  creatorDiscordId String? // Discord ID of creator when created through bot
+  creatorId        String?
+  creator          User?         @relation("Creator", fields: [creatorId], references: [id])
+  creatorDiscordId String?
   
   // Match details
-  stake         Float
-  tokenAddress  String?   // null for ETH
-  totalPrize    Float
-  winnerAddress String?
+  stake            Float
+  tokenAddress     String?       // null for ETH
+  totalPrize       Float
+  winnerAddress    String?
+  discordChannelId String?       // Discord channel ID for match notifications
   
-  // Team related
-  teams         Team[]
-  participants  User[]    @relation("Participant")
+  // Relations
+  teams            Team[]
+  participants     User[]        @relation("Participant")
   
   @@index([matchId])
   @@index([creatorDiscordId])
+  @@index([discordChannelId])
 }
 
 // Tournament model
 model Tournament {
   id              String    @id @default(uuid())
-  tournamentId    Int       @unique // On-chain tournament ID
+  tournamentId    Int       @unique
   status          TournamentStatus
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   
-  // Tournament details
   entryFee       Float
-  tokenAddress   String?   // null for ETH
+  tokenAddress   String?
   totalPrize     Float
   maxParticipants Int
   
-  // Participants
   participants    User[]    @relation("TournamentParticipant")
   
   @@index([tournamentId])
@@ -79,15 +79,24 @@ model Tournament {
 
 // Team model
 model Team {
-  id            String    @id @default(uuid())
+  id            String        @id @default(uuid())
   matchId       String
-  match         Match     @relation(fields: [matchId], references: [id])
-  isTeamA       Boolean   // true for Team A, false for Team B
-  
-  // Team members
-  members       User[]    @relation("TeamMember")
+  match         Match         @relation(fields: [matchId], references: [id])
+  isTeamA       Boolean
+  members       TeamMember[]
   
   @@unique([matchId, isTeamA])
+}
+
+// TeamMember model for many-to-many relation between Team and User
+model TeamMember {
+  id        String   @id @default(uuid())
+  teamId    String
+  userId    String
+  team      Team     @relation(fields: [teamId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+  
+  @@unique([teamId, userId])
 }
 
 enum MatchType {
@@ -97,11 +106,11 @@ enum MatchType {
 }
 
 enum MatchStatus {
-  PENDING   // Created by Discord bot, waiting for on-chain creation
-  OPEN      // Created on-chain, waiting for players
-  FILLED    // All players joined
-  COMPLETED // Match finished
-  CANCELLED // Match cancelled
+  PENDING     // Created by Discord bot, waiting for on-chain creation
+  OPEN        // Created on-chain, waiting for players
+  FILLED      // All players joined
+  COMPLETED   // Match finished
+  CANCELLED   // Match cancelled
 }
 
 enum TournamentStatus {

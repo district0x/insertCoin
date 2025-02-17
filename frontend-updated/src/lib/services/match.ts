@@ -196,7 +196,7 @@ export async function createMatchInDb({
   matchId: number;
 }) {
   try {
-    console.log(`[DB] Creating regular match for wallet ${walletAddress}`);
+    console.log(`[DB] Processing match for wallet ${walletAddress}`);
 
     // Create or get user
     console.log(`[DB] Upserting user with wallet ${walletAddress}`);
@@ -209,8 +209,33 @@ export async function createMatchInDb({
     });
     console.log(`[DB] User upserted: ${JSON.stringify(user)}`);
 
-    // Create match with provided matchId
-    console.log(`[DB] Creating match with ID ${matchId}`);
+    // Check if match already exists (created by Discord bot)
+    const existingMatch = await prisma.match.findUnique({
+      where: { matchId },
+      include: { creator: true },
+    });
+
+    if (existingMatch) {
+      console.log(`[DB] Updating existing match with ID ${matchId}`);
+      const updatedMatch = await prisma.match.update({
+        where: { matchId },
+        data: {
+          matchType,
+          status: MatchStatus.OPEN,
+          creatorId: user.id,
+          stake: parseFloat(stake),
+          totalPrize: parseFloat(stake),
+        },
+        include: {
+          creator: true,
+        },
+      });
+      console.log(`[DB] Match updated successfully: ${JSON.stringify(updatedMatch)}`);
+      return updatedMatch;
+    }
+
+    // If no existing match, create new one
+    console.log(`[DB] Creating new match with ID ${matchId}`);
     const match = await prisma.match.create({
       data: {
         matchId,
@@ -228,7 +253,9 @@ export async function createMatchInDb({
     console.log(`[DB] Match created successfully: ${JSON.stringify(match)}`);
     return match;
   } catch (error) {
-    console.error("[DB] Error creating match:", error);
+    // Properly format the error for logging
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error("[DB] Error processing match:", { error: errorMessage });
     throw error;
   }
 }
