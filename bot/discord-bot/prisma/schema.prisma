@@ -1,7 +1,7 @@
 generator client {
   provider             = "prisma-client-py"
-  interface            = "sync"
   recursive_type_depth = "5"
+  interface            = "sync"
 }
 
 datasource db {
@@ -11,55 +11,63 @@ datasource db {
 }
 
 model User {
-  id                String       @id @default(uuid())
-  address           String?      @unique
-  discordId         String?      @unique
-  username          String?      @unique
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-  totalMatches      Int          @default(0)
-  totalWins         Int          @default(0)
-  totalLosses       Int          @default(0)
-  matchesCreated    Match[]      @relation("Creator")
-  TeamMember        TeamMember[]
-  Match_Participant Match[]      @relation("Participant")
-  Tournament        Tournament[] @relation("TournamentParticipant")
+  id                    String                  @id @default(uuid())
+  address               String?                 @unique
+  discordId             String?                 @unique
+  username              String?                 @unique
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  totalMatches          Int                     @default(0)
+  totalWins             Int                     @default(0)
+  totalLosses           Int                     @default(0)
+  matchesCreated        Match[]                 @relation("Creator")
+  TeamMember            TeamMember[]
+  Participant           Participant[]
+  TournamentParticipant TournamentParticipant[]
 }
 
 model Match {
-  id               String      @id @default(uuid())
-  matchId          Int         @unique
-  matchType        MatchType
-  status           MatchStatus @default(PENDING)
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
-  creatorId        String?
-  creatorDiscordId String?
-  stake            Float
-  tokenAddress     String?
-  totalPrize       Float
-  winnerAddress    String?
-  discordChannelId String?
-  creator          User?       @relation("Creator", fields: [creatorId], references: [id])
-  teams            Team[]
-  User_Participant User[]      @relation("Participant")
+  id                String        @id @default(uuid())
+  matchId           Int           @unique
+  matchType         MatchType
+  status            MatchStatus   @default(PENDING)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  creatorId         String?
+  creatorDiscordId  String?
+  stake             Float
+  tokenAddress      String?
+  totalPrize        Float
+  winnerAddress     String?
+  discordChannelId  String?
+  game              String?
+  gameCategory      String?
+  matchAmountUsd    Int?
+  opponentDiscordId String?
+  platform          String?
+  winnerId          String?
+  creator           User?         @relation("Creator", fields: [creatorId], references: [id])
+  teams             Team[]
+  Participant       Participant[]
 
   @@index([matchId])
   @@index([creatorDiscordId])
   @@index([discordChannelId])
+  @@index([opponentDiscordId])
+  @@index([winnerId])
 }
 
 model Tournament {
-  id              String           @id @default(uuid())
-  tournamentId    Int              @unique
-  status          TournamentStatus
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  entryFee        Float
-  tokenAddress    String?
-  totalPrize      Float
-  maxParticipants Int
-  User            User[]           @relation("TournamentParticipant")
+  id                    String                  @id @default(uuid())
+  tournamentId          Int                     @unique
+  status                TournamentStatus
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  entryFee              Float
+  tokenAddress          String?
+  totalPrize            Float
+  maxParticipants       Int
+  TournamentParticipant TournamentParticipant[]
 
   @@index([tournamentId])
 }
@@ -82,6 +90,28 @@ model TeamMember {
   User   User   @relation(fields: [userId], references: [id])
 
   @@unique([teamId, userId])
+}
+
+model Participant {
+  A     String
+  B     String
+  Match Match  @relation(fields: [A], references: [id], onDelete: Cascade)
+  User  User   @relation(fields: [B], references: [id], onDelete: Cascade)
+
+  @@id([A, B], map: "_Participant_AB_pkey")
+  @@index([B], map: "_Participant_B_index")
+  @@map("_Participant")
+}
+
+model TournamentParticipant {
+  A          String
+  B          String
+  Tournament Tournament @relation(fields: [A], references: [id], onDelete: Cascade)
+  User       User       @relation(fields: [B], references: [id], onDelete: Cascade)
+
+  @@id([A, B], map: "_TournamentParticipant_AB_pkey")
+  @@index([B], map: "_TournamentParticipant_B_index")
+  @@map("_TournamentParticipant")
 }
 
 enum MatchType {

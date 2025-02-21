@@ -50,6 +50,16 @@ model Match {
   winnerAddress    String?
   discordChannelId String?       // Discord channel ID for match notifications
   
+  // Game details
+  platform         String?       // PS5, PC
+  gameCategory     String?       // Sports, Fighting, Racing
+  game            String?       // Specific game name
+  matchAmountUsd   Int?         // Match amount in USD
+  
+  // Opponent details
+  opponentDiscordId String?     // Discord ID of the opponent
+  winnerId         String?      // Discord ID of the winner
+  
   // Relations
   teams            Team[]
   participants     User[]        @relation("Participant")
@@ -57,6 +67,8 @@ model Match {
   @@index([matchId])
   @@index([creatorDiscordId])
   @@index([discordChannelId])
+  @@index([opponentDiscordId])
+  @@index([winnerId])
 }
 
 // Tournament model
