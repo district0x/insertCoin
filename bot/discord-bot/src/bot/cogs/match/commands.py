@@ -16,8 +16,9 @@ from .utils import (
     get_opponent_record,
     get_user_stats,
 )
-from .embeds import (
+from src.utils.embeds import (
     create_match_embed,
+    create_match_info_embed,
     create_stats_embed,
     create_match_history_embed,
     create_opponent_record_embed,
@@ -82,18 +83,41 @@ async def handle_match_info(
     await interaction.response.defer()
     
     try:
+        logger.info(f"Handling match info request for match ID: {match_id}")
         match = await get_match_info(match_id)
+        
         if not match:
-            await interaction.followup.send("Match not found.", ephemeral=True)
+            await interaction.followup.send(
+                f"Match #{match_id} not found. Please check the match ID and try again.",
+                ephemeral=True
+            )
             return
             
-        creator = await bot.fetch_user(int(match.creatorDiscordId))
-        embed = create_match_embed(match, creator)
-        
+        try:
+            creator = await bot.fetch_user(int(match.creatorDiscordId))
+        except Exception as e:
+            logger.error(f"Error fetching creator user: {e}", exc_info=True)
+            creator = None
+            
+        if not creator:
+            await interaction.followup.send(
+                "Could not find the match creator. The match data might be corrupted.",
+                ephemeral=True
+            )
+            return
+            
+        # Use create_match_info_embed for viewing match details
+        embed = create_match_info_embed(match, creator)
         await interaction.followup.send(embed=embed)
+        logger.info(f"Successfully sent match info for match #{match_id}")
         
+    except ValueError:
+        await interaction.followup.send(
+            "Invalid match ID format. Please provide a valid number.",
+            ephemeral=True
+        )
     except Exception as e:
-        logger.error(f"Error getting match info: {e}", exc_info=True)
+        logger.error(f"Error handling match info: {e}", exc_info=True)
         await interaction.followup.send(
             "An error occurred while getting match info. Please try again.",
             ephemeral=True

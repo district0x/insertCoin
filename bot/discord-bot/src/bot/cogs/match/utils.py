@@ -7,7 +7,7 @@ from typing import Optional, List, Dict
 import discord
 from src.db.prisma import prisma
 from src.web3.contract import contract
-from .embeds import create_match_embed
+from src.utils.embeds import create_match_embed, create_match_info_embed
 
 logger = logging.getLogger(__name__)
 
@@ -81,8 +81,8 @@ async def create_match_embeds(
     channel_info: ChannelInfo
 ):
     """Create and send match embeds."""
-    # Create and send match embed
-    embed = create_match_embed(match, interaction.user)
+    # Create and send match embed for new match creation
+    embed = create_match_embed(match, interaction.user)  # Use create_match_embed for new match creation
     match_message = await channel_info.channel.send(embed=embed)
     await match_message.pin()
     
@@ -243,9 +243,15 @@ async def get_opponent_record(user_id: str, opponent_id: str) -> Optional[Dict]:
 
 async def get_match_info(match_id: str) -> Optional[Dict]:
     """Get information about a specific match."""
-    match = prisma.match.find_first(
-        where={
-            "id": match_id
-        }
-    )
-    return match 
+    try:
+        logger.info(f"Fetching match info for match ID: {match_id}")
+        match = prisma.match.find_first(
+            where={
+                "matchId": int(match_id)  # Convert string ID to integer
+            }
+        )
+        logger.info(f"Found match: {match}")
+        return match
+    except Exception as e:
+        logger.error(f"Error fetching match info: {e}", exc_info=True)
+        return None 

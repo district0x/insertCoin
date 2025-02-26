@@ -94,8 +94,11 @@ discord-bot/
 ├── src/
 │   ├── bot/
 │   │   ├── cogs/           # Discord bot commands
-│   │   │   ├── match.py    # Match-related commands
-│   │   │   └── utils.py    # Utility commands
+│   │   │   ├── match/      # Match-related functionality
+│   │   │   │   ├── cog.py  # Match cog implementation
+│   │   │   │   ├── commands.py # Command handlers
+│   │   │   │   ├── constants.py # Match constants
+│   │   │   │   └── utils.py # Match utilities
 │   │   └── main.py         # Bot initialization
 │   ├── db/
 │   │   └── prisma.py       # Database client
