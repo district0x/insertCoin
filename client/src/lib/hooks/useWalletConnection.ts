@@ -4,14 +4,7 @@ import { useEffect, useCallback, useRef } from "react";
 import { useAccount, useConnect, useDisconnect, usePublicClient } from "wagmi";
 import { useToast } from "@/lib/hooks/use-toast";
 import { saveWalletToDb } from "@/lib/actions/wallet";
-
-// MTK Token details
-const MTK_TOKEN = {
-  address: "0x29Cf44155892ba0A811daace8a45dba4205df2Fb" as `0x${string}`,
-  symbol: "MTK",
-  decimals: 18,
-  name: "Match Token",
-} as const;
+import { MTK_TOKEN } from "@/lib/constants/tokens";
 
 export function useWalletConnection() {
   const { address, isConnected, status } = useAccount();

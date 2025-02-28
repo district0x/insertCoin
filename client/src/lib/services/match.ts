@@ -189,11 +189,13 @@ export async function createMatchInDb({
   matchType,
   stake,
   matchId,
+  tokenAddress,
 }: {
   walletAddress: string;
   matchType: MatchType;
   stake: string;
   matchId: number;
+  tokenAddress: string | null;
 }) {
   try {
     console.log(`[DB] Processing match for wallet ${walletAddress}`);
@@ -225,6 +227,7 @@ export async function createMatchInDb({
           creatorId: user.id,
           stake: parseFloat(stake),
           totalPrize: parseFloat(stake),
+          tokenAddress: tokenAddress || null,
         },
         include: {
           creator: true,
@@ -244,6 +247,7 @@ export async function createMatchInDb({
         creatorId: user.id,
         stake: parseFloat(stake),
         totalPrize: parseFloat(stake),
+        tokenAddress: tokenAddress || null,
       },
       include: {
         creator: true,

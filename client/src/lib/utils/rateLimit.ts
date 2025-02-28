@@ -1,7 +1,8 @@
 // Global request queue
 const requestQueue: Array<() => Promise<unknown>> = [];
 let isProcessing = false;
-const RATE_LIMIT_DELAY = 500; // 500ms between requests
+const RATE_LIMIT_DELAY = 200; // Reduced from 500ms to 200ms between requests
+const BATCH_SIZE = 5; // Process up to 5 requests in parallel
 
 // Process queue
 async function processQueue() {
@@ -10,14 +11,18 @@ async function processQueue() {
   isProcessing = true;
 
   while (requestQueue.length > 0) {
-    const request = requestQueue.shift();
-    if (request) {
-      try {
-        await request();
-      } catch (error) {
-        console.error("Error processing request:", error);
-      }
-      // Wait before processing next request
+    // Process requests in batches
+    const batch = requestQueue.splice(0, Math.min(BATCH_SIZE, requestQueue.length));
+    
+    try {
+      // Execute batch in parallel
+      await Promise.all(batch.map(request => request()));
+    } catch (error) {
+      console.error("Error processing request batch:", error);
+    }
+    
+    // Only wait between batches, not individual requests
+    if (requestQueue.length > 0) {
       await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_DELAY));
     }
   }

@@ -9,7 +9,7 @@ import { useWalletConnection } from "@/lib/hooks/useWalletConnection";
 import { usePublicClient } from "wagmi";
 import { updateMatchWithWallet, createMatchInDb } from "@/lib/services/match";
 import { formatEther, decodeEventLog } from "viem";
-import { MatchType } from "@prisma/client";
+import { MatchType } from "@/types/match";
 import { UsdInput } from "@/components/ui/usd-input";
 import { ONEVONE_ABI } from "@/lib/contracts/abis/OneVOne";
 import Link from "next/link";
@@ -28,6 +28,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { MTK_TOKEN, TokenOption, TOKEN_OPTIONS } from "@/lib/constants/tokens";
 
 type MatchEventArgs = {
   matchId: bigint;
@@ -41,12 +44,11 @@ function CreateMatchForm() {
   const { toast } = useToast();
   const { address } = useWalletConnection();
   const publicClient = usePublicClient();
-  const [matchType, setMatchType] = React.useState<MatchType>(
-    MatchType.ONE_V_ONE
-  );
+  const [matchType, setMatchType] = React.useState<MatchType>("ONE_V_ONE");
   const [ethAmount, setEthAmount] = React.useState<bigint>(BigInt(0));
   const [isLoading, setIsLoading] = React.useState(false);
   const [txHash, setTxHash] = React.useState<string | null>(null);
+  const [selectedToken, setSelectedToken] = React.useState<TokenOption>("ETH");
   const { createMatch, create2v2Match, create5v5Match } = useMatch();
 
   // Get matchId from URL if it exists (coming from Discord)
@@ -68,9 +70,9 @@ function CreateMatchForm() {
           // Find the match started event
           const eventName = (() => {
             switch (matchType) {
-              case MatchType.FIVE_V_FIVE:
+              case "FIVE_V_FIVE":
                 return "Match5v5Started";
-              case MatchType.TWO_V_TWO:
+              case "TWO_V_TWO":
                 return "Team2v2MatchStarted";
               default:
                 return "MatchStarted";
@@ -108,6 +110,7 @@ function CreateMatchForm() {
             matchType,
             stake: formatEther(ethAmount),
             matchId: Number(onChainMatchId),
+            tokenAddress: selectedToken === "MTK" ? MTK_TOKEN.address : null,
           });
 
           toast({
@@ -121,35 +124,25 @@ function CreateMatchForm() {
           }, 1500);
         }
       } catch (error) {
-        console.error("[Match Creation] Error watching transaction:", error);
-        setIsLoading(false); // Stop loading state
+        setIsLoading(false);
+        console.error("Transaction error:", error);
         toast({
-          variant: "destructive",
           title: "Transaction Failed",
           description:
-            error instanceof Error ? error.message : "Please try again",
+            error instanceof Error
+              ? error.message
+              : "Failed to create match. Please try again.",
+          variant: "destructive",
         });
       }
     };
 
     watchTransaction();
-  }, [txHash, publicClient, matchType, ethAmount, address, router, toast]);
+  }, [txHash, publicClient, matchType, address, ethAmount, router, toast, selectedToken]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!address) {
-      toast({
-        title: "Wallet Not Connected",
-        description: "Please connect your wallet to create a match",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (isLoading) {
-      return;
-    }
+    if (isLoading) return;
 
     setIsLoading(true);
 
@@ -165,6 +158,7 @@ function CreateMatchForm() {
           throw new Error("Failed to update match");
         }
 
+        // For Discord-created matches, we currently only support ETH
         const hash = await createMatch(BigInt(updatedMatch.stake));
         if (!hash) throw new Error("Failed to create match");
 
@@ -178,19 +172,23 @@ function CreateMatchForm() {
         // Regular match creation flow
         try {
           let hash: `0x${string}` | undefined;
+          // Get token address if MTK is selected
+          const tokenAddress = selectedToken === "MTK" ? MTK_TOKEN.address : undefined;
+          
           switch (matchType) {
-            case MatchType.TWO_V_TWO:
-              hash = await create2v2Match(ethAmount);
+            case "TWO_V_TWO":
+              hash = await create2v2Match(ethAmount, tokenAddress);
               break;
-            case MatchType.FIVE_V_FIVE:
-              hash = await create5v5Match(ethAmount);
+            case "FIVE_V_FIVE":
+              hash = await create5v5Match(ethAmount, tokenAddress);
               break;
             default:
-              hash = await createMatch(ethAmount);
+              hash = await createMatch(ethAmount, tokenAddress);
           }
 
           if (!hash) throw new Error("Failed to create match");
 
+          // Now hash is guaranteed to be a `0x${string}` and not undefined
           setTxHash(hash);
           toast({
             title: "Transaction Submitted",
@@ -200,147 +198,150 @@ function CreateMatchForm() {
           throw err;
         }
       }
-    } catch (err) {
-      console.error("[Match Creation] Error:", err);
-
-      // Extract contract error details
-      const contractError = err as Error;
-      const errorMessage = contractError.message;
-
-      // Handle specific error cases
-      if (errorMessage.includes("insufficient funds")) {
-        toast({
-          variant: "destructive",
-          title: "Insufficient Funds",
-          description:
-            "You don't have enough ETH to cover the stake amount and gas fees. Please add more ETH to your wallet and try again.",
-        });
-      } else if (errorMessage.includes("User rejected")) {
-        toast({
-          variant: "destructive",
-          title: "Transaction Cancelled",
-          description: "You cancelled the transaction.",
-        });
-      } else {
-        // Handle other contract errors
-        toast({
-          variant: "destructive",
-          title: "Smart Contract Error",
-          description:
-            errorMessage || "Something went wrong. Please try again.",
-        });
-      }
+    } catch (error) {
       setIsLoading(false);
+      console.error("Error creating match:", error);
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to create match. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <Link
-        href="/matches"
-        className="flex items-center text-sm text-muted-foreground mb-6 hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Matches
-      </Link>
+    <div className="flex justify-center items-start min-h-[calc(100vh-80px)] py-12 px-4">
+      <div className="w-full max-w-md">
+        <div className="mb-6">
+          <Link
+            href="/matches"
+            className="inline-flex items-center text-sm text-muted-foreground hover:text-primary transition-colors"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Matches
+          </Link>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            {matchId ? "Link Wallet to Discord Match" : "Create New Match"}
-          </CardTitle>
-          <CardDescription>
-            {matchId
-              ? "Connect your wallet to create the match from Discord"
-              : "Choose your match type and stake amount"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {!matchId && (
-              <>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Match Type</label>
-                  <Select
-                    value={matchType}
-                    onValueChange={(value: string) =>
-                      setMatchType(value as MatchType)
-                    }
-                    disabled={isLoading}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select match type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={MatchType.ONE_V_ONE}>
-                        1v1 Match
-                      </SelectItem>
-                      <SelectItem value={MatchType.TWO_V_TWO}>
-                        2v2 Match
-                      </SelectItem>
-                      <SelectItem value={MatchType.FIVE_V_FIVE}>
-                        5v5 Match
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+        <Card className="shadow-md border-opacity-50">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-2xl">
+              {matchId ? "Link Wallet to Discord Match" : "Create New Match"}
+            </CardTitle>
+            <CardDescription className="text-base">
+              {matchId
+                ? "Connect your wallet to create the match from Discord"
+                : "Choose your match type and stake amount"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-8">
+              {!matchId && (
+                <>
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium">Match Type</label>
+                    <Select
+                      value={matchType}
+                      onValueChange={(value: string) =>
+                        setMatchType(value as MatchType)
+                      }
+                      disabled={isLoading}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select match type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ONE_V_ONE">
+                          1v1 Match
+                        </SelectItem>
+                        <SelectItem value="TWO_V_TWO">
+                          2v2 Match
+                        </SelectItem>
+                        <SelectItem value="FIVE_V_FIVE">
+                          5v5 Match
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div className="space-y-2">
-                  <UsdInput
-                    label="Stake Amount (USD)"
-                    onEthChange={setEthAmount}
-                    placeholder="Enter stake amount in USD"
-                    disabled={isLoading}
-                    required
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    {ethAmount > BigInt(0) && `≈ ${formatEther(ethAmount)} ETH`}
-                  </p>
-                </div>
-              </>
-            )}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Token</Label>
+                    <RadioGroup 
+                      value={selectedToken} 
+                      onValueChange={(value) => setSelectedToken(value as TokenOption)}
+                      className="flex space-x-6 pt-2"
+                      disabled={isLoading}
+                    >
+                      {TOKEN_OPTIONS.map((option) => (
+                        <div key={option.value} className="flex items-center space-x-2">
+                          <RadioGroupItem value={option.value} id={option.value.toLowerCase()} />
+                          <Label htmlFor={option.value.toLowerCase()} className="cursor-pointer font-medium">
+                            {option.label}
+                          </Label>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                  </div>
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isLoading || (!matchId && ethAmount === BigInt(0))}
-            >
-              {isLoading ? (
-                <span className="flex items-center justify-center">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating match...
-                </span>
-              ) : matchId ? (
-                "Link Wallet and Create Match"
-              ) : (
-                "Create Match"
+                  <div className="space-y-3">
+                    <UsdInput
+                      label="Stake Amount (USD)"
+                      onEthChange={setEthAmount}
+                      placeholder="Enter stake amount in USD"
+                      disabled={isLoading}
+                      required
+                    />
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {ethAmount > BigInt(0) && (
+                        selectedToken === "ETH" 
+                          ? `≈ ${formatEther(ethAmount)} ETH` 
+                          : `≈ ${formatEther(ethAmount)} MTK`
+                      )}
+                    </p>
+                  </div>
+                </>
               )}
-            </Button>
-          </form>
 
-          {txHash && (
-            <div className="mt-4 text-sm text-muted-foreground">
-              Transaction Hash:{" "}
-              <a
-                href={`https://etherscan.io/tx/${txHash}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
+              <Button
+                type="submit"
+                className="w-full py-6 text-base font-medium"
+                disabled={isLoading || (!matchId && ethAmount === BigInt(0))}
               >
-                {txHash}
-              </a>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                {isLoading ? (
+                  <span className="flex items-center justify-center">
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Creating match...
+                  </span>
+                ) : matchId ? (
+                  "Link Wallet and Create Match"
+                ) : (
+                  "Create Match"
+                )}
+              </Button>
+            </form>
+
+            {txHash && (
+              <div className="mt-6 text-sm text-muted-foreground p-3 bg-muted rounded-md">
+                Transaction Hash:{" "}
+                <a
+                  href={`https://sepolia.basescan.org/tx/${txHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline font-medium"
+                >
+                  {txHash.slice(0, 10)}...{txHash.slice(-8)}
+                </a>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
 
 export default function CreateMatchPage() {
-  return (
-    <React.Suspense fallback={<div>Loading...</div>}>
-      <CreateMatchForm />
-    </React.Suspense>
-  );
+  return <CreateMatchForm />;
 }
