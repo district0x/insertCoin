@@ -48,6 +48,7 @@ export async function batchFetchMatches(
           const match = await fetchMatchDirect(contract, publicClient, id.toString());
           return match;
         } catch (error) {
+          console.error(`Failed to fetch match ${id}:`, error);
           return null;
         }
       });
@@ -65,6 +66,7 @@ export async function batchFetchMatches(
     const validMatches = fetchedMatches.filter(Boolean) as OnChainMatch[];
     return [...cachedMatches, ...validMatches];
   } catch (error) {
+    console.error('Error in batch fetch:', error);
     // Return cached matches if available
     return cachedMatches;
   }

@@ -149,9 +149,13 @@ function CreateMatchForm() {
     try {
       // If matchId exists, this is a Discord-created match
       if (matchId) {
+        if (!address) {
+          throw new Error("Wallet address is required");
+        }
+
         const updatedMatch = await updateMatchWithWallet({
           matchId,
-          walletAddress: address,
+          walletAddress: address as string,
         });
 
         if (!updatedMatch) {
@@ -343,5 +347,15 @@ function CreateMatchForm() {
 }
 
 export default function CreateMatchPage() {
-  return <CreateMatchForm />;
+  return (
+    <React.Suspense 
+      fallback={
+        <div className="flex justify-center items-center min-h-[calc(100vh-80px)]">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      }
+    >
+      <CreateMatchForm />
+    </React.Suspense>
+  );
 }

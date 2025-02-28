@@ -244,6 +244,7 @@ export async function fetchMatch(
 
     return match;
   } catch (error) {
+    console.error(`Failed to fetch match ${matchId}:`, error);
     return null;
   }
 }
@@ -481,6 +482,7 @@ export async function fetchMatchDirect(
     cacheMatch(matchId, result);
     return result;
   } catch (error) {
+    console.error(`Failed to fetch match ${matchId} directly:`, error);
     return null;
   }
 } 

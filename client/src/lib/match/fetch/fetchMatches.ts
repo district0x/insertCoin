@@ -30,6 +30,7 @@ export async function fetchMatches(
         functionName: "nextMatchId",
       });
     } catch (error) {
+      console.error('Failed to read nextMatchId:', error);
       // If we can't read nextMatchId, try to return some hardcoded test data
       
       // Create some mock matches for testing
@@ -104,6 +105,7 @@ export async function fetchMatches(
       paginatedIds.map(id => id.toString())
     );
   } catch (error) {
+    console.error('Failed to fetch matches:', error);
     return [];
   }
 } 

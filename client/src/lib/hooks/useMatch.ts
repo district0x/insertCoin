@@ -1,7 +1,7 @@
 import { useContract } from "./useContract";
 import { useWalletClient, usePublicClient } from "wagmi";
 import { BaseError } from "viem";
-import { MTK_TOKEN, ERC20_APPROVAL_ABI, ZERO_ADDRESS } from "@/lib/constants/tokens";
+import { ERC20_APPROVAL_ABI, ZERO_ADDRESS } from "@/lib/constants/tokens";
 
 // Remove the MTK_TOKEN and ERC20_APPROVAL_ABI constants as they're now imported
 

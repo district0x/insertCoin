@@ -5,11 +5,10 @@ import Link from "next/link";
 import { useContract } from "@/lib/hooks/useContract";
 import { usePublicClient } from "wagmi";
 import { formatEther } from "viem";
-import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useInView } from "react-intersection-observer";
 import { OnChainMatch } from "@/types/match";
-import { fetchMatches, prefetchMatch } from "@/lib/match";
+import { prefetchMatch } from "@/lib/match";
 import { fetchMatch } from "@/lib/match/fetch";
 
 const MATCHES_PER_PAGE = 12;
@@ -211,7 +210,6 @@ export default function MatchesPage() {
     } catch (error) {
       console.error("Failed to read nextMatchId after retries:", error);
       
-      // If we're in development, return a mock value
       if (process.env.NODE_ENV === 'development') {
         return BigInt(50); // Mock value for development
       }
@@ -454,7 +452,7 @@ export default function MatchesPage() {
   // Remove the global fetchMatchDirect function since we're using fetchMatch directly
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
-      // @ts-ignore
+      // @ts-expect-error - Suppressing type error for development environment check
       window.debugFetchMatch = async (matchId) => {
         try {
           if (!contract || !publicClient) {
@@ -487,9 +485,12 @@ export default function MatchesPage() {
         <div className="min-h-[800px]">
           {isLoading && sortedMatches.length === 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 transition-all duration-300">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <MatchSkeleton key={`initial-skeleton-${getUniqueId()}`} />
-              ))}
+              {Array.from({ length: 6 }).map(() => {
+                const key = getUniqueId();
+                return (
+                  <MatchSkeleton key={`initial-skeleton-${key}`} />
+                );
+              })}
             </div>
           ) : error ? (
             <div className="text-center py-8 space-y-4">
@@ -530,11 +531,14 @@ export default function MatchesPage() {
                 {/* Stable skeleton loaders for loading more */}
                 {isLoadingMore && hasMore && (
                   <>
-                    {Array.from({ length: stableSkeletonCount }).map((_, index) => (
-                      <div key={`loading-more-${index}`} className="transition-opacity duration-300 ease-in-out">
-                        <MatchSkeleton />
-                      </div>
-                    ))}
+                    {Array.from({ length: stableSkeletonCount }).map(() => {
+                      const key = getUniqueId();
+                      return (
+                        <div key={`loading-more-${key}`} className="transition-opacity duration-300 ease-in-out">
+                          <MatchSkeleton />
+                        </div>
+                      );
+                    })}
                   </>
                 )}
             </div>
