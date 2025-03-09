@@ -200,15 +200,21 @@ export async function fetchMatch(
         player1Amount:
           matchType === "FIVE_V_FIVE"
             ? match5v5.player1Amount
-            : match2v2.player1Amount,
+            : matchType === "TWO_V_TWO"
+            ? match2v2.player1Amount
+            : baseMatch[2],
         player2Amount:
           matchType === "FIVE_V_FIVE"
             ? match5v5.player1Amount
-            : match2v2.player2Amount,
+            : matchType === "TWO_V_TWO"
+            ? match2v2.player2Amount
+            : baseMatch[3],
         totalAmount:
           matchType === "FIVE_V_FIVE"
             ? match5v5.totalAmount
-            : match2v2.totalAmount,
+            : matchType === "TWO_V_TWO"
+            ? match2v2.totalAmount
+            : baseMatch[4],
         donatedAmount: baseMatch[5],
         isOpen:
           matchType === "ONE_V_ONE"
@@ -444,15 +450,21 @@ export async function fetchMatchDirect(
       player1Amount:
         matchType === "FIVE_V_FIVE"
           ? match5v5.player1Amount
-          : match2v2.player1Amount,
+          : matchType === "TWO_V_TWO"
+          ? match2v2.player1Amount
+          : baseMatch[2],
       player2Amount:
         matchType === "FIVE_V_FIVE"
           ? match5v5.player1Amount
-          : match2v2.player2Amount,
+          : matchType === "TWO_V_TWO"
+          ? match2v2.player2Amount
+          : baseMatch[3],
       totalAmount:
         matchType === "FIVE_V_FIVE"
           ? match5v5.totalAmount
-          : match2v2.totalAmount,
+          : matchType === "TWO_V_TWO"
+          ? match2v2.totalAmount
+          : baseMatch[4],
       donatedAmount: baseMatch[5],
       isOpen:
         matchType === "ONE_V_ONE"
