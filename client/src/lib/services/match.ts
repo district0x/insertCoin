@@ -217,9 +217,10 @@ export async function createMatchInDb({
       include: { creator: true },
     });
 
+    let match;
     if (existingMatch) {
       console.log(`[DB] Updating existing match with ID ${matchId}`);
-      const updatedMatch = await prisma.match.update({
+      match = await prisma.match.update({
         where: { matchId },
         data: {
           matchType,
@@ -233,28 +234,113 @@ export async function createMatchInDb({
           creator: true,
         },
       });
-      console.log(`[DB] Match updated successfully: ${JSON.stringify(updatedMatch)}`);
-      return updatedMatch;
+      console.log(`[DB] Match updated successfully: ${JSON.stringify(match)}`);
+    } else {
+      // If no existing match, create new one
+      console.log(`[DB] Creating new match with ID ${matchId}`);
+      match = await prisma.match.create({
+        data: {
+          matchId,
+          matchType,
+          status: MatchStatus.OPEN,
+          creatorId: user.id,
+          stake: parseFloat(stake),
+          totalPrize: parseFloat(stake),
+          tokenAddress: tokenAddress || null,
+        },
+        include: {
+          creator: true,
+        },
+      });
+      console.log(`[DB] Match created successfully: ${JSON.stringify(match)}`);
     }
 
-    // If no existing match, create new one
-    console.log(`[DB] Creating new match with ID ${matchId}`);
-    const match = await prisma.match.create({
+    // Add the creator as a participant in the match
+    console.log(`[DB] Adding creator as participant to match`);
+    await prisma.user.update({
+      where: { id: user.id },
       data: {
-        matchId,
-        matchType,
-        status: MatchStatus.OPEN,
-        creatorId: user.id,
-        stake: parseFloat(stake),
-        totalPrize: parseFloat(stake),
-        tokenAddress: tokenAddress || null,
-      },
-      include: {
-        creator: true,
-      },
+        participatedMatches: {
+          connect: { id: match.id }
+        }
+      }
     });
+    
+    // Create team records based on match type
+    if (matchType === 'ONE_V_ONE') {
+      // For 1v1 matches, create two teams (team A and team B)
+      console.log(`[DB] Creating Team A for 1v1 match`);
+      await prisma.team.create({
+        data: {
+          matchId: match.id,
+          isTeamA: true,
+          members: {
+            create: {
+              userId: user.id
+            }
+          }
+        }
+      });
+      
+      console.log(`[DB] Creating Team B for 1v1 match`);
+      await prisma.team.create({
+        data: {
+          matchId: match.id,
+          isTeamA: false
+        }
+      });
+      
+      console.log(`[DB] Teams created for 1v1 match`);
+    } else if (matchType === 'TWO_V_TWO') {
+      // For 2v2 matches, create two teams with initially one member in team A
+      console.log(`[DB] Creating Team A for 2v2 match`);
+      await prisma.team.create({
+        data: {
+          matchId: match.id,
+          isTeamA: true,
+          members: {
+            create: {
+              userId: user.id
+            }
+          }
+        }
+      });
+      
+      console.log(`[DB] Creating Team B for 2v2 match`);
+      await prisma.team.create({
+        data: {
+          matchId: match.id,
+          isTeamA: false
+        }
+      });
+      
+      console.log(`[DB] Teams created for 2v2 match`);
+    } else if (matchType === 'FIVE_V_FIVE') {
+      // For 5v5 matches, create two teams with initially one member in team A
+      console.log(`[DB] Creating Team A for 5v5 match`);
+      await prisma.team.create({
+        data: {
+          matchId: match.id,
+          isTeamA: true,
+          members: {
+            create: {
+              userId: user.id
+            }
+          }
+        }
+      });
+      
+      console.log(`[DB] Creating Team B for 5v5 match`);
+      await prisma.team.create({
+        data: {
+          matchId: match.id,
+          isTeamA: false
+        }
+      });
+      
+      console.log(`[DB] Teams created for 5v5 match`);
+    }
 
-    console.log(`[DB] Match created successfully: ${JSON.stringify(match)}`);
     return match;
   } catch (error) {
     // Properly format the error for logging
@@ -289,6 +375,214 @@ export async function getMatchTypes(matchIds: number[]) {
     return matchTypeMap;
   } catch (error) {
     console.error("[DB] Error fetching match types:", error);
+    throw error;
+  }
+}
+
+// Function to handle a user joining a match in the database
+export async function joinMatchInDb({
+  walletAddress,
+  matchId,
+  isTeamA = false, // For 2v2 and 5v5, which team to join
+}: {
+  walletAddress: string;
+  matchId: number;
+  isTeamA?: boolean;
+}) {
+  try {
+    console.log(`[DB] Processing join for wallet ${walletAddress} to match ${matchId}`);
+
+    // Validate the inputs
+    if (!walletAddress || !matchId) {
+      throw new Error("Wallet address and match ID are required");
+    }
+    
+    // Create or get user
+    console.log(`[DB] Upserting user with wallet ${walletAddress}`);
+    const user = await prisma.user.upsert({
+      where: { address: walletAddress },
+      update: {},
+      create: {
+        address: walletAddress,
+      },
+    });
+    console.log(`[DB] User upserted: ${JSON.stringify(user)}`);
+
+    // Get the match with extensive details
+    console.log(`[DB] Finding match with ID ${matchId}`);
+    const match = await prisma.match.findUnique({
+      where: { matchId },
+      include: {
+        teams: {
+          include: {
+            members: true
+          }
+        },
+        participants: true
+      }
+    });
+
+    if (!match) {
+      throw new Error(`Match with ID ${matchId} not found`);
+    }
+    
+    console.log(`[DB] Found match: ${JSON.stringify({
+      id: match.id,
+      matchId: match.matchId,
+      status: match.status,
+      matchType: match.matchType,
+      teams: match.teams.map(t => ({
+        id: t.id,
+        isTeamA: t.isTeamA,
+        memberCount: t.members.length
+      }))
+    })}`);
+
+    // Check if user is already a participant in this match
+    const alreadyParticipating = match.participants.some(p => p.id === user.id);
+    if (alreadyParticipating) {
+      console.log(`[DB] User is already a participant in match ${matchId}`);
+      
+      // Check if the user is already in a team
+      let alreadyInTeam = false;
+      for (const team of match.teams) {
+        if (team.members.some(m => m.userId === user.id)) {
+          alreadyInTeam = true;
+          console.log(`[DB] User is already in team: ${team.id}, isTeamA: ${team.isTeamA}`);
+          break;
+        }
+      }
+      
+      // If user is a participant but not in a team, we'll continue and add them to a team
+      if (alreadyInTeam) {
+        return match; // User is already fully set up in this match
+      }
+    }
+
+    // For 1v1 matches, always join as team B
+    // For team matches, join the specified team
+    const teamToJoin = match.matchType === 'ONE_V_ONE' 
+      ? match.teams.find(team => !team.isTeamA) 
+      : match.teams.find(team => team.isTeamA === isTeamA);
+
+    if (!teamToJoin) {
+      throw new Error(`Team not found for match ID ${matchId}`);
+    }
+
+    // Check if user is already in this team
+    const alreadyInTeam = teamToJoin.members.some(m => m.userId === user.id);
+    if (alreadyInTeam) {
+      console.log(`[DB] User is already in team: ${teamToJoin.id}, isTeamA: ${teamToJoin.isTeamA}`);
+    } else {
+      console.log(`[DB] Adding user to team: ${teamToJoin.id}, isTeamA: ${teamToJoin.isTeamA}`);
+
+      // Add user to the team
+      await prisma.teamMember.create({
+        data: {
+          teamId: teamToJoin.id,
+          userId: user.id
+        }
+      });
+      console.log(`[DB] User added to team successfully`);
+    }
+    
+    // Add user as a participant in the match if not already
+    if (!alreadyParticipating) {
+      console.log(`[DB] Adding user as participant to match`);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          participatedMatches: {
+            connect: { id: match.id }
+          },
+          // Increment totalMatches
+          totalMatches: {
+            increment: 1
+          }
+        }
+      });
+      console.log(`[DB] User added as participant successfully`);
+    }
+
+    // Check if all teams are filled
+    console.log(`[DB] Checking if match is now filled`);
+    const updatedMatch = await prisma.match.findUnique({
+      where: { matchId },
+      include: {
+        teams: {
+          include: {
+            members: true
+          }
+        }
+      }
+    });
+
+    if (!updatedMatch) {
+      throw new Error(`Match with ID ${matchId} not found after update`);
+    }
+
+    // Determine if the match is now filled
+    let isFilled = false;
+    if (updatedMatch.matchType === 'ONE_V_ONE') {
+      // For 1v1, need one player in each team
+      const teamA = updatedMatch.teams.find(t => t.isTeamA);
+      const teamB = updatedMatch.teams.find(t => !t.isTeamA);
+      if (teamA?.members.length === 1 && teamB?.members.length === 1) {
+        isFilled = true;
+      }
+    } else if (updatedMatch.matchType === 'TWO_V_TWO') {
+      // For 2v2, need 2 players in each team
+      const teamA = updatedMatch.teams.find(t => t.isTeamA);
+      const teamB = updatedMatch.teams.find(t => !t.isTeamA);
+      if (teamA?.members.length === 2 && teamB?.members.length === 2) {
+        isFilled = true;
+      }
+    } else if (updatedMatch.matchType === 'FIVE_V_FIVE') {
+      // For 5v5, need 5 players in each team
+      const teamA = updatedMatch.teams.find(t => t.isTeamA);
+      const teamB = updatedMatch.teams.find(t => !t.isTeamA);
+      if (teamA?.members.length === 5 && teamB?.members.length === 5) {
+        isFilled = true;
+      }
+    }
+
+    // Update match status if filled
+    if (isFilled && updatedMatch.status !== 'FILLED') {
+      console.log(`[DB] Match ${matchId} is now filled, updating status from ${updatedMatch.status} to FILLED`);
+      await prisma.match.update({
+        where: { matchId },
+        data: {
+          status: MatchStatus.FILLED
+        }
+      });
+      console.log(`[DB] Match status updated to FILLED`);
+    } else {
+      console.log(`[DB] Match ${matchId} is not filled yet (status: ${updatedMatch.status})`);
+    }
+
+    // Get the fully updated match with all relations
+    const finalMatch = await prisma.match.findUnique({
+      where: { matchId },
+      include: {
+        teams: {
+          include: {
+            members: {
+              include: {
+                user: true
+              }
+            }
+          }
+        },
+        participants: true,
+        creator: true
+      }
+    });
+
+    console.log(`[DB] User successfully joined match ${matchId}`);
+    return finalMatch;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error("[DB] Error joining match:", { error: errorMessage });
     throw error;
   }
 }

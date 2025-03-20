@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 import { OnChainMatch } from "@/types/match";
+import { formatEther } from "viem";
 
 interface MatchCloseDialogProps {
   match: OnChainMatch;
@@ -50,7 +51,7 @@ export function MatchCloseDialog({
               Select the winner of this match. This action cannot be undone.
             </p>
             <p className="text-sm text-muted-foreground">
-              Prize Pool: {match.totalAmount} ETH ($
+              Prize Pool: {formatEther(match.totalAmount)} {match.isERC20 ? "MTK" : "ETH"} ($
               {convertToUsd(match.totalAmount).toFixed(2)})
             </p>
           </DialogDescription>

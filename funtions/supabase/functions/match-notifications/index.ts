@@ -53,6 +53,17 @@ interface DatabaseWebhookPayload {
   }
 }
 
+// For participant join events
+interface ParticipantWebhookPayload {
+  type: 'INSERT'
+  table: string
+  schema: string
+  record: {
+    A: string // User ID
+    B: string // Match ID
+  }
+}
+
 async function sendDiscordNotification(content: string, channelId: string) {
   try {
     console.log(`Sending Discord notification to channel ${channelId}: ${content}`);
@@ -113,30 +124,92 @@ async function getMatchDetails(matchId: number) {
   }
 }
 
-function convertWebhookToMatchEvent(payload: DatabaseWebhookPayload): MatchEvent | null {
+// Get user details by ID
+async function getUserDetails(userId: string) {
+  try {
+    console.log(`Fetching user details for ID: ${userId}`);
+    const { data: user, error } = await supabase
+      .from('User')
+      .select('*')
+      .eq('id', userId)
+      .single()
+
+    if (error) {
+      console.error('Database error:', error);
+      throw error
+    }
+
+    console.log('User details retrieved:', user);
+    return user
+  } catch (error) {
+    console.error(`Error fetching user details for ID ${userId}:`, error);
+    throw error;
+  }
+}
+
+// Get match ID from match reference ID
+async function getMatchIdFromReference(matchRefId: string) {
+  try {
+    console.log(`Fetching match ID for reference: ${matchRefId}`);
+    const { data: match, error } = await supabase
+      .from('Match')
+      .select('matchId')
+      .eq('id', matchRefId)
+      .single()
+
+    if (error) {
+      console.error('Database error:', error);
+      throw error
+    }
+
+    console.log('Match ID retrieved:', match.matchId);
+    return match.matchId
+  } catch (error) {
+    console.error(`Error fetching match ID for reference ${matchRefId}:`, error);
+    throw error;
+  }
+}
+
+function convertWebhookToMatchEvent(payload: DatabaseWebhookPayload | ParticipantWebhookPayload): MatchEvent | null {
   console.log('Converting webhook payload to match event:', payload);
   
-  // Only process Match table events
+  // Handle participant join events (from the _Participant join table)
+  if (payload.table === '_Participant' && payload.type === 'INSERT') {
+    console.log('Processing participant join event');
+    const participantPayload = payload as ParticipantWebhookPayload;
+    
+    return {
+      type: 'PLAYER_JOINED',
+      matchId: 0, // Will be populated later with the actual match ID
+      data: {
+        playerAddress: participantPayload.record.A // User ID, will get address later
+      }
+    };
+  }
+  
+  // Only process Match table events for status changes
   if (payload.table !== 'Match') {
     console.log('Ignoring non-Match table event');
     return null;
   }
 
+  const matchPayload = payload as DatabaseWebhookPayload;
+  
   // Handle different status transitions
-  if (payload.type === 'UPDATE' && payload.old_record) {
-    const oldStatus = payload.old_record.status;
-    const newStatus = payload.record.status;
-    const channelId = payload.record.discordChannelId || undefined;
+  if (matchPayload.type === 'UPDATE' && matchPayload.old_record) {
+    const oldStatus = matchPayload.old_record.status;
+    const newStatus = matchPayload.record.status;
+    const channelId = matchPayload.record.discordChannelId || undefined;
     
     console.log(`Status transition: ${oldStatus} -> ${newStatus}`);
 
     if (oldStatus === 'PENDING' && newStatus === 'OPEN') {
       return {
         type: 'MATCH_CREATED',
-        matchId: payload.record.matchId,
+        matchId: matchPayload.record.matchId,
         data: {
-          matchType: payload.record.matchType,
-          stake: payload.record.stake.toString(),
+          matchType: matchPayload.record.matchType,
+          stake: matchPayload.record.stake.toString(),
           discordChannelId: channelId
         }
       };
@@ -145,7 +218,7 @@ function convertWebhookToMatchEvent(payload: DatabaseWebhookPayload): MatchEvent
     if (oldStatus === 'OPEN' && newStatus === 'FILLED') {
       return {
         type: 'MATCH_STARTED',
-        matchId: payload.record.matchId,
+        matchId: matchPayload.record.matchId,
         data: {
           discordChannelId: channelId
         }
@@ -155,9 +228,9 @@ function convertWebhookToMatchEvent(payload: DatabaseWebhookPayload): MatchEvent
     if (newStatus === 'COMPLETED') {
       return {
         type: 'MATCH_COMPLETED',
-        matchId: payload.record.matchId,
+        matchId: matchPayload.record.matchId,
         data: {
-          winnerAddress: payload.record.winnerAddress || undefined,
+          winnerAddress: matchPayload.record.winnerAddress || undefined,
           discordChannelId: channelId
         }
       };
@@ -166,7 +239,7 @@ function convertWebhookToMatchEvent(payload: DatabaseWebhookPayload): MatchEvent
     if (newStatus === 'CANCELLED') {
       return {
         type: 'MATCH_CANCELLED',
-        matchId: payload.record.matchId,
+        matchId: matchPayload.record.matchId,
         data: {
           discordChannelId: channelId
         }
@@ -180,6 +253,19 @@ function convertWebhookToMatchEvent(payload: DatabaseWebhookPayload): MatchEvent
 async function handleMatchEvent(event: MatchEvent) {
   try {
     console.log('Processing match event:', event);
+    
+    // Special handling for PLAYER_JOINED events from the _Participant table
+    if (event.type === 'PLAYER_JOINED' && event.matchId === 0 && event.data.playerAddress) {
+      // Get user details first
+      const userId = event.data.playerAddress;
+      const user = await getUserDetails(userId);
+      
+      // Get match ID from reference if needed (for _Participant table events)
+      const matchId = await getMatchIdFromReference(event.data.discordChannelId || '');
+      event.matchId = matchId;
+      event.data.playerAddress = user.address;
+    }
+    
     const match = await getMatchDetails(event.matchId)
     
     // Update discordChannelId if provided in the event
@@ -297,7 +383,7 @@ serve(async (req) => {
     // Check if this is a database webhook event
     if (body.type === 'INSERT' || body.type === 'UPDATE' || body.type === 'DELETE') {
       console.log('Processing database webhook event');
-      const webhookEvent = convertWebhookToMatchEvent(body as DatabaseWebhookPayload);
+      const webhookEvent = convertWebhookToMatchEvent(body);
       
       if (!webhookEvent) {
         console.log('Event ignored - no action needed');

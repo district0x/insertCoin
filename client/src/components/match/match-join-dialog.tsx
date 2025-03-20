@@ -73,7 +73,7 @@ export function MatchJoinDialog({
 
     const ethAmount = formatEther(match.player1Amount);
     const usdAmount = convertToUsd(match.player1Amount).toFixed(2);
-    return `Join Match with ${ethAmount} ETH (≈$${usdAmount})`;
+    return `Join Match with ${ethAmount} ${match.isERC20 ? "MTK" : "ETH"} (≈$${usdAmount})`;
   };
 
   const isJoinButtonDisabled = () => {
@@ -159,10 +159,10 @@ export function MatchJoinDialog({
             {match.matchType === "ONE_V_ONE"
               ? `You are about to join this match with ${formatEther(
                   match.player1Amount
-                )} ETH (≈$${convertToUsd(match.player1Amount).toFixed(2)}).`
+                )} ${match.isERC20 ? "MTK" : "ETH"} (≈$${convertToUsd(match.player1Amount).toFixed(2)}).`
               : `Select a team to join with ${formatEther(
                   match.player1Amount
-                )} ETH (≈$${convertToUsd(match.player1Amount).toFixed(
+                )} ${match.isERC20 ? "MTK" : "ETH"} (≈$${convertToUsd(match.player1Amount).toFixed(
                   2
                 )}) stake.`}
             This action cannot be undone.
@@ -201,13 +201,13 @@ export function MatchJoinDialog({
                 {getTeamMembers(match.teamB)}
               </div>
               <p className="text-sm">
-                Stake Amount: {formatEther(match.player1Amount)} ETH
+                Stake Amount: {formatEther(match.player1Amount)} {match.isERC20 ? "MTK" : "ETH"}
                 <span className="text-muted-foreground ml-1">
                   (≈${convertToUsd(match.player1Amount).toFixed(2)})
                 </span>
               </p>
               <p className="text-sm">
-                Total Prize Pool: {formatEther(match.totalAmount)} ETH
+                Total Prize Pool: {formatEther(match.totalAmount)} {match.isERC20 ? "MTK" : "ETH"}
                 <span className="text-muted-foreground ml-1">
                   (≈${convertToUsd(match.totalAmount).toFixed(2)})
                 </span>

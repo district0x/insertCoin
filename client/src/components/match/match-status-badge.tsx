@@ -1,27 +1,32 @@
 import { OnChainMatch } from "@/types/match";
+import { getMatchStatus, getMatchStatusColor } from "@/lib/match/types";
 
 interface MatchStatusBadgeProps {
   match: OnChainMatch;
 }
 
 export function MatchStatusBadge({ match }: MatchStatusBadgeProps) {
-  const getStatusText = (match: OnChainMatch) => {
-    if (!match.isOpen) return "Completed";
-    if (match.player2 === "0x0000000000000000000000000000000000000000")
-      return "Open";
-    return "In Progress";
-  };
-
-  const getStatusColor = (match: OnChainMatch) => {
-    if (!match.isOpen) return "bg-gray-100 text-gray-800";
-    if (match.player2 === "0x0000000000000000000000000000000000000000")
-      return "bg-green-100 text-green-800";
-    return "bg-blue-100 text-blue-800";
-  };
+  // Use the utility functions with full match information
+  const hasOpponent = match.player2 !== "0x0000000000000000000000000000000000000000";
+  const status = getMatchStatus(
+    match.isOpen, 
+    hasOpponent, 
+    match.matchType, 
+    match.teamA.length, 
+    match.teamB.length
+  );
+  
+  const statusColor = getMatchStatusColor(
+    match.isOpen, 
+    hasOpponent, 
+    match.matchType, 
+    match.teamA.length, 
+    match.teamB.length
+  );
 
   return (
-    <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(match)}`}>
-      {getStatusText(match)}
+    <span className={`px-2 py-1 text-xs rounded-full ${statusColor}`}>
+      {status}
     </span>
   );
 }

@@ -38,6 +38,9 @@ type MatchEventArgs = {
   matchAmount: bigint;
 };
 
+// A reasonable max stake for a match (100 ETH or equivalent)
+const MAX_STAKE_AMOUNT = 100n * 10n ** 18n; // 100 ETH in wei
+
 function CreateMatchForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -48,6 +51,7 @@ function CreateMatchForm() {
   const [ethAmount, setEthAmount] = React.useState<bigint>(BigInt(0));
   const [isLoading, setIsLoading] = React.useState(false);
   const [txHash, setTxHash] = React.useState<string | null>(null);
+  const [isWaitingForTx, setIsWaitingForTx] = React.useState(false);
   const [selectedToken, setSelectedToken] = React.useState<TokenOption>("ETH");
   const { createMatch, create2v2Match, create5v5Match } = useMatch();
 
@@ -60,9 +64,26 @@ function CreateMatchForm() {
 
     const watchTransaction = async () => {
       try {
+        setIsWaitingForTx(true);
+        
+        // Add a more detailed status message
+        toast({
+          title: "Transaction Submitted",
+          description: `Waiting for transaction to be confirmed on Base Sepolia. This may take a few minutes.`,
+          duration: 30000, // Show for longer since blockchain confirmations take time
+        });
+        
         const receipt = await publicClient.waitForTransactionReceipt({
           hash: txHash as `0x${string}`,
+          // Increase timeout to 3 minutes (180000ms) for Base Sepolia which can be slow
+          timeout: 180000,
+          // Poll more frequently to catch confirmations faster
+          pollingInterval: 3000,
+          // Add confirmation blocks for extra security
+          confirmations: 1
         });
+
+        setIsWaitingForTx(false);
 
         if (receipt.status === "success") {
           setIsLoading(false); // Stop loading state
@@ -115,7 +136,9 @@ function CreateMatchForm() {
 
           toast({
             title: "Match Created Successfully!",
-            description: `Your ${matchType.toLowerCase()} match has been created with ID #${onChainMatchId}.`,
+            description: `Your ${matchType.toLowerCase()} match with ID #${onChainMatchId} is now live with a stake of ${formatEther(ethAmount)} ${selectedToken}.`,
+            variant: "success",
+            duration: 5000, // Show for 5 seconds to ensure user sees it
           });
 
           // Redirect to the match page after a short delay
@@ -125,15 +148,27 @@ function CreateMatchForm() {
         }
       } catch (error) {
         setIsLoading(false);
+        setIsWaitingForTx(false);
         console.error("Transaction error:", error);
-        toast({
-          title: "Transaction Failed",
-          description:
-            error instanceof Error
-              ? error.message
-              : "Failed to create match. Please try again.",
-          variant: "destructive",
-        });
+        
+        // Check if it's a timeout error
+        if (error instanceof Error && error.message.includes("Timed out")) {
+          toast({
+            title: "Transaction Taking Longer Than Expected",
+            description: `The transaction is taking longer than expected to confirm. You can check the status on the Base Sepolia explorer: https://sepolia.basescan.org/tx/${txHash}`,
+            variant: "destructive",
+            duration: 10000,
+          });
+        } else {
+          toast({
+            title: "Transaction Failed",
+            description: error instanceof Error
+              ? `Failed to create match: ${error.message}`
+              : "Failed to create match. The transaction was not processed correctly. Please try again.",
+            variant: "destructive",
+            duration: 7000, // Show longer for errors
+          });
+        }
       }
     };
 
@@ -143,6 +178,26 @@ function CreateMatchForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
+    
+    if (ethAmount <= 0n) {
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a stake amount greater than 0.",
+        variant: "destructive",
+        duration: 5000,
+      });
+      return;
+    }
+    
+    if (ethAmount > MAX_STAKE_AMOUNT) {
+      toast({
+        title: "Amount Too Large",
+        description: "The stake amount is too large. Please enter a smaller amount.",
+        variant: "destructive",
+        duration: 5000,
+      });
+      return;
+    }
 
     setIsLoading(true);
 
@@ -170,7 +225,8 @@ function CreateMatchForm() {
 
         toast({
           title: "Transaction Submitted",
-          description: "Your match is being created...",
+          description: `Creating your ${matchType.toLowerCase()} match. Please wait for blockchain confirmation...`,
+          duration: 10000, // Show for longer since blockchain confirmations take time
         });
       } else {
         // Regular match creation flow
@@ -196,7 +252,8 @@ function CreateMatchForm() {
           setTxHash(hash);
           toast({
             title: "Transaction Submitted",
-            description: "Your match is being created...",
+            description: `Your transaction has been submitted to the network. Please confirm it in your wallet and wait for blockchain confirmation.`,
+            duration: 10000, // Show for longer since blockchain confirmations take time
           });
         } catch (err) {
           throw err;
@@ -206,12 +263,12 @@ function CreateMatchForm() {
       setIsLoading(false);
       console.error("Error creating match:", error);
       toast({
-        title: "Error",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Failed to create match. Please try again.",
+        title: "Match Creation Error",
+        description: error instanceof Error
+          ? `${error.message}`
+          : "Failed to create match. Please check your wallet connection and try again.",
         variant: "destructive",
+        duration: 7000, // Show longer for errors
       });
     }
   };
@@ -296,12 +353,18 @@ function CreateMatchForm() {
                       placeholder="Enter stake amount in USD"
                       disabled={isLoading}
                       required
+                      // Add validation for min/max amounts (in USD)
+                      min={1}
+                      max={1000000} // $1M max stake as a reasonable limit
                     />
                     <p className="text-sm text-muted-foreground mt-1">
                       {ethAmount > BigInt(0) && (
-                        selectedToken === "ETH" 
-                          ? `≈ ${formatEther(ethAmount)} ETH` 
-                          : `≈ ${formatEther(ethAmount)} MTK`
+                        <>
+                          ≈ {formatEther(ethAmount)} {selectedToken}
+                          {ethAmount > MAX_STAKE_AMOUNT && (
+                            <span className="text-red-500 ml-1">(Amount too large)</span>
+                          )}
+                        </>
                       )}
                     </p>
                   </div>
@@ -316,7 +379,7 @@ function CreateMatchForm() {
                 {isLoading ? (
                   <span className="flex items-center justify-center">
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Creating match...
+                    {isWaitingForTx ? "Waiting for confirmation..." : "Creating match..."}
                   </span>
                 ) : matchId ? (
                   "Link Wallet and Create Match"

@@ -103,10 +103,47 @@ export function useEthPrice() {
   }, []);
 
   const convertUsdToEth = (usdAmount: number): bigint => {
-    if (!ethPrice) return 0n;
-    const ethAmount = usdAmount / ethPrice;
-    // Convert to wei (18 decimal places)
-    return BigInt(Math.floor(ethAmount * 1e18));
+    if (!ethPrice || ethPrice <= 0 || usdAmount <= 0) return 0n;
+    
+    try {
+      // Current reasonable maximum (to prevent overflow)
+      const MAX_ETH_AMOUNT = 1000000n * 10n ** 18n; // 1M ETH in wei (much more than anyone would reasonably use)
+      
+      // Convert USD to ETH
+      const ethAmount = usdAmount / ethPrice;
+      
+      // Guard against NaN or Infinity
+      if (!isFinite(ethAmount)) return 0n;
+      
+      // Convert to wei (18 decimal places)
+      // Use a safer conversion method with range checking
+      let weiAmount: bigint;
+      try {
+        // Convert with floor to ensure we don't exceed the amount
+        const weiFloat = ethAmount * 1e18;
+        
+        // Check for overflow before conversion
+        if (weiFloat > Number.MAX_SAFE_INTEGER) {
+          // If too large, we cap at maximum safe value
+          weiAmount = MAX_ETH_AMOUNT;
+        } else {
+          weiAmount = BigInt(Math.floor(weiFloat));
+        }
+      } catch (error) {
+        console.error("Error converting ETH to wei:", error);
+        return 0n;
+      }
+      
+      // Final safety check
+      if (weiAmount > MAX_ETH_AMOUNT) {
+        return MAX_ETH_AMOUNT;
+      }
+      
+      return weiAmount;
+    } catch (error) {
+      console.error("Error in convertUsdToEth:", error);
+      return 0n;
+    }
   };
 
   const convertEthToUsd = (ethAmount: bigint): number => {

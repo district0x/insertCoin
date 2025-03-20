@@ -37,14 +37,14 @@ export function MatchDonationSuccessDialog({
           <div className="p-4 bg-muted rounded-lg space-y-2">
             <p className="text-sm">
               <span className="font-medium">Your Donation:</span>{" "}
-              {formatEther(lastDonationAmount)} ETH
+              {formatEther(lastDonationAmount)} {match.isERC20 ? "MTK" : "ETH"}
               <span className="text-muted-foreground ml-1">
                 (≈${convertToUsd(lastDonationAmount).toFixed(2)})
               </span>
             </p>
             <p className="text-sm">
               <span className="font-medium">New Prize Pool:</span>{" "}
-              {formatEther(match.totalAmount)} ETH
+              {formatEther(match.totalAmount)} {match.isERC20 ? "MTK" : "ETH"}
               <span className="text-muted-foreground ml-1">
                 (≈${convertToUsd(match.totalAmount).toFixed(2)})
               </span>

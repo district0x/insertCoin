@@ -16,6 +16,7 @@ import Welcome from "@/components/home/welcome";
 import Features from "@/components/home/features";
 import TwitchCard from "@/components/home/twitch-card";
 import Tournaments from "@/components/home/tournaments";
+import { MatchStatusBadge } from "@/components/match/match-status-badge";
 const INITIAL_MATCHES_COUNT = 7;
 const POLLING_INTERVAL = 30000; // 30 seconds
 let lastFetchTime = 0;
@@ -168,26 +169,10 @@ export default function Home() {
                   {match.matchType} Match #{match.id.toString()}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Prize Pool: {formatEther(match.totalAmount)} ETH
+                  Prize Pool: {formatEther(match.totalAmount)} {match.isERC20 ? "MTK" : "ETH"}
                 </p>
               </div>
-              <span
-                className={`px-2 py-1 text-xs rounded-full ${
-                  !match.isOpen
-                    ? "bg-gray-100 text-gray-800"
-                    : match.player2 ===
-                      "0x0000000000000000000000000000000000000000"
-                    ? "bg-green-100 text-green-800"
-                    : "bg-blue-100 text-blue-800"
-                }`}
-              >
-                {!match.isOpen
-                  ? "Completed"
-                  : match.player2 ===
-                    "0x0000000000000000000000000000000000000000"
-                  ? "Open"
-                  : "In Progress"}
-              </span>
+              <MatchStatusBadge match={match} />
             </div>
             <div className="space-y-2">
               <div className="space-y-1">

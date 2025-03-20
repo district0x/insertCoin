@@ -13,6 +13,7 @@ import { useState } from "react";
 import { DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { formatEther } from "viem";
+import { getMatchStatus } from "@/lib/match/types";
 
 interface MatchDonationDialogProps {
   match: OnChainMatch;
@@ -32,19 +33,31 @@ export function MatchDonationDialog({
   convertToUsd,
 }: MatchDonationDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
+  
+  // Determine if donations are allowed based on match status
+  const hasOpponent = match.player2 !== "0x0000000000000000000000000000000000000000";
+  const status = getMatchStatus(
+    match.isOpen,
+    hasOpponent,
+    match.matchType,
+    match.teamA.length,
+    match.teamB.length
+  );
+  
+  const canDonate = status === "Open" || status === "In Progress";
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button className="w-full" variant="outline" disabled={!match.isOpen}>
-          {match.isOpen ? "Donate to Prize Pool" : "Match Closed"}
+        <Button className="w-full" variant="outline" disabled={!canDonate}>
+          {canDonate ? "Donate to Prize Pool" : "Match Closed"}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Donate to Match #{match.id.toString()}</DialogTitle>
           <DialogDescription>
-            Current prize pool: {formatEther(match.totalAmount)} ETH
+            Current prize pool: {formatEther(match.totalAmount)} {match.isERC20 ? "MTK" : "ETH"}
             <span className="text-muted-foreground ml-1">
               (≈${convertToUsd(match.totalAmount).toFixed(2)})
             </span>
@@ -61,7 +74,7 @@ export function MatchDonationDialog({
             <p className="text-sm text-muted-foreground">
               {donationEthAmount > BigInt(0) && (
                 <>
-                  ≈ {formatEther(donationEthAmount)} ETH
+                  ≈ {formatEther(donationEthAmount)} {match.isERC20 ? "MTK" : "ETH"}
                   <span className="ml-1">
                     (≈${convertToUsd(donationEthAmount).toFixed(2)})
                   </span>

@@ -6,6 +6,7 @@ interface MatchPlayerInfoProps {
   label: string;
   maxPlayers: number;
   convertToUsd: (ethAmount: bigint) => number;
+  isERC20?: boolean;
 }
 
 export function MatchPlayerInfo({
@@ -14,6 +15,7 @@ export function MatchPlayerInfo({
   label,
   maxPlayers,
   convertToUsd,
+  isERC20 = false,
 }: MatchPlayerInfoProps) {
   const truncateAddress = (address: string | null | undefined) => {
     if (!address) return "N/A";
@@ -36,7 +38,7 @@ export function MatchPlayerInfo({
       <h3 className="font-medium mb-2">{label}</h3>
       <div className="space-y-1">{playerSlots}</div>
       <p className="text-sm text-muted-foreground mt-2">
-        Stake per player: {formatEther(stake)} ETH
+        Stake per player: {formatEther(stake)} {isERC20 ? "MTK" : "ETH"}
         <span className="ml-1">(≈${convertToUsd(stake).toFixed(2)})</span>
       </p>
     </div>

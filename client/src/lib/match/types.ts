@@ -60,16 +60,58 @@ export function getMaxPlayers(matchType: MatchType): number {
   }
 }
 
-export function getMatchStatus(isOpen: boolean, hasOpponent: boolean) {
+export function getMatchStatus(isOpen: boolean, hasOpponent: boolean, matchType?: MatchType, teamALength?: number, teamBLength?: number) {
+  // For simple checks without full data (backward compatibility)
+  if (matchType === undefined || teamALength === undefined || teamBLength === undefined) {
+    if (!isOpen && hasOpponent) return "In Progress";
+    if (!isOpen) return "Completed";
+    return hasOpponent ? "In Progress" : "Open";
+  }
+  
+  // For 1v1 matches
+  if (matchType === "ONE_V_ONE") {
+    // If player2 is set but match is not open, it means both players have joined
+    // but the match is still in progress (not completed yet)
+    if (!isOpen && hasOpponent) return "In Progress";
+    
+    // If match is not open and no player2, it's completed (rare case)
+    if (!isOpen) return "Completed";
+    
+    // If player2 exists, the match is in progress
+    if (hasOpponent) return "In Progress";
+    
+    // Otherwise, it's still open for joining
+    return "Open";
+  }
+  
+  // For team-based matches (2v2, 5v5)
+  const maxPlayersPerTeam = getMaxPlayers(matchType);
+  const teamAFull = teamALength === maxPlayersPerTeam;
+  const teamBFull = teamBLength === maxPlayersPerTeam;
+  
+  // If match is not open, it's really completed
   if (!isOpen) return "Completed";
-  if (!hasOpponent) return "Open";
-  return "In Progress";
+  
+  // If both teams are full, it's in progress
+  if (teamAFull && teamBFull) return "In Progress";
+  
+  // If any team has at least one player but teams are not full, it's open for more players
+  return "Open";
 }
 
-export function getMatchStatusColor(isOpen: boolean, hasOpponent: boolean) {
-  if (!isOpen) return "bg-gray-100 text-gray-800";
-  if (!hasOpponent) return "bg-green-100 text-green-800";
-  return "bg-blue-100 text-blue-800";
+export function getMatchStatusColor(isOpen: boolean, hasOpponent: boolean, matchType?: MatchType, teamALength?: number, teamBLength?: number) {
+  const status = getMatchStatus(isOpen, hasOpponent, matchType, teamALength, teamBLength);
+  
+  switch (status) {
+    case "Completed":
+      return "bg-gray-100 text-gray-800";
+    case "Open":
+      return "bg-green-100 text-green-800";
+    case "In Progress":
+      return "bg-blue-100 text-blue-800";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
 }
 
 export function determineMatchType(
