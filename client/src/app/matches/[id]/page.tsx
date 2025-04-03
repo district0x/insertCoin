@@ -36,8 +36,8 @@ export default function MatchPage() {
   // Fetch match data
   const { match, error, mutate } = useMatchData({
     matchId,
-    contract,
-    publicClient,
+            contract,
+            publicClient,
     isVisible
   });
 
@@ -65,9 +65,9 @@ export default function MatchPage() {
     handleDonateToMatch,
     handleCloseMatch
   } = useMatchActions({
-    contract,
-    publicClient,
-    walletClient,
+        contract,
+        publicClient,
+        walletClient,
     address,
     match,
     onSuccess: () => mutate()
@@ -106,16 +106,16 @@ export default function MatchPage() {
 
       <Card>
         <MatchDetailContent
-          match={displayMatch}
-          isProcessing={isProcessing}
-          userAddress={address}
-          donationEthAmount={donationEthAmount}
-          onDonationEthChange={setDonationEthAmount}
-          onDonate={handleDonateToMatch}
-          selectedWinner={selectedWinner}
-          onSelectWinner={setSelectedWinner}
+                  match={displayMatch}
+                  isProcessing={isProcessing}
+                  userAddress={address}
+                donationEthAmount={donationEthAmount}
+                onDonationEthChange={setDonationEthAmount}
+                onDonate={handleDonateToMatch}
+                  selectedWinner={selectedWinner}
+                  onSelectWinner={setSelectedWinner}
           onJoin={handleJoinMatch}
-          onClose={handleCloseMatch}
+                  onClose={handleCloseMatch}
           showJoinConfirmation={showJoinConfirmation}
           setShowJoinConfirmation={setShowJoinConfirmation}
           showCloseConfirmation={showCloseConfirmation}

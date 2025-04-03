@@ -26,7 +26,7 @@ export default function MatchesPage() {
       });
     }
   }, [contract, publicClient]);
-
+  
   // Expose debug function in development environment
   React.useEffect(() => {
     if (typeof window !== 'undefined') {

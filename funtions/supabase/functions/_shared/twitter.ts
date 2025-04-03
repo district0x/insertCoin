@@ -99,48 +99,53 @@ export async function postTweet(content: string): Promise<{ id: string }> {
   }
 }
 
-export function formatMatchTweet(data: {
-  type: "created" | "joined";
-  game: string;
-  platform: string;
-  match_amount_usd: number;
-  player1_name?: string;
-  player2_name?: string;
+export function formatMatchCreatedTweet(data: {
+  matchId: number;
+  matchType: string;
+  stake: string;
 }): string {
-  if (data.type === "created") {
-    return `🎮 New match created!
-Game: ${data.game}
-Platform: ${data.platform}
-Prize: $${data.match_amount_usd}
+  return `🎮 New match created!
+Match ID: #${data.matchId}
+Type: ${data.matchType}
+Stake: $${data.stake}
 Waiting for opponent...`;
-  }
-
-  return `⚔️ Match is on!
-${data.player1_name} vs ${data.player2_name}
-Game: ${data.game}
-Platform: ${data.platform}
-Prize: $${data.match_amount_usd}`;
 }
 
-export function formatTournamentTweet(data: {
-  game_name: string;
-  amount: number;
-  num_entrants: number;
+export function formatMatchJoinedTweet(data: {
+  matchId: number;
+  matchType: string;
+  stake: string;
+  creatorAddress?: string;
+  joinerAddress?: string;
 }): string {
-  return `🏆 New Tournament Alert!
-Game: ${data.game_name}
-Prize Pool: $${data.amount}
-Players: ${data.num_entrants}
-Join now!`;
+  return `⚔️ Match is on!
+Match ID: #${data.matchId}
+Type: ${data.matchType}
+Stake: $${data.stake}
+Ready to battle!`;
+}
+
+export function formatMatchCompletedTweet(data: {
+  matchId: number;
+  matchType: string;
+  stake: string;
+  totalPrize: string;
+  winnerAddress?: string;
+}): string {
+  return `🏆 Match completed!
+Match ID: #${data.matchId}
+Type: ${data.matchType}
+Total Prize: $${data.totalPrize}
+${data.winnerAddress ? `Winner: ${data.winnerAddress.substring(0, 6)}...${data.winnerAddress.substring(data.winnerAddress.length - 4)}` : 'No winner declared'}`;
 }
 
 export function formatDailyStatsTweet(data: {
-  total_matches: number;
-  total_prize_pool: number;
-  top_player: { name: string; wins: number };
+  totalMatches: number;
+  totalPrizePool: number;
+  topPlayer?: { address: string; wins: number };
 }): string {
   return `📊 Daily Stats Update
-Total Matches: ${data.total_matches}
-Total Prize Pool: $${data.total_prize_pool}
-Top Player: ${data.top_player.name} (${data.top_player.wins} wins)`;
-}
+Total Matches: ${data.totalMatches}
+Total Prize Pool: $${data.totalPrizePool}
+${data.topPlayer ? `Top Player: ${data.topPlayer.address.substring(0, 6)}...${data.topPlayer.address.substring(data.topPlayer.address.length - 4)} (${data.topPlayer.wins} wins)` : ''}`;
+} 

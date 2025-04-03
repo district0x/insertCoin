@@ -225,7 +225,8 @@ function convertWebhookToMatchEvent(payload: DatabaseWebhookPayload | Participan
       };
     }
     
-    if (newStatus === 'COMPLETED') {
+    // Only trigger COMPLETED notification if the status actually changed from a different status
+    if (newStatus === 'COMPLETED' && oldStatus !== 'COMPLETED') {
       return {
         type: 'MATCH_COMPLETED',
         matchId: matchPayload.record.matchId,
@@ -236,7 +237,8 @@ function convertWebhookToMatchEvent(payload: DatabaseWebhookPayload | Participan
       };
     }
     
-    if (newStatus === 'CANCELLED') {
+    // Only trigger CANCELLED notification if the status actually changed from a different status
+    if (newStatus === 'CANCELLED' && oldStatus !== 'CANCELLED') {
       return {
         type: 'MATCH_CANCELLED',
         matchId: matchPayload.record.matchId,
