@@ -1,5 +1,5 @@
 import { GetContractReturnType, PublicClient, WalletClient } from "viem";
-import { ONEVONE_ABI } from "../contracts/abis/OneVOne";
+import { ONEVONE_ABI } from "../contracts/abis/ABI";
 import { ERC20_APPROVAL_ABI } from "../constants/tokens";
 
 // Helper function to check if a match uses ERC20 tokens and approve if needed

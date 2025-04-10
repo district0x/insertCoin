@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import useSWR from "swr";
 import { GetContractReturnType, PublicClient } from "viem";
-import { ONEVONE_ABI } from "@/lib/contracts/abis/OneVOne";
+import { ONEVONE_ABI } from "@/lib/contracts/abis/ABI";
 import { OnChainMatch } from "@/types/match";
 import { fetchMatch } from "@/lib/match/fetch";
 

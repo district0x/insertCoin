@@ -1,5 +1,5 @@
 import { GetContractReturnType, PublicClient, WalletClient } from "viem";
-import { ONEVONE_ABI } from "../contracts/abis/OneVOne";
+import { ONEVONE_ABI } from "../contracts/abis/ABI";
 
 export async function createMatch(
   contract: GetContractReturnType<typeof ONEVONE_ABI>,

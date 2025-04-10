@@ -1,6 +1,6 @@
 import { getContract } from "viem";
 import { usePublicClient } from "wagmi";
-import { ONEVONE_ABI } from "@/lib/contracts/abis/OneVOne";
+import { ONEVONE_ABI } from "@/lib/contracts/abis/ABI";
 
 // Base Sepolia contract address as fallback
 const FALLBACK_CONTRACT_ADDRESS = "0xE5e646aF90F8F1F1B72AcB1F7d3AcE43D91F5a34";

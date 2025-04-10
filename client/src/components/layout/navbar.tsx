@@ -14,6 +14,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: "/matches", label: "Matches" },
+  { href: "/tournaments", label: "Tournaments" },
   { href: "/how-it-works", label: "How It Works" },
   { href: "/community", label: "Community" },
   { href: "/about", label: "About One v One" },
@@ -52,7 +53,10 @@ export function Navbar() {
     <header className="border-b bg-gray-900 text-white">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <div className="flex items-center space-x-8">
-          <Link href="/" className="text-2xl font-bold hover:text-white/80 transition-colors">
+          <Link
+            href="/"
+            className="text-2xl font-bold hover:text-white/80 transition-colors"
+          >
             One v One
           </Link>
           <nav className="hidden md:flex space-x-6">
@@ -73,7 +77,7 @@ export function Navbar() {
 
         <div className="flex items-center gap-4">
           <ConnectButton />
-          
+
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsOpen(!isOpen)}
@@ -106,7 +110,9 @@ export function Navbar() {
                 href={item.href}
                 className={cn(
                   "block py-2 px-3 text-base font-medium rounded-md transition-colors hover:bg-gray-800",
-                  isActive(item.href) ? "bg-gray-800 text-primary" : "text-gray-200"
+                  isActive(item.href)
+                    ? "bg-gray-800 text-primary"
+                    : "text-gray-200"
                 )}
                 onClick={() => setIsOpen(false)}
               >

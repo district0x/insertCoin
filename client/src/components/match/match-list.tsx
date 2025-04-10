@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useInView } from "react-intersection-observer";
 import { OnChainMatch } from "@/types/match";
 import { GetContractReturnType, PublicClient } from "viem";
-import { ONEVONE_ABI } from "@/lib/contracts/abis/OneVOne";
+import { ONEVONE_ABI } from "@/lib/contracts/abis/ABI";
 import { useToast } from "@/hooks/use-toast";
 import { prefetchMatch } from "@/lib/match";
 import MatchCard from "./match-card";

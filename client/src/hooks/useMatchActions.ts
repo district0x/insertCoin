@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { OnChainMatch } from "@/types/match";
 import { useToast } from "@/hooks/use-toast";
 import { GetContractReturnType, PublicClient, WalletClient } from "viem";
-import { ONEVONE_ABI } from "@/lib/contracts/abis/OneVOne";
+import { ONEVONE_ABI } from "@/lib/contracts/abis/ABI";
 import { getMaxPlayers, getMatchStatus } from "@/lib/match/types";
 import {
   joinMatch,
@@ -123,19 +123,19 @@ export function useMatchActions({
           description: "Successfully joined match!",
           variant: "success"
         });
-        
+
         try {
           console.log(`Updating database for match join: Wallet=${address}, MatchID=${Number(displayMatch.id)}, isTeamA=${isTeamA}`);
-          
+
           // Update the database with the user joining the match
           const result = await joinMatchInDb({
             walletAddress: address,
             matchId: Number(displayMatch.id),
             isTeamA: displayMatch.matchType !== "ONE_V_ONE" ? isTeamA : undefined
           });
-          
+
           console.log("Database updated successfully:", result);
-          
+
           // Additional notification for successful database update
           toast({
             title: "Database Updated",
@@ -143,11 +143,11 @@ export function useMatchActions({
             variant: "success",
             duration: 3000
           });
-          
+
           onSuccess?.();
         } catch (dbError) {
           console.error("Error updating database after joining match:", dbError);
-          
+
           // Still notify user, but with warning about database
           toast({
             title: "Warning",
@@ -155,7 +155,7 @@ export function useMatchActions({
             variant: "destructive",
             duration: 7000
           });
-          
+
           // Still call onSuccess since the blockchain transaction succeeded
           onSuccess?.();
         }
@@ -205,7 +205,7 @@ export function useMatchActions({
       displayMatch.teamA.length,
       displayMatch.teamB.length
     );
-    
+
     if (status === "Completed") {
       toast({
         variant: "destructive",
@@ -239,7 +239,17 @@ export function useMatchActions({
           abi: contract.abi,
           functionName: "matches",
           args: [displayMatch.id],
-        });
+        }) as [
+            `0x${string}`, // player1
+            `0x${string}`, // player2
+            boolean,       // isComplete
+            `0x${string}`, // winner
+            bigint,        // matchAmount
+            bigint,        // donatedAmount
+            boolean,       // isERC20
+            `0x${string}`  // token
+          ];
+
         const newDonationAmount = updatedMatch[5] - displayMatch.donatedAmount;
 
         setLastDonationAmount(newDonationAmount);
@@ -330,13 +340,13 @@ export function useMatchActions({
               winnerAddress: selectedWinner,
             }),
           });
-          
+
           toast({
             title: "Match Completed",
-            description: `Match has been completed. The winner is ${selectedWinner.slice(0,6)}...${selectedWinner.slice(-4)}`,
+            description: `Match has been completed. The winner is ${selectedWinner.slice(0, 6)}...${selectedWinner.slice(-4)}`,
             variant: "success",
           });
-          
+
           setShowSuccessDialog(true);
           onSuccess?.();
         } catch (dbError) {
@@ -384,14 +394,14 @@ export function useMatchActions({
     showSuccessDialog,
     optimisticMatch,
     displayMatch,
-    
+
     // Setters
     setDonationEthAmount,
     setShowJoinConfirmation,
     setShowCloseConfirmation,
     setSelectedWinner,
     setShowSuccessDialog,
-    
+
     // Handlers
     handleJoinMatch,
     handleDonateToMatch,

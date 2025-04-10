@@ -1,5 +1,5 @@
 import { GetContractReturnType, PublicClient } from "viem";
-import { ONEVONE_ABI } from "../../contracts/abis/OneVOne";
+import { ONEVONE_ABI } from "../../contracts/abis/ABI";
 import { OnChainMatch } from "@/types/match";
 import {
   Match2v2Response,
@@ -29,12 +29,12 @@ export async function fetchMatch(
     // Wrap the actual fetch logic in throttleRequest
     const match = await throttleRequest(async () => {
       // Get base match data
-      const baseMatch = (await publicClient.readContract({
+      const baseMatch = await publicClient.readContract({
         address: contract.address,
         abi: contract.abi,
         functionName: "matches",
         args: [BigInt(matchId)],
-      })) as readonly [
+      }) as readonly [
         `0x${string}`,
         `0x${string}`,
         bigint,
@@ -47,12 +47,12 @@ export async function fetchMatch(
       ];
 
       // Get 2v2 and 5v5 data to determine match type
-      const match2v2Raw = (await publicClient.readContract({
+      const match2v2Raw = await publicClient.readContract({
         address: contract.address,
         abi: contract.abi,
         functionName: "matches2v2",
         args: [BigInt(matchId)],
-      })) as readonly [
+      }) as readonly [
         `0x${string}`,
         `0x${string}`,
         `0x${string}`,
@@ -66,12 +66,12 @@ export async function fetchMatch(
         `0x${string}`
       ];
 
-      const match5v5Raw = (await publicClient.readContract({
+      const match5v5Raw = await publicClient.readContract({
         address: contract.address,
         abi: contract.abi,
         functionName: "matches5v5",
         args: [BigInt(matchId)],
-      })) as readonly [
+      }) as readonly [
         `0x${string}`,
         `0x${string}`,
         `0x${string}`,
@@ -201,39 +201,39 @@ export async function fetchMatch(
           matchType === "FIVE_V_FIVE"
             ? match5v5.player1Amount
             : matchType === "TWO_V_TWO"
-            ? match2v2.player1Amount
-            : baseMatch[2],
+              ? match2v2.player1Amount
+              : baseMatch[2],
         player2Amount:
           matchType === "FIVE_V_FIVE"
             ? match5v5.player1Amount
             : matchType === "TWO_V_TWO"
-            ? match2v2.player2Amount
-            : baseMatch[3],
+              ? match2v2.player2Amount
+              : baseMatch[3],
         totalAmount:
           matchType === "FIVE_V_FIVE"
             ? match5v5.totalAmount
             : matchType === "TWO_V_TWO"
-            ? match2v2.totalAmount
-            : baseMatch[4],
+              ? match2v2.totalAmount
+              : baseMatch[4],
         donatedAmount: baseMatch[5],
         isOpen:
           matchType === "ONE_V_ONE"
             ? baseMatch[6]
             : matchType === "FIVE_V_FIVE"
-            ? match5v5.isOpen
-            : match2v2.isOpen,
+              ? match5v5.isOpen
+              : match2v2.isOpen,
         isERC20:
           matchType === "ONE_V_ONE"
             ? baseMatch[7]
             : matchType === "FIVE_V_FIVE"
-            ? match5v5.isERC20
-            : match2v2.isERC20,
+              ? match5v5.isERC20
+              : match2v2.isERC20,
         token:
           matchType === "ONE_V_ONE"
             ? baseMatch[8]
             : matchType === "FIVE_V_FIVE"
-            ? match5v5.token
-            : match2v2.token,
+              ? match5v5.token
+              : match2v2.token,
         matchType,
         teamA,
         teamB,
@@ -263,7 +263,7 @@ export async function fetchMatchDirect(
 ): Promise<OnChainMatch | null> {
   // This is a simplified version of fetchMatch that doesn't use throttleRequest
   // It's used by batchFetchMatches to avoid nested throttling
-  
+
   if (!contract || !publicClient || !matchId) {
     return null;
   }
@@ -276,7 +276,7 @@ export async function fetchMatchDirect(
 
   // Implementation similar to fetchMatch but without throttleRequest wrapper
   // ... (same implementation as fetchMatch but without the throttleRequest wrapper)
-  
+
   try {
     // Get base match data
     const baseMatch = (await publicClient.readContract({
@@ -316,12 +316,12 @@ export async function fetchMatchDirect(
       `0x${string}`
     ];
 
-    const match5v5Raw = (await publicClient.readContract({
+    const match5v5Raw = await publicClient.readContract({
       address: contract.address,
       abi: contract.abi,
       functionName: "matches5v5",
       args: [BigInt(matchId)],
-    })) as readonly [
+    }) as readonly [
       `0x${string}`,
       `0x${string}`,
       `0x${string}`,
@@ -451,39 +451,39 @@ export async function fetchMatchDirect(
         matchType === "FIVE_V_FIVE"
           ? match5v5.player1Amount
           : matchType === "TWO_V_TWO"
-          ? match2v2.player1Amount
-          : baseMatch[2],
+            ? match2v2.player1Amount
+            : baseMatch[2],
       player2Amount:
         matchType === "FIVE_V_FIVE"
           ? match5v5.player1Amount
           : matchType === "TWO_V_TWO"
-          ? match2v2.player2Amount
-          : baseMatch[3],
+            ? match2v2.player2Amount
+            : baseMatch[3],
       totalAmount:
         matchType === "FIVE_V_FIVE"
           ? match5v5.totalAmount
           : matchType === "TWO_V_TWO"
-          ? match2v2.totalAmount
-          : baseMatch[4],
+            ? match2v2.totalAmount
+            : baseMatch[4],
       donatedAmount: baseMatch[5],
       isOpen:
         matchType === "ONE_V_ONE"
           ? baseMatch[6]
           : matchType === "FIVE_V_FIVE"
-          ? match5v5.isOpen
-          : match2v2.isOpen,
+            ? match5v5.isOpen
+            : match2v2.isOpen,
       isERC20:
         matchType === "ONE_V_ONE"
           ? baseMatch[7]
           : matchType === "FIVE_V_FIVE"
-          ? match5v5.isERC20
-          : match2v2.isERC20,
+            ? match5v5.isERC20
+            : match2v2.isERC20,
       token:
         matchType === "ONE_V_ONE"
           ? baseMatch[8]
           : matchType === "FIVE_V_FIVE"
-          ? match5v5.token
-          : match2v2.token,
+            ? match5v5.token
+            : match2v2.token,
       matchType,
       teamA,
       teamB,

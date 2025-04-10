@@ -1,5 +1,5 @@
 import { GetContractReturnType, PublicClient } from "viem";
-import { ONEVONE_ABI } from "../../contracts/abis/OneVOne";
+import { ONEVONE_ABI } from "../../contracts/abis/ABI";
 import { OnChainMatch } from "@/types/match";
 import { getCachedMatch } from "./cache";
 import { fetchMatchDirect } from "./fetchMatch";
