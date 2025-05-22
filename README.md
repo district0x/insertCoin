@@ -91,3 +91,10 @@ This trivia game integrates with Insert Coin's core infrastructure:
 - **Admin Management**: Centralized admin controls for all games in the ecosystem
 - **Matching Pool**: Contributes to and benefits from the platform-wide matching pool system
 - **User Accounts**: Seamless experience across all Insert Coin gaming modules
+- 
+
+
+## In Progress
+ERC20 Token Support: The smart contract currently accepts ERC20 tokens for tournament entry fees, but this feature has not been implemented in the trivia game UI options yet. Currently, only ETH tournaments are supported through the interface. 
+Enhanced Admin Panel: Full admin panel functionality is available but restricted to wallet addresses that have been granted admin privileges on the smart contract. Admin features include tournament fund management, prize distribution, and platform settings. 
+Smart Contract: Deployed on Base Sepolia testnet at: 0x052E7926f7B0C892Ef953EcC709d3c6e3D17268b
