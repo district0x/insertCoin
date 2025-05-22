@@ -13,6 +13,7 @@ export interface Player {
     name: string;
     score: number;
     eliminated?: boolean;
+    walletAddress?: string;
 }
 
 export interface GameRoom {

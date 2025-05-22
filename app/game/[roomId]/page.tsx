@@ -2,15 +2,37 @@
 
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
+import { useAddress, useConnectionStatus } from "@thirdweb-dev/react";
 import { useSocket } from '@/app/hooks/useSocket';
+import { useAuth } from '@/hooks/useAuth';
 import { Player, Question } from '@/app/types';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useTournamentContract } from '@/hooks/useTournamentContract';
+import { useToast } from '@/lib/hooks/use-toast';
+import { OnChainTournament, TournamentPlayer, TournamentWinner } from '@/app/types/tournament';
+import { TournamentPayoutPanel } from '@/components/TournamentPayoutPanel';
+import { WinnerSummary } from '@/components/WinnerSummary';
+
+
+
 
 export default function GameRoom() {
     const params = useParams();
     const searchParams = useSearchParams();
     const { socket, updateRoomSettings } = useSocket();
     const [isClient, setIsClient] = useState(false);
+    const { isAuthenticated } = useAuth(true, '/');
+    const address = useAddress();
+    const connectionStatus = useConnectionStatus();
+    const tournamentId = searchParams.get('tournamentId');
+    const [isTournamentMode, setIsTournamentMode] = useState(!!tournamentId);
+    const [tournamentDetails, setTournamentDetails] = useState<OnChainTournament | null>(null);
+    const [entryFee, setEntryFee] = useState('0.01');
+    const [hasJoinedTournament, setHasJoinedTournament] = useState(false);
+    const { joinTournament, isEntrantInTournament, endTournament, getTournamentDetails, saveGameResult, startTournament, isLoading: isTournamentLoading } = useTournamentContract();
+    const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
 
     // Safe logging functions
     const safeLog = (...args: any[]) => {
@@ -64,19 +86,25 @@ export default function GameRoom() {
         return players.filter(p => !p.eliminated).length;
     }, [players]);
 
+
+
     // Join the room when socket is ready
     useEffect(() => {
         if (socket) {
-            // Join the room
-            socket.emit('join-room', roomId, playerName);
+            // Get wallet address from URL parameters or connected wallet
+            const walletAddress = searchParams.get('walletAddress') || address || '';
+            console.log('Joining room with wallet address:', walletAddress);
 
+            // Join the room with wallet address
+            socket.emit('join-room', roomId, playerName, walletAddress);
             // Set up socket event listeners
             socket.on('player-info', (playerInfo) => {
                 setCurrentPlayer({
                     id: playerInfo.id,
                     name: playerInfo.name,
                     score: 0,
-                    eliminated: false
+                    eliminated: false,
+                    walletAddress: playerInfo.walletAddress || null
                 });
             });
 
@@ -429,6 +457,26 @@ export default function GameRoom() {
         return () => clearInterval(interval);
     }, [gameStatus, timer, currentPlayer, selectedAnswer, waitingForPlayers, roomId, socket]);
 
+    // Save game results when the game ends
+    useEffect(() => {
+        if (gameStatus === 'completed' && results.length > 0 && connectionStatus === "connected" && address && isAuthenticated) {
+            // Find the current player's result
+            const playerResult = results.find(p => p.id === currentPlayer?.id);
+
+            if (playerResult && currentPlayer) {
+                console.log(`Saving game result for player ${currentPlayer.name} with score ${playerResult.score}`);
+
+                // Save result on-chain
+                saveGameResult(roomId, address, playerResult.score)
+                    .then((tx) => {
+                        console.log("Game result saved on-chain:", tx);
+                    })
+                    .catch((error) => {
+                        console.error("Failed to save game result:", error);
+                    });
+            }
+        }
+    }, [gameStatus, results, currentPlayer, roomId, address, connectionStatus, saveGameResult, isAuthenticated]);
 
     // Shuffle answers only once when a new question is loaded
     useEffect(() => {
@@ -556,8 +604,24 @@ export default function GameRoom() {
     };
 
     // Handle starting the game
-    const handleStartGame = () => {
+    const handleStartGame = async () => {
         if (socket && isHost) {
+            // If this is a tournament, start it on the blockchain first
+            if (tournamentId) {
+                try {
+                    console.log(`Starting tournament ${tournamentId} on blockchain...`);
+                    const result = await startTournament(parseInt(tournamentId));
+                    console.log('Tournament started on blockchain successfully:', result);
+                } catch (error) {
+                    console.error("Error starting tournament on blockchain:", error);
+                    alert("Failed to start the tournament on blockchain. Please try again.");
+                    return; // Don't continue with game start if blockchain transaction fails
+                }
+            }
+
+            // Once tournament is started on blockchain (or if not a tournament game),
+            // emit the start-game event
+            console.log(`Emitting start-game event for room ${roomId}`);
             socket.emit('start-game', roomId);
         }
     };
@@ -649,6 +713,134 @@ export default function GameRoom() {
         }
     };
 
+    useEffect(() => {
+        if (tournamentId) {
+            const fetchTournamentDetails = async () => {
+                try {
+                    const details = await getTournamentDetails(parseInt(tournamentId));
+                    setTournamentDetails(details);
+                    setEntryFee(details.entryFee);
+                } catch (error) {
+                    console.error("Error fetching tournament details:", error);
+                }
+            };
+
+            fetchTournamentDetails();
+        }
+    }, [tournamentId, getTournamentDetails]);
+
+    // Add this useEffect to check if the player has already joined
+    useEffect(() => {
+        if (tournamentId) {
+            const fetchTournamentDetails = async () => {
+                try {
+                    // Clear any existing debounce timer
+                    if (debounceTimerRef.current) {
+                        clearTimeout(debounceTimerRef.current);
+                    }
+
+                    // Set a new debounce timer (300ms delay)
+                    debounceTimerRef.current = setTimeout(async () => {
+                        console.log(`Fetching tournament details for ID: ${tournamentId}`);
+
+                        try {
+                            const details = await getTournamentDetails(parseInt(tournamentId));
+                            setTournamentDetails(details);
+                            setEntryFee(details.entryFee);
+                        } catch (error) {
+                            console.error("Error fetching tournament details:", error);
+                            // Add exponential backoff for retries if needed
+                        }
+
+                        debounceTimerRef.current = null;
+                    }, 300);
+                } catch (error) {
+                    console.error("Error in tournament details fetch:", error);
+                }
+            };
+
+            fetchTournamentDetails();
+
+            // Cleanup function to clear any pending debounce timer
+            return () => {
+                if (debounceTimerRef.current) {
+                    clearTimeout(debounceTimerRef.current);
+                    debounceTimerRef.current = null;
+                }
+            };
+        }
+    }, [tournamentId, getTournamentDetails]);
+
+    // Add the function to handle joining a tournament
+    const handleJoinTournament = async () => {
+        if (!tournamentId || !address || hasJoinedTournament) return;
+
+        try {
+            await joinTournament(parseInt(tournamentId), entryFee);
+            setHasJoinedTournament(true);
+
+            alert('Successfully joined the tournament!');
+
+            // Notify the host and other players
+            socket?.emit('player-joined-tournament', {
+                roomId,
+                playerId: playerId,
+                playerName: currentPlayer?.name
+            });
+        } catch (error: any) {
+            console.error("Error joining tournament:", error);
+            alert(`Failed to join tournament: ${error.message || "Unknown error"}`);
+        }
+    };
+
+    // Add this function to handle tournament ending
+    const handleEndTournament = async () => {
+        if (!tournamentId || !isHost) return;
+
+        try {
+            // Sort players by score (highest first)
+            const sortedPlayers = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
+
+            // Get the top 3 players (or fewer if there are less than 3 players)
+            const topPlayers = sortedPlayers.slice(0, Math.min(3, sortedPlayers.length));
+
+            // Filter out players without wallet addresses
+            const winnersWithAddresses = topPlayers.filter(p => p.walletAddress && p.walletAddress !== '');
+
+            if (winnersWithAddresses.length === 0) {
+                alert("No players with wallet addresses found. Cannot distribute prizes.");
+                return;
+            }
+
+            // Assign percentages based on rank
+            let percentages: number[] = [];
+
+            if (winnersWithAddresses.length === 1) {
+                percentages = [100];
+            } else if (winnersWithAddresses.length === 2) {
+                percentages = [70, 30];
+            } else {
+                percentages = [60, 30, 10];
+            }
+
+            // Get the addresses
+            const winnerAddresses = winnersWithAddresses.map(p => p.walletAddress || '');
+
+            // End the tournament and distribute prizes
+            await endTournament(
+                parseInt(tournamentId),
+                winnerAddresses,
+                percentages
+            );
+
+            alert("Tournament ended successfully. Prizes have been distributed!");
+        } catch (error: any) {
+            console.error("Error ending tournament:", error);
+            alert(`Failed to end tournament: ${error.message || "Unknown error"}`);
+        }
+    };
+
+
 
     useEffect(() => {
         console.log('COMPONENT INITIALIZED - URL Params:', {
@@ -668,10 +860,24 @@ export default function GameRoom() {
         setIsClient(true);
     }, []);
 
+    // Render wallet info in the UI components
+    const renderWalletInfo = () => (
+        <div className="mb-4 bg-gray-50 p-3 rounded-lg text-sm">
+            <div className="flex flex-wrap gap-2 justify-between items-center">
+                <div>
+                    <span className="font-medium">Wallet:</span> {address?.substring(0, 6)}...{address?.substring(address.length - 4)}
+                </div>
+            </div>
+        </div>
+    );
+
     // Render waiting room
     const renderWaitingRoom = () => (
         <div className="text-center">
             <h2 className="text-2xl font-bold mb-4">Waiting for players...</h2>
+
+            {address && renderWalletInfo()}
+            {tournamentId && renderTournamentInfo()}
 
             <div className="mb-6 p-4 bg-gray-50 rounded-lg">
                 <h3 className="text-lg font-semibold mb-2">Game Settings</h3>
@@ -718,6 +924,48 @@ export default function GameRoom() {
             )}
         </div>
     );
+
+    const renderTournamentInfo = () => {
+        if (!tournamentId || !tournamentDetails) return null;
+
+        return (
+            <div className="mb-4 bg-purple-50 p-4 rounded-lg border border-purple-200">
+                <h3 className="font-medium text-purple-800 mb-2">Tournament Game</h3>
+                <p className="text-sm text-purple-700 mb-2">
+                    Entry Fee: {tournamentDetails.entryFee} ETH
+                </p>
+                <p className="text-sm text-purple-700 mb-2">
+                    Players: {tournamentDetails.currentEntrants}/{tournamentDetails.numEntrants}
+                </p>
+
+                {!isHost && !hasJoinedTournament && address && (
+                    <button
+                        onClick={handleJoinTournament}
+                        disabled={isTournamentLoading}
+                        className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm disabled:bg-purple-300"
+                    >
+                        {isTournamentLoading ? 'Joining...' : 'Join Tournament'}
+                    </button>
+                )}
+
+                {hasJoinedTournament && (
+                    <div className="text-sm bg-green-50 text-green-700 p-2 rounded-md">
+                        You've joined this tournament!
+                    </div>
+                )}
+
+                {isHost && gameStatus === 'completed' && (
+                    <button
+                        onClick={handleEndTournament}
+                        disabled={isTournamentLoading}
+                        className="mt-2 px-4 py-2 bg-purple-600 text-white rounded-md text-sm disabled:bg-purple-300"
+                    >
+                        {isTournamentLoading ? 'Processing...' : 'End Tournament & Distribute Prizes'}
+                    </button>
+                )}
+            </div>
+        );
+    };
 
     // Render game in progress
     const renderGameInProgress = () => {
@@ -826,7 +1074,31 @@ export default function GameRoom() {
         );
     };
 
+    useEffect(() => {
+        if (gameStatus === 'completed' && tournamentId && isHost) {
+            // Wait for all results to be available
+            if (players.length > 0 && players.every(p => p.score !== undefined)) {
+                // Auto-end the tournament after a delay (to allow players to see results)
+                const endTimeout = setTimeout(() => {
+                    handleEndTournament();
+                }, 10000); // 10 seconds delay
+
+                return () => clearTimeout(endTimeout);
+            }
+        }
+    }, [gameStatus, players, tournamentId, isHost]);
+
     // Render game over
+    // Updated renderGameOver function for your game component
+
+    // Add these state variables at the component level (with the other state declarations)
+    // At the top of your GameRoom component where other state variables are declared:
+
+    // Add these near your other state declarations
+    const [payoutComplete, setPayoutComplete] = useState(false);
+
+    // Then update your renderGameOver function to use this state:
+    // Updated renderGameOver function that includes wallet addresses
     const renderGameOver = () => {
         // First sort by elimination status, then by score
         const sortedPlayers = [...players].sort((a, b) => {
@@ -840,6 +1112,11 @@ export default function GameRoom() {
 
         const winner = sortedPlayers[0];
         const survivorCount = sortedPlayers.filter(p => !p.eliminated).length;
+
+        // Helper function for tournament payout
+        const handlePayoutComplete = () => {
+            setPayoutComplete(true);
+        };
 
         return (
             <div className="text-center">
@@ -857,6 +1134,11 @@ export default function GameRoom() {
                                 </span>
                             )}
                         </div>
+                        {winner.walletAddress && (
+                            <div className="text-sm mt-1 text-gray-600">
+                                Wallet: {winner.walletAddress.substring(0, 6)}...{winner.walletAddress.substring(winner.walletAddress.length - 4)}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -887,11 +1169,43 @@ export default function GameRoom() {
                                         </span>
                                     )}
                                 </div>
-                                <span className="font-semibold">{player.score} pts</span>
+                                <div className="flex flex-col items-end">
+                                    <span className="font-semibold">{player.score} pts</span>
+                                    {player.walletAddress && (
+                                        <span className="text-xs text-gray-500">
+                                            {player.walletAddress.substring(0, 6)}...{player.walletAddress.substring(player.walletAddress.length - 4)}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         ))}
                     </div>
                 </div>
+
+                {/* Tournament payout section - only shown if this is a tournament */}
+                {tournamentId && (
+                    <div className="mb-8">
+                        {isHost && !payoutComplete ? (
+                            <TournamentPayoutPanel
+                                tournamentId={tournamentId}
+                                isHost={isHost}
+                                players={sortedPlayers}
+                                onPayoutComplete={handlePayoutComplete}
+                            />
+                        ) : (
+                            <WinnerSummary
+                                tournamentId={tournamentId}
+                                isCompleted={payoutComplete}
+                            />
+                        )}
+
+                        {isHost && payoutComplete && (
+                            <div className="mt-3 p-3 bg-green-100 rounded-lg text-green-700">
+                                Prizes have been distributed successfully!
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 <div className="flex justify-center gap-4">
                     {isHost && (

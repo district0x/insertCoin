@@ -101,8 +101,8 @@ app.prepare().then(() => {
         console.log(`User connected: ${socket.id}`);
 
         // Handle player joining a room
-        socket.on('join-room', (roomId, playerName) => {
-            console.log(`Player ${playerName} joining room ${roomId}`);
+        socket.on('join-room', (roomId, playerName, walletAddress) => {
+            console.log(`Player ${playerName} joining room ${roomId} with wallet ${walletAddress || 'none'}`);
             socket.join(roomId);
 
             // Generate a player ID (using UUID for uniqueness)
@@ -113,32 +113,20 @@ app.prepare().then(() => {
 
             // Create room if it doesn't exist
             if (!gameRooms.has(roomId)) {
-                // Extract settings from URL if provided
-                const urlParams = new URLSearchParams(socket.handshake.query);
-                const timerDuration = parseInt(urlParams.get('timerDuration') || '15');
-                const suddenDeath = urlParams.get('suddenDeath') === 'true';
-
-                console.log(`CREATING NEW ROOM: ${roomId} with settings:`, {
-                    timerDuration,
-                    suddenDeath
-                });
-
+                console.log(`Creating new room: ${roomId}`);
                 gameRooms.set(roomId, {
                     id: roomId,
-                    players: [],
+                    players: [], // Initialize an empty players array
                     status: 'waiting',
                     hostSocketId: socket.id, // First player is the host
                     questions: [],
                     currentQuestionIndex: 0,
                     settings: {
-                        suddenDeath: suddenDeath,
-                        timerDuration: timerDuration
+                        suddenDeath: false,
+                        timerDuration: 15
                     },
-                    // Track which players have answered the current question
                     playerAnswers: new Set()
                 });
-            } else {
-                console.log(`Player joining existing room: ${roomId}`);
             }
 
             const room = gameRooms.get(roomId);
@@ -151,11 +139,18 @@ app.prepare().then(() => {
                 const existingPlayer = room.players[existingPlayerIndex];
                 playerSocketMap.set(existingPlayer.id, socket.id);
 
+                // Update wallet address if provided and not already set
+                if (walletAddress && !existingPlayer.walletAddress) {
+                    existingPlayer.walletAddress = walletAddress;
+                    console.log(`Updated wallet address for ${playerName}: ${walletAddress}`);
+                }
+
                 // Send player their info but keep existing ID
                 socket.emit('player-info', {
                     id: existingPlayer.id,
                     name: playerName,
-                    roomId
+                    roomId,
+                    walletAddress: existingPlayer.walletAddress // Include wallet address in info
                 });
 
                 // Update room settings for the reconnecting player
@@ -169,8 +164,11 @@ app.prepare().then(() => {
                     id: playerId,
                     name: playerName,
                     score: 0,
-                    eliminated: false
+                    eliminated: false,
+                    walletAddress: walletAddress || null // Store wallet address
                 };
+
+                console.log(`Adding new player to room ${roomId}: ${playerName} with wallet: ${walletAddress || 'none'}`);
 
                 // Add player to room
                 room.players.push(newPlayer);
@@ -182,7 +180,8 @@ app.prepare().then(() => {
                 socket.emit('player-info', {
                     id: playerId,
                     name: playerName,
-                    roomId
+                    roomId,
+                    walletAddress // Include wallet address in player info
                 });
 
                 // Send room settings to the new player
