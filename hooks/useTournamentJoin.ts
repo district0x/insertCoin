@@ -1,18 +1,18 @@
 import { ethers } from "ethers";
 import { useState, useCallback } from 'react';
-import { useAddress, useConnectionStatus } from "@thirdweb-dev/react";
-import { useTournamentContract } from './useTournamentContract';
-import { useAuth } from './useAuth';
 import { useRouter } from 'next/navigation';
+import { useTournamentContract } from './useTournamentContract';
+import { usePrivy } from '@privy-io/react-auth';
 import { formatTournamentError } from '@/lib/tournamentDiagnostics';
 
 
 interface TournamentDetails {
     tournamentId: string;
     entryFee: string;
+    tokenAddress: string; // Needed for ERC20 approval flow
     maxParticipants: number;
     currentParticipants: number;
-    totalPrize: number;
+    totalPrize: string;
     roomCode: string;
     status: string;
 }
@@ -20,13 +20,12 @@ interface TournamentDetails {
 export function useTournamentJoin() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [step, setStep] = useState<'initial' | 'connecting' | 'authenticating' | 'joining' | 'complete'>('initial');
+    const [step, setStep] = useState<'initial' | 'connecting' | 'authenticating' | 'approving' | 'approved' | 'joining' | 'complete'>('initial');
 
     const router = useRouter();
-    const address = useAddress();
-    const connectionStatus = useConnectionStatus();
-    const { isAuthenticated, signIn } = useAuth();
-    const { joinTournament, isEntrantInTournament } = useTournamentContract();
+    const { authenticated: isAuthenticated, user, login } = usePrivy();
+    const { joinTournament, isEntrantInTournament, checkAllowance, approveTokenSpend } = useTournamentContract();
+    console.log('Privy:', { isAuthenticated, user });
 
     // Reset the joining state
     const resetState = useCallback(() => {
@@ -37,52 +36,46 @@ export function useTournamentJoin() {
 
     // Start the joining process
     const startJoinProcess = useCallback(() => {
+        console.log('[DEBUG] startJoinProcess called, isAuthenticated:', isAuthenticated);
         setError(null);
-
-        // Determine the starting step based on the current state
-        if (connectionStatus !== 'connected') {
-            setStep('connecting');
-        } else if (!isAuthenticated) {
+        if (!isAuthenticated) {
+            console.log('[DEBUG] User not authenticated, setting step to authenticating');
             setStep('authenticating');
         } else {
+            console.log('[DEBUG] User authenticated, setting step to joining');
             setStep('joining');
         }
-    }, [connectionStatus, isAuthenticated]);
+    }, [isAuthenticated]);
 
-    // Authenticate with Ethereum signature
+    // Authenticate with Privy
     const authenticate = useCallback(async () => {
-        if (connectionStatus !== 'connected') {
-            setError('Please connect your wallet first');
-            setStep('connecting');
+        console.log('[DEBUG] authenticate called, isAuthenticated:', isAuthenticated);
+        if (!isAuthenticated) {
+            console.log('[DEBUG] Starting authentication process');
+            setStep('authenticating');
+            await login();
             return false;
         }
-
-        try {
-            setIsLoading(true);
-            const success = await signIn();
-
-            if (success) {
-                setStep('joining');
-                return true;
-            } else {
-                setError('Authentication failed');
-                return false;
-            }
-        } catch (err: any) {
-            setError(formatTournamentError(err));
-            return false;
-        } finally {
-            setIsLoading(false);
-        }
-    }, [connectionStatus, signIn]);
+        console.log('[DEBUG] User already authenticated, setting step to joining');
+        setStep('joining');
+        return true;
+    }, [isAuthenticated, login]);
 
     // Join a tournament
     const joinTournamentGame = useCallback(async (
         tournament: TournamentDetails,
         playerName: string
     ) => {
-        if (!address || !isAuthenticated) {
+        if (!user?.wallet?.address || !isAuthenticated) {
             setError('Please connect your wallet and authenticate first');
+            return false;
+        }
+        const address = user.wallet.address;
+        const contractAddress = process.env.NEXT_PUBLIC_TOURNAMENT_CONTRACT_ADDRESS;
+        const isErc20 = tournament.tokenAddress && tournament.tokenAddress !== '0x0000000000000000000000000000000000000000';
+
+        if (!contractAddress) {
+            setError('Tournament contract address is not configured.');
             return false;
         }
 
@@ -90,124 +83,145 @@ export function useTournamentJoin() {
             setIsLoading(true);
             setError(null);
 
+            console.log('[DEBUG] Starting join process:', {
+                tournamentId: tournament.tournamentId,
+                address,
+                isAuthenticated,
+                user: user?.wallet,
+                roomCode: tournament.roomCode,
+                tournamentKeys: Object.keys(tournament)
+            });
+
             // First check if already joined
+            console.log('[DEBUG] Checking participant status for tournamentId:', tournament.tournamentId, 'address:', address);
             const isParticipant = await isEntrantInTournament(
                 parseInt(tournament.tournamentId),
                 address
             );
+            console.log('[DEBUG] isEntrantInTournament result:', isParticipant);
 
             if (isParticipant) {
-                // Already joined, no need to pay again
+                console.log('[DEBUG] User is already a participant, proceeding to game');
                 setStep('complete');
-
-                // Navigate to game room
                 router.push(
                     `/game/${tournament.roomCode}?name=${encodeURIComponent(playerName)}&role=player&tournamentId=${tournament.tournamentId}&walletAddress=${address}`
                 );
-
                 return true;
             }
 
-            // Join the tournament by paying the entry fee
-            // Format the entry fee properly for the transaction
-            console.log("Processing entry fee:", {
-                fee: tournament.entryFee,
-                type: typeof tournament.entryFee,
-                isString: typeof tournament.entryFee === 'string',
-                hasDecimal: typeof tournament.entryFee === 'string' && tournament.entryFee.includes('.')
-            });
+            // --- ERC20 Approval Flow ---
+            if (isErc20) {
+                setStep('approving');
+                const entryFeeBigNum = ethers.BigNumber.from(tournament.entryFee);
 
-            let entryFeeForJoin;
-            try {
-                // First ensure we're working with a string
-                const entryFeeStr = tournament.entryFee.toString();
+                // 1. Check allowance
+                const currentAllowance = await checkAllowance(tournament.tokenAddress, address, contractAddress);
 
-                // Handle different formats
-                if (entryFeeStr.includes('.')) {
-                    // It's in ETH format (e.g. "0.01"), convert to Wei
-                    entryFeeForJoin = ethers.utils.parseEther(entryFeeStr).toString();
-                    console.log("Converted ETH to Wei:", entryFeeForJoin);
-                } else if (entryFeeStr.length > 10) {
-                    // It's likely already in Wei format
-                    entryFeeForJoin = entryFeeStr;
-                    console.log("Using existing Wei value:", entryFeeForJoin);
-                } else {
-                    // For smaller numbers without decimal, determine if it's ETH or Wei
-                    const value = parseFloat(entryFeeStr);
-                    if (value < 1) {
-                        // Small value like 0.01 - treat as ETH
-                        entryFeeForJoin = ethers.utils.parseEther(entryFeeStr).toString();
-                        console.log("Converted small number to Wei:", entryFeeForJoin);
-                    } else {
-                        // Larger value - treat as Wei
-                        entryFeeForJoin = entryFeeStr;
-                        console.log("Using number as Wei:", entryFeeForJoin);
-                    }
+                // 2. If allowance is insufficient, request approval
+                if (currentAllowance.lt(entryFeeBigNum)) {
+                    const approveTx = await approveTokenSpend(tournament.tokenAddress, entryFeeBigNum);
+                    await approveTx.wait(); // Wait for the approval transaction to be mined
                 }
-            } catch (err) {
-                console.error("Error formatting entry fee:", err);
-
-                // Fallback - try direct conversion or use a default
-                try {
-                    entryFeeForJoin = tournament.entryFee.toString();
-                } catch (fallbackErr) {
-                    console.error("Fallback also failed:", fallbackErr);
-                    entryFeeForJoin = "10000000000000000"; // Default to 0.01 ETH in Wei
-                }
+                setStep('approved');
             }
+            // --- End of Approval Flow ---
 
-            // Log the final value we're using
-            console.log("Final entry fee for join:", entryFeeForJoin);
-
-            // Join the tournament by paying the entry fee
-            const joinResult = await joinTournament(
+            setStep('joining');
+            console.log('[DEBUG] Calling on-chain joinTournament with entryFee:', tournament.entryFee);
+            await joinTournament(
                 parseInt(tournament.tournamentId),
-                entryFeeForJoin
+                tournament.entryFee as string,
+                isErc20 as boolean
             );
 
             // Update participant in database
-            await fetch(`/api/tournament/${tournament.roomCode}`, {
+            console.log('[DEBUG] Adding participant to database:', {
+                roomCode: tournament.roomCode,
+                walletAddress: address,
+                name: playerName,
+                tournamentId: tournament.tournamentId,
+                tournamentIdType: typeof tournament.tournamentId
+            });
+
+            // Check if room code is valid
+            if (!tournament.roomCode || tournament.roomCode === 'undefined') {
+                console.error('[DEBUG] Invalid room code detected:', tournament.roomCode);
+                throw new Error(`Invalid room code: ${tournament.roomCode}`);
+            }
+
+            console.log('[DEBUG] Making database call to room code:', tournament.roomCode);
+            const dbResponse = await fetch(`/api/tournament/${tournament.roomCode}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     action: 'join',
-                    walletAddress: address
+                    walletAddress: address,
+                    name: playerName
                 })
             });
 
-            setStep('complete');
+            console.log('[DEBUG] Database response status:', dbResponse.status);
+            console.log('[DEBUG] Database response headers:', Object.fromEntries(dbResponse.headers.entries()));
 
-            // Navigate to game room
+            if (!dbResponse.ok) {
+                const errorData = await dbResponse.json();
+                console.error('[DEBUG] Database error response:', errorData);
+                throw new Error(`Database error: ${errorData.error || 'Unknown error'}`);
+            }
+
+            const dbResult = await dbResponse.json();
+            console.log('[DEBUG] Database join result:', dbResult);
+
+            setStep('complete');
             router.push(
                 `/game/${tournament.roomCode}?name=${encodeURIComponent(playerName)}&role=player&tournamentId=${tournament.tournamentId}&walletAddress=${address}`
             );
-
             return true;
         } catch (err: any) {
-            console.error('Error joining tournament:', err);
-            setError(formatTournamentError(err));
+            console.error('[DEBUG] Error joining tournament:', {
+                message: err.message,
+                code: err.code,
+                reason: err.reason,
+                error: err.error,
+                data: err.data,
+                transaction: err.transaction,
+                receipt: err.receipt,
+                stack: err.stack,
+                fullError: err
+            });
+
+            // Set a more descriptive error message
+            let errorMessage = "Failed to join tournament";
+            if (err.message) {
+                errorMessage = err.message;
+            } else if (err.reason) {
+                errorMessage = err.reason;
+            } else if (err.error?.message) {
+                errorMessage = err.error.message;
+            }
+
+            setError(errorMessage);
             return false;
         } finally {
             setIsLoading(false);
         }
-    }, [address, isAuthenticated, isEntrantInTournament, joinTournament, router]);
+    }, [user, isAuthenticated, router, joinTournament, isEntrantInTournament, checkAllowance, approveTokenSpend]);
 
     // Check if already a participant
     const checkParticipantStatus = useCallback(async (tournamentId: string) => {
-        if (!address) return false;
-
+        if (!user?.wallet?.address) return false;
         try {
             return await isEntrantInTournament(
                 parseInt(tournamentId),
-                address
+                user.wallet.address
             );
         } catch (err) {
             console.error('Error checking participant status:', err);
             return false;
         }
-    }, [address, isEntrantInTournament]);
+    }, [user, isEntrantInTournament]);
 
     return {
         isLoading,

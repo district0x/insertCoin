@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { usePrivy } from '@privy-io/react-auth';
 
 export function AuthButton() {
-    const { isAuthenticated, signIn, signOut, isLoading, error } = useAuth();
+    const { authenticated: isAuthenticated, login: signIn, logout: signOut, isLoading, error } = usePrivy();
     const [authLoading, setAuthLoading] = useState(false);
 
     const handleAuth = async () => {
@@ -23,8 +23,8 @@ export function AuthButton() {
                 onClick={handleAuth}
                 disabled={isLoading || authLoading}
                 className={`px-4 py-2 rounded-lg text-white font-medium ${isAuthenticated
-                        ? 'bg-red-600 hover:bg-red-700'
-                        : 'bg-green-600 hover:bg-green-700'
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-green-600 hover:bg-green-700'
                     } disabled:opacity-50`}
             >
                 {isLoading || authLoading

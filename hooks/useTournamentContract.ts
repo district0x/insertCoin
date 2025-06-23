@@ -1,19 +1,25 @@
 // hooks/useTournamentContract.ts - With RPC rate limit handling
 import { useState, useCallback, useRef } from 'react';
-import { useAddress, useSDK } from "@thirdweb-dev/react";
 import { ethers } from "ethers";
 import { TournamentABI } from "@/app/lib/contracts/abis/TournamentABI";
+import { usePrivy } from '@privy-io/react-auth';
 
 // Global cache object to store important data with TTL
 const CACHE = {
     // Admin status cache - lasts 10 minutes
     adminStatus: new Map<string, { value: boolean, timestamp: number }>(),
 
-    // Tournament details cache - lasts 30 seconds
-    tournamentDetails: new Map<number, { data: any, timestamp: number }>(),
+    // Tournament details cache - lasts 2 minutes
+    tournamentDetails: new Map<number, { value: any, timestamp: number }>(),
+
+    // Winner data cache - lasts 2 minutes
+    winnerData: new Map<string, { value: any, timestamp: number }>(),
 
     // Participant status cache - lasts 1 minute
     participantStatus: new Map<string, { value: boolean, timestamp: number }>(),
+
+    // Matching pool balance cache - lasts 1 minute
+    matchingPool: new Map<string, { value: string, timestamp: number }>(),
 
     // Check if cached data is still valid
     isValid: (timestamp: number, ttl: number) => (Date.now() - timestamp) < ttl,
@@ -31,31 +37,89 @@ const CACHE = {
             return entry.value;
         }
         return null;
-    }
+    },
+
+    has: (cache: Map<any, { value: any, timestamp: number }>, key: any) => cache.has(key),
+
+    delete: (cache: Map<any, { value: any, timestamp: number }>, key: any) => cache.delete(key),
+
+    clear: (cache: Map<any, { value: any, timestamp: number }>) => cache.clear()
 };
 
 // TTL constants
 const TTL = {
-    ADMIN_STATUS: 10 * 60 * 1000, // 10 minutes
-    TOURNAMENT_DETAILS: 30 * 1000, // 30 seconds
-    MATCHING_POOL: 30 * 1000, // 30 seconds
-    PARTICIPANT_STATUS: 60 * 1000, // 1 minute
+    TOURNAMENT_DETAILS: 2 * 60 * 1000, // 2 minutes
+    ADMIN_STATUS: 10 * 60 * 1000,      // 10 minutes
+    MATCHING_POOL: 1 * 60 * 1000,      // 1 minute
 };
 
 // Keep track of pending requests to avoid duplicate calls
 const pendingRequests = new Map<string, Promise<any>>();
 
+// Create a cache instance for RPC calls with a TTL of 2 minutes
+const rpcCache = {
+    get: (key: string) => CACHE.get(CACHE.tournamentDetails, key, TTL.TOURNAMENT_DETAILS),
+    set: (key: string, value: any) => CACHE.set(CACHE.tournamentDetails, key, value),
+    has: (key: string) => CACHE.has(CACHE.tournamentDetails, key),
+    delete: (key: string) => CACHE.delete(CACHE.tournamentDetails, key),
+    clear: () => CACHE.clear(CACHE.tournamentDetails)
+};
+
 // Keep a fallback counter for when tournament IDs can't be retrieved
 let fallbackIdCounter = Math.floor(Date.now() / 1000);
+
+/**
+ * A generic ERC20 ABI for interacting with tokens.
+ * This is used for the approval and allowance checks.
+ */
+const ERC20_ABI = [
+    "function approve(address spender, uint256 amount) returns (bool)",
+    "function allowance(address owner, address spender) view returns (uint256)"
+];
 
 export function useTournamentContract() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const address = useAddress();
-    const sdk = useSDK();
+    const { user } = usePrivy();
+    const address = user?.wallet?.address;
 
-    // Contract address from environment variable
+    // Get ethers provider and signer
+    let provider: ethers.providers.Web3Provider | undefined;
+    let signer: ethers.Signer | undefined;
+    if (typeof window !== 'undefined' && (window as any).ethereum) {
+        provider = new ethers.providers.Web3Provider((window as any).ethereum);
+        signer = provider.getSigner();
+    }
+
     const contractAddress = process.env.NEXT_PUBLIC_TOURNAMENT_CONTRACT_ADDRESS || '';
+
+    // Helper to get contract instance with connected signer
+    async function getContractAsync() {
+        if (!user?.wallet?.address) {
+            throw new Error('Wallet not connected. Please connect your wallet first.');
+        }
+
+        // Check if ethereum provider is available
+        if (typeof window === 'undefined' || !(window as any).ethereum) {
+            throw new Error('Ethereum provider not available. Please ensure your wallet is connected.');
+        }
+
+        try {
+            const provider = new ethers.providers.Web3Provider((window as any).ethereum);
+            const signer = provider.getSigner();
+
+            // Verify the signer address matches Privy's wallet address
+            const signerAddress = await signer.getAddress();
+            if (signerAddress.toLowerCase() !== user.wallet.address.toLowerCase()) {
+                throw new Error('Wallet address mismatch. Please reconnect your wallet.');
+            }
+
+            return new ethers.Contract(contractAddress, TournamentABI, signer);
+        } catch (error) {
+            console.error('Error getting contract instance:', error);
+            throw new Error('Failed to initialize contract. Please check your wallet connection.');
+        }
+    }
 
     // Track and limit RPC requests
     const requestsInLastSecond = useRef<number>(0);
@@ -110,9 +174,19 @@ export function useTournamentContract() {
 
     // Get tournament details with caching and rate limiting
     async function getTournamentDetails(tournamentId: number) {
+        const cacheKey = `tournament_${tournamentId}`;
+        const cached = rpcCache.get(cacheKey);
+
+        if (cached) {
+            console.log(`[Cache HIT] Returning cached details for tournament ${tournamentId}`);
+            return cached.value;
+        }
+
+        console.log(`[Cache MISS] Fetching details for tournament ${tournamentId}`);
+
         try {
-            if (!sdk) {
-                throw new Error("SDK not initialized");
+            if (!signer) {
+                throw new Error("Wallet not connected or provider not available");
             }
 
             if (!tournamentId) {
@@ -122,21 +196,15 @@ export function useTournamentContract() {
             setIsLoading(true);
             setError(null);
 
-            // Check cache for tournament details
-            const cachedDetails = CACHE.get(CACHE.tournamentDetails, tournamentId, TTL.TOURNAMENT_DETAILS);
-            if (cachedDetails) {
-                return cachedDetails;
-            }
-
             // Function to fetch from blockchain
             const fetchDetails = async () => {
                 console.log(`Fetching tournament details from blockchain for ID: ${tournamentId}`);
 
                 // Get the contract instance with ABI
-                const contract = await sdk.getContract(contractAddress, TournamentABI);
+                const contract = await getContractAsync();
 
                 // Call the tournaments mapping
-                const tournament = await contract.call("tournaments", [tournamentId]);
+                const tournament = await contract.tournaments(tournamentId);
 
                 if (!tournament) {
                     throw new Error(`Tournament with ID ${tournamentId} not found`);
@@ -145,7 +213,7 @@ export function useTournamentContract() {
                 // Get current tournament round if available
                 let currentRound = 0;
                 try {
-                    currentRound = await contract.call("currentTournamentRound", [tournamentId]);
+                    currentRound = await contract.currentTournamentRound(tournamentId);
                 } catch (err) {
                     console.log("Could not get current tournament round:", err);
                 }
@@ -158,7 +226,7 @@ export function useTournamentContract() {
 
                     if (numEntrants > 0) {
                         // Check first slot
-                        const firstEntrant = await contract.call("tournamentEntrants", [tournamentId, 0]);
+                        const firstEntrant = await contract.tournamentEntrants(tournamentId, 0);
                         if (firstEntrant !== ethers.constants.AddressZero) {
                             // At least one entrant
                             currentEntrants = 1;
@@ -166,14 +234,14 @@ export function useTournamentContract() {
                             // If more than 5 entrants possible, check the middle slot
                             if (numEntrants > 5) {
                                 const midSlot = Math.floor(numEntrants / 2);
-                                const midEntrant = await contract.call("tournamentEntrants", [tournamentId, midSlot]);
+                                const midEntrant = await contract.tournamentEntrants(tournamentId, midSlot);
 
                                 if (midEntrant !== ethers.constants.AddressZero) {
                                     // If middle slot filled, assume at least half full
                                     currentEntrants = midSlot + 1;
 
                                     // Check last slot to see if full
-                                    const lastEntrant = await contract.call("tournamentEntrants", [tournamentId, numEntrants - 1]);
+                                    const lastEntrant = await contract.tournamentEntrants(tournamentId, numEntrants - 1);
                                     if (lastEntrant !== ethers.constants.AddressZero) {
                                         // If last slot filled, tournament is full
                                         currentEntrants = numEntrants;
@@ -206,14 +274,14 @@ export function useTournamentContract() {
                 };
 
                 // Cache the result
-                CACHE.set(CACHE.tournamentDetails, tournamentId, tournamentDetails);
+                rpcCache.set(cacheKey, tournamentDetails);
 
                 return tournamentDetails;
             };
 
             // Use throttled call
             return await throttledRPCCall(
-                `tournament-${tournamentId}`,
+                cacheKey,
                 TTL.TOURNAMENT_DETAILS,
                 fetchDetails
             );
@@ -228,79 +296,34 @@ export function useTournamentContract() {
 
     // Check if an address is an admin with caching
     async function isAdmin(checkAddress: string) {
-        try {
-            if (!sdk) return false;
-
-            // Check cache first
-            const cachedStatus = CACHE.get(CACHE.adminStatus, checkAddress, TTL.ADMIN_STATUS);
-            if (cachedStatus !== null) {
-                return cachedStatus;
-            }
-
-            // Function to fetch from blockchain
-            const fetchAdminStatus = async () => {
-                console.log(`Checking admin status for ${checkAddress} from blockchain`);
-
-                // Get the contract instance with ABI
-                const contract = await sdk.getContract(contractAddress, TournamentABI);
-
-                // Call the isAdmin function
-                const adminStatus = await contract.call("isAdmin", [checkAddress]);
-
-                // Cache the result
-                CACHE.set(CACHE.adminStatus, checkAddress, adminStatus);
-
-                return adminStatus;
-            };
-
-            // Use throttled call
-            return await throttledRPCCall(
-                `admin-${checkAddress}`,
-                TTL.ADMIN_STATUS,
-                fetchAdminStatus
-            );
-        } catch (err) {
-            console.error("Error checking admin status:", err);
-            return false;
+        // Use cache for admin status
+        const cachedStatus = CACHE.get(CACHE.adminStatus, checkAddress, TTL.ADMIN_STATUS);
+        if (cachedStatus !== null) {
+            return cachedStatus;
         }
+
+        const fetchAdminStatus = async () => {
+            try {
+                const contract = await getContractAsync();
+                const status = await contract.isAdmin(checkAddress);
+                // Cache the result
+                CACHE.set(CACHE.adminStatus, checkAddress, status);
+                return status;
+            } catch (error: any) {
+                console.error(`Error checking admin status for ${checkAddress}:`, error);
+                return false;
+            }
+        };
+
+        return await throttledRPCCall(`admin-${checkAddress}`, TTL.ADMIN_STATUS, fetchAdminStatus);
     }
 
     // Check if a user is a participant in a tournament
     async function isEntrantInTournament(tournamentId: number, playerAddress: string) {
         try {
-            if (!sdk) return false;
-
-            // Create a cache key
-            const cacheKey = `entrant_${tournamentId}_${playerAddress}`;
-
-            // Check cache first
-            const cachedStatus = CACHE.get(CACHE.participantStatus, cacheKey, TTL.PARTICIPANT_STATUS);
-            if (cachedStatus !== null) {
-                return cachedStatus;
-            }
-
-            // Function to fetch from blockchain
-            const fetchParticipantStatus = async () => {
-                console.log(`Checking if address ${playerAddress} is a participant in tournament ${tournamentId}`);
-
-                // Get the contract instance with ABI
-                const contract = await sdk.getContract(contractAddress, TournamentABI);
-
-                // Call the isEntrantInTournament function
-                const isParticipant = await contract.call("isEntrantInTournament", [tournamentId, playerAddress]);
-
-                // Cache the result
-                CACHE.set(CACHE.participantStatus, cacheKey, isParticipant);
-
-                return isParticipant;
-            };
-
-            // Use throttled call
-            return await throttledRPCCall(
-                cacheKey,
-                TTL.PARTICIPANT_STATUS,
-                fetchParticipantStatus
-            );
+            if (!signer) throw new Error('Wallet not connected or provider not available');
+            const contract = await getContractAsync();
+            return await contract.isEntrantInTournament(tournamentId, playerAddress);
         } catch (err) {
             console.error("Error checking participant status:", err);
             return false;
@@ -309,59 +332,25 @@ export function useTournamentContract() {
 
     // Get matching pool balance with caching
     async function getMatchingPoolBalance() {
-        try {
-            if (!sdk) {
-                throw new Error("SDK not initialized");
-            }
+        const cacheKey = 'matching-pool-balance';
+        const cached = CACHE.get(CACHE.matchingPool, cacheKey, TTL.MATCHING_POOL);
 
-            const cacheKey = 'matching-pool-balance';
+        if (cached !== null) return cached;
 
-            // Check localStorage cache first
+        const fetchBalance = async () => {
             try {
-                const cachedItem = localStorage.getItem(cacheKey);
-                if (cachedItem) {
-                    const { balance, timestamp } = JSON.parse(cachedItem);
-                    if (Date.now() - timestamp < TTL.MATCHING_POOL) {
-                        return ethers.BigNumber.from(balance);
-                    }
-                }
-            } catch (e) {
-                console.warn("Cache error:", e);
+                const contract = await getContractAsync();
+                const balance = await contract.matchingPool();
+                const formattedBalance = ethers.utils.formatUnits(balance, 18); // Assuming 18 decimals
+                CACHE.set(CACHE.matchingPool, cacheKey, formattedBalance);
+                return formattedBalance;
+            } catch (error: any) {
+                console.error('Error fetching matching pool balance:', error);
+                return '0';
             }
+        };
 
-            // Function to fetch from blockchain
-            const fetchBalance = async () => {
-                console.log('Fetching matching pool balance from blockchain');
-
-                // Get the contract instance with ABI
-                const contract = await sdk.getContract(contractAddress, TournamentABI);
-
-                // Call the matchingPool view function
-                const balance = await contract.call("matchingPool");
-
-                // Cache in localStorage
-                try {
-                    localStorage.setItem(cacheKey, JSON.stringify({
-                        balance: balance.toString(),
-                        timestamp: Date.now()
-                    }));
-                } catch (e) {
-                    console.warn("Cache storage error:", e);
-                }
-
-                return balance;
-            };
-
-            // Use throttled call
-            return await throttledRPCCall(
-                cacheKey,
-                TTL.MATCHING_POOL,
-                fetchBalance
-            );
-        } catch (err: any) {
-            console.error("Error getting matching pool balance:", err);
-            throw err;
-        }
+        return await throttledRPCCall('matching-pool-balance', TTL.MATCHING_POOL, fetchBalance);
     }
 
     // Create a new tournament
@@ -372,66 +361,37 @@ export function useTournamentContract() {
         tokenAddress: string;
         entryFee: string;
     }) {
-        if (!address || !sdk) {
-            throw new Error("Wallet not connected or SDK not initialized");
+        if (!address) {
+            throw new Error("Wallet not connected or provider not initialized");
         }
-
         setIsLoading(true);
         setError(null);
-
         try {
-            console.log("Creating tournament with params:", params);
-
-            // Get the contract instance with ABI
-            const contract = await sdk.getContract(contractAddress, TournamentABI);
-
-            // Parse the entry fee to wei - ensure we handle both decimal and wei formats
+            const contract = await getContractAsync();
             let entryFeeWei;
-            try {
-                // First ensure we're working with a string
-                const entryFeeStr = params.entryFee.toString();
-
-                // Handle different formats of entry fee
-                if (entryFeeStr.includes('.')) {
-                    // It's in ETH format (e.g. "0.01"), convert to Wei
-                    entryFeeWei = ethers.utils.parseEther(entryFeeStr);
-                } else if (entryFeeStr.length > 10) {
-                    // It's likely already in Wei format
-                    entryFeeWei = ethers.BigNumber.from(entryFeeStr);
-                } else {
-                    // For smaller numbers without decimal, determine if it's ETH or Wei
-                    const value = parseFloat(entryFeeStr);
-                    if (value < 1) {
-                        // Small value like 0.01 - treat as ETH
-                        entryFeeWei = ethers.utils.parseEther(entryFeeStr);
-                    } else {
-                        // Larger value - treat as Wei
-                        entryFeeWei = ethers.BigNumber.from(entryFeeStr);
-                    }
-                }
-            } catch (err) {
-                console.error("Error parsing entry fee:", err);
-                // Last resort fallback
-                entryFeeWei = ethers.utils.parseEther("0.01");
+            if (params.entryFee && params.entryFee.toString().length > 10) {
+                entryFeeWei = ethers.BigNumber.from(params.entryFee);
+            } else {
+                entryFeeWei = ethers.utils.parseEther(params.entryFee);
             }
 
             // Try to get current next tournament ID before transaction
             let nextIdBefore;
             try {
-                nextIdBefore = await contract.call("nextTournamentId");
+                nextIdBefore = await contract.nextTournamentId();
                 console.log(`Current nextTournamentId before transaction: ${nextIdBefore.toString()}`);
             } catch (e) {
                 console.warn(`Could not get nextTournamentId before transaction:`, e);
             }
 
             // Call the contract function
-            const tx = await contract.call("createTournament", [
+            const tx = await contract.createTournament(
                 params.numEntrants,
                 params.winnersPercentage,
                 params.multisigPercentage,
                 params.tokenAddress,
                 entryFeeWei
-            ]);
+            );
 
             console.log("Transaction submitted:", tx.hash || "No hash available");
 
@@ -475,7 +435,7 @@ export function useTournamentContract() {
             // Check 3: Compare nextTournamentId before and after
             if (!tournamentId && nextIdBefore) {
                 try {
-                    const nextIdAfter = await contract.call("nextTournamentId");
+                    const nextIdAfter = await contract.nextTournamentId();
                     console.log(`nextTournamentId after transaction: ${nextIdAfter.toString()}`);
 
                     if (nextIdAfter > nextIdBefore) {
@@ -514,69 +474,64 @@ export function useTournamentContract() {
     }
 
     // Join an existing tournament
-    async function joinTournament(tournamentId: number, entryFee: string) {
-        if (!address || !sdk) {
-            throw new Error("Wallet not connected or SDK not initialized");
+    async function joinTournament(tournamentId: number, entryFee: string, isErc20: boolean) {
+        if (!address) {
+            throw new Error("Wallet not connected or provider not initialized");
         }
-
         setIsLoading(true);
         setError(null);
-
         try {
-            console.log("Joining tournament:", tournamentId, "with entry fee:", entryFee);
+            console.log('[DEBUG] joinTournament called with:', { tournamentId, entryFee, address });
 
-            // Get the contract instance with ABI
-            const contract = await sdk.getContract(contractAddress, TournamentABI);
+            const contract = await getContractAsync();
+            console.log('[DEBUG] Contract instance created successfully');
 
-            // Parse the entry fee to wei - handle both formats
             let entryFeeWei;
-            try {
-                // Check if it's already a large number (possibly wei)
-                if (entryFee && entryFee.toString().length > 10) {
-                    entryFeeWei = ethers.BigNumber.from(entryFee);
-                } else {
-                    // It's likely a decimal like "0.01", so parse it
-                    entryFeeWei = ethers.utils.parseEther(entryFee);
-                }
-            } catch (err) {
-                console.error("Error parsing entry fee:", err);
-                // If all else fails, try the direct approach
+            if (entryFee && entryFee.toString().length > 10) {
+                entryFeeWei = ethers.BigNumber.from(entryFee);
+            } else {
                 entryFeeWei = ethers.utils.parseEther(entryFee);
             }
+            console.log('[DEBUG] Entry fee converted to Wei:', entryFeeWei.toString());
 
-            // Call the joinTournament function
-            const tx = await contract.call("joinTournament", [tournamentId], {
-                value: entryFeeWei
-            });
-
-            console.log("Join tournament transaction submitted:", tx);
-
-            // Clear any cached data for this tournament
-            CACHE.tournamentDetails.delete(tournamentId);
-            // Clear participant status cache for this address
-            CACHE.participantStatus.delete(`entrant_${tournamentId}_${address}`);
-
-            // Handle the transaction result, regardless of format
-            let result = {
-                hash: tx.hash || "unknown",
-                receipt: tx
-            };
-
-            // If tx.wait exists, try to use it, but don't fail if it doesn't
-            if (tx && typeof tx.wait === 'function') {
-                try {
-                    const receipt = await tx.wait();
-                    console.log("Join tournament transaction confirmed:", receipt);
-                    result.receipt = receipt;
-                } catch (waitError) {
-                    console.warn("Could not wait for transaction, but continuing:", waitError);
-                }
+            const txOptions: { value?: ethers.BigNumber } = {};
+            if (!isErc20) {
+                txOptions.value = entryFeeWei;
             }
 
-            return result;
+            console.log('[DEBUG] About to call contract.joinTournament with options:', txOptions);
+            const tx = await contract.joinTournament(tournamentId, txOptions);
+            console.log('[DEBUG] Transaction submitted:', tx.hash);
+
+            console.log('[DEBUG] Waiting for transaction confirmation...');
+            await tx.wait();
+            console.log('[DEBUG] Transaction confirmed!');
+
+            return { hash: tx.hash, receipt: tx };
         } catch (err: any) {
-            console.error("Error joining tournament:", err);
-            setError(err.message || "Failed to join tournament");
+            console.error('[DEBUG] Error in joinTournament:', {
+                message: err.message,
+                code: err.code,
+                reason: err.reason,
+                error: err.error,
+                data: err.data,
+                transaction: err.transaction,
+                receipt: err.receipt,
+                stack: err.stack,
+                fullError: err
+            });
+
+            // Set a more descriptive error message
+            let errorMessage = "Failed to join tournament";
+            if (err.message) {
+                errorMessage = err.message;
+            } else if (err.reason) {
+                errorMessage = err.reason;
+            } else if (err.error?.message) {
+                errorMessage = err.error.message;
+            }
+
+            setError(errorMessage);
             throw err;
         } finally {
             setIsLoading(false);
@@ -585,28 +540,23 @@ export function useTournamentContract() {
 
     // Fill up matching pool
     async function fillUpMatchingPool(amount: ethers.BigNumber) {
-        if (!address || !sdk) {
-            throw new Error("Wallet not connected or SDK not initialized");
+        if (!signer) {
+            throw new Error("Wallet not connected or provider not available");
         }
-
         setIsLoading(true);
         setError(null);
-
         try {
             console.log("Adding funds to matching pool:", amount.toString());
 
-            // Get the contract instance with ABI
-            const contract = await sdk.getContract(contractAddress, TournamentABI);
+            const contract = await getContractAsync();
 
             // Call the fillUpMatchingPool function (which is payable)
-            const tx = await contract.call("fillUpMatchingPool", [], {
-                value: amount
-            });
+            const tx = await contract.fillUpMatchingPool({ value: amount });
 
             console.log("Add funds transaction submitted:", tx);
 
             // Clear any cached balance
-            localStorage.removeItem('matching-pool-balance');
+            CACHE.matchingPool.delete('balance');
 
             // Handle different transaction response formats
             let receipt;
@@ -637,26 +587,23 @@ export function useTournamentContract() {
 
     // Allocate funds from matching pool to tournament
     async function allocateMatchingPoolToTournament(tournamentId: number) {
-        if (!address || !sdk) {
-            throw new Error("Wallet not connected or SDK not initialized");
+        if (!signer) {
+            throw new Error("Wallet not connected or provider not available");
         }
-
         setIsLoading(true);
         setError(null);
-
         try {
             console.log("Allocating funds to tournament:", tournamentId);
 
-            // Get the contract instance with ABI
-            const contract = await sdk.getContract(contractAddress, TournamentABI);
+            const contract = await getContractAsync();
 
             // Call the allocateMatchingPoolToTournament function
-            const tx = await contract.call("allocateMatchingPoolToTournament", [tournamentId]);
+            const tx = await contract.allocateMatchingPoolToTournament(tournamentId);
 
             console.log("Allocation transaction submitted:", tx);
 
             // Clear caches
-            localStorage.removeItem('matching-pool-balance');
+            CACHE.matchingPool.delete('balance');
             CACHE.tournamentDetails.delete(tournamentId);
 
             // Handle different transaction response formats
@@ -692,13 +639,11 @@ export function useTournamentContract() {
         winners: string[],  // Array of winner addresses
         percentages: number[]  // Array of percentages for each winner (must sum to 100)
     ) {
-        if (!address || !sdk) {
-            throw new Error("Wallet not connected or SDK not initialized");
+        if (!signer) {
+            throw new Error("Wallet not connected or provider not available");
         }
-
         setIsLoading(true);
         setError(null);
-
         try {
             // Validate percentages
             const totalPercentage = percentages.reduce((sum, p) => sum + p, 0);
@@ -721,8 +666,7 @@ export function useTournamentContract() {
                 }
             }
 
-            // Get the contract instance with ABI
-            const contract = await sdk.getContract(contractAddress, TournamentABI);
+            const contract = await getContractAsync();
 
             console.log("Ending tournament:", {
                 tournamentId,
@@ -731,11 +675,11 @@ export function useTournamentContract() {
             });
 
             // Call the endTournament function
-            const tx = await contract.call("endTournament", [
+            const tx = await contract.endTournament(
                 tournamentId,
                 winners,
                 percentages
-            ]);
+            );
 
             console.log("End tournament transaction submitted:", tx);
 
@@ -773,24 +717,21 @@ export function useTournamentContract() {
 
     // Start a tournament
     async function startTournament(tournamentId: number) {
-        if (!address || !sdk) {
-            throw new Error("Wallet not connected or SDK not initialized");
+        if (!signer) {
+            throw new Error("Wallet not connected or provider not available");
         }
-
         setIsLoading(true);
         setError(null);
-
         try {
             console.log("Starting tournament with ID:", tournamentId);
 
             // Clear cache BEFORE the transaction to ensure we fetch fresh data
             CACHE.tournamentDetails.delete(tournamentId);
 
-            // Get the contract instance with ABI
-            const contract = await sdk.getContract(contractAddress, TournamentABI);
+            const contract = await getContractAsync();
 
             // Call the startTournament function
-            const tx = await contract.call("startTournament", [tournamentId]);
+            const tx = await contract.startTournament(tournamentId);
 
             console.log("Start tournament transaction submitted:", tx);
 
@@ -823,8 +764,8 @@ export function useTournamentContract() {
 
     // Save game result (mock function)
     async function saveGameResult(gameId: string, playerAddress: string, score: number) {
-        if (!sdk || !playerAddress) {
-            console.error("Cannot save game result: SDK not initialized or no player address");
+        if (!signer || !playerAddress) {
+            console.error("Cannot save game result: Wallet not connected or no player address");
             return null;
         }
 
@@ -843,6 +784,245 @@ export function useTournamentContract() {
         }
     }
 
+    // Get tournament winner data (payout amount and claim status)
+    async function getTournamentWinnerData(tournamentId: number, winnerAddress: string): Promise<{ amount: string; hasClaimed: boolean }> {
+        const cacheKey = `winner-${tournamentId}-${winnerAddress}`;
+        const cachedData = CACHE.get(CACHE.winnerData, cacheKey, TTL.TOURNAMENT_DETAILS);
+        if (cachedData) {
+            return cachedData;
+        }
+
+        const fetchWinnerData = async (): Promise<{ amount: string; hasClaimed: boolean }> => {
+            try {
+                const contract = await getContractAsync();
+                const data = await contract.getTournamentWinner(tournamentId, winnerAddress);
+                const winnerData = { amount: data.amount.toString(), hasClaimed: data.hasClaimed };
+                // Cache the result
+                CACHE.set(CACHE.winnerData, cacheKey, winnerData);
+                return winnerData;
+            } catch (err) {
+                console.error(`Error fetching winner data for ${winnerAddress} in tournament ${tournamentId}:`, err);
+                return { amount: '0', hasClaimed: false };
+            }
+        };
+
+        return await throttledRPCCall(cacheKey, TTL.TOURNAMENT_DETAILS, fetchWinnerData);
+    }
+
+    // Smart Contract Management Functions
+    async function addAdmin(adminAddress: string) {
+        try {
+            if (!signer) {
+                throw new Error("Wallet not connected or provider not available");
+            }
+
+            if (!adminAddress || !ethers.utils.isAddress(adminAddress)) {
+                throw new Error("Invalid admin address");
+            }
+
+            setIsLoading(true);
+            setError(null);
+
+            const contract = await getContractAsync();
+            const tx = await contract.addAdmin(adminAddress);
+            const receipt = await tx.wait();
+
+            console.log("Admin added successfully:", receipt);
+            return { hash: tx.hash, receipt };
+        } catch (error: any) {
+            console.error('Error adding admin:', error);
+            setError(error.message || 'Failed to add admin');
+            throw error;
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    async function removeAdmin(adminAddress: string) {
+        try {
+            if (!signer) {
+                throw new Error("Wallet not connected or provider not available");
+            }
+
+            if (!adminAddress || !ethers.utils.isAddress(adminAddress)) {
+                throw new Error("Invalid admin address");
+            }
+
+            setIsLoading(true);
+            setError(null);
+
+            const contract = await getContractAsync();
+            const tx = await contract.removeAdmin(adminAddress);
+            const receipt = await tx.wait();
+
+            console.log("Admin removed successfully:", receipt);
+            return { hash: tx.hash, receipt };
+        } catch (error: any) {
+            console.error('Error removing admin:', error);
+            setError(error.message || 'Failed to remove admin');
+            throw error;
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    async function addBlacklisted(address: string) {
+        try {
+            if (!signer) {
+                throw new Error("Wallet not connected or provider not available");
+            }
+
+            if (!address || !ethers.utils.isAddress(address)) {
+                throw new Error("Invalid address");
+            }
+
+            setIsLoading(true);
+            setError(null);
+
+            const contract = await getContractAsync();
+            const tx = await contract.addBlacklisted(address);
+            const receipt = await tx.wait();
+
+            console.log("Address blacklisted successfully:", receipt);
+            return { hash: tx.hash, receipt };
+        } catch (error: any) {
+            console.error('Error blacklisting address:', error);
+            setError(error.message || 'Failed to blacklist address');
+            throw error;
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    async function removeBlacklisted(address: string) {
+        try {
+            if (!signer) {
+                throw new Error("Wallet not connected or provider not available");
+            }
+
+            if (!address || !ethers.utils.isAddress(address)) {
+                throw new Error("Invalid address");
+            }
+
+            setIsLoading(true);
+            setError(null);
+
+            const contract = await getContractAsync();
+            const tx = await contract.removeBlacklisted(address);
+            const receipt = await tx.wait();
+
+            console.log("Address removed from blacklist successfully:", receipt);
+            return { hash: tx.hash, receipt };
+        } catch (error: any) {
+            console.error('Error removing from blacklist:', error);
+            setError(error.message || 'Failed to remove from blacklist');
+            throw error;
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    async function approveToken(tokenAddress: string, approved: boolean) {
+        try {
+            if (!signer) {
+                throw new Error("Wallet not connected or provider not available");
+            }
+
+            if (!tokenAddress || !ethers.utils.isAddress(tokenAddress)) {
+                throw new Error("Invalid token address");
+            }
+
+            setIsLoading(true);
+            setError(null);
+
+            const contract = await getContractAsync();
+            const tx = await contract.approveToken(tokenAddress, approved);
+            const receipt = await tx.wait();
+
+            console.log("Token approval updated successfully:", receipt);
+            return { hash: tx.hash, receipt };
+        } catch (error: any) {
+            console.error('Error updating token approval:', error);
+            setError(error.message || 'Failed to update token approval');
+            throw error;
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    async function setMultisigAddress(multisigAddress: string) {
+        try {
+            if (!signer) {
+                throw new Error("Wallet not connected or provider not available");
+            }
+
+            if (!multisigAddress || !ethers.utils.isAddress(multisigAddress)) {
+                throw new Error("Invalid multisig address");
+            }
+
+            setIsLoading(true);
+            setError(null);
+
+            const contract = await getContractAsync();
+            const tx = await contract.setMultisigAddress(multisigAddress);
+            const receipt = await tx.wait();
+
+            console.log("Multisig address updated successfully:", receipt);
+            return { hash: tx.hash, receipt };
+        } catch (error: any) {
+            console.error('Error updating multisig address:', error);
+            setError(error.message || 'Failed to update multisig address');
+            throw error;
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    async function checkAllowance(tokenAddress: string, owner: string, spender: string): Promise<ethers.BigNumber> {
+        if (!provider) {
+            throw new Error("Provider not available");
+        }
+        const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
+        return await tokenContract.allowance(owner, spender);
+    }
+
+    async function approveTokenSpend(tokenAddress: string, amount: ethers.BigNumber): Promise<ethers.providers.TransactionResponse> {
+        if (!signer) {
+            throw new Error("Wallet not connected or provider not available");
+        }
+        const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
+        const tx = await tokenContract.approve(process.env.NEXT_PUBLIC_TOURNAMENT_CONTRACT_ADDRESS, amount);
+        return tx;
+    }
+
+    async function withdrawFunds(amount: ethers.BigNumber) {
+        try {
+            if (!signer) {
+                throw new Error("Wallet not connected or provider not available");
+            }
+
+            if (!amount || amount.lte(0)) {
+                throw new Error("Invalid withdrawal amount");
+            }
+
+            setIsLoading(true);
+            setError(null);
+
+            const contract = await getContractAsync();
+            const tx = await contract.withdrawFunds(amount);
+            const receipt = await tx.wait();
+
+            console.log("Funds withdrawn successfully:", receipt);
+            return { hash: tx.hash, receipt };
+        } catch (error: any) {
+            console.error('Error withdrawing funds:', error);
+            setError(error.message || 'Failed to withdraw funds');
+            throw error;
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
     return {
         createTournament,
         joinTournament,
@@ -855,7 +1035,17 @@ export function useTournamentContract() {
         fillUpMatchingPool,
         allocateMatchingPoolToTournament,
         getMatchingPoolBalance,
+        getTournamentWinnerData,
         isLoading,
-        error
+        error,
+        addAdmin,
+        removeAdmin,
+        addBlacklisted,
+        removeBlacklisted,
+        approveToken,
+        setMultisigAddress,
+        withdrawFunds,
+        checkAllowance,
+        approveTokenSpend
     };
 }

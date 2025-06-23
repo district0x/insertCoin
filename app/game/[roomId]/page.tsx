@@ -2,17 +2,16 @@
 
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
-import { useAddress, useConnectionStatus } from "@thirdweb-dev/react";
 import { useSocket } from '@/app/hooks/useSocket';
-import { useAuth } from '@/hooks/useAuth';
+import { usePrivy } from '@privy-io/react-auth';
 import { Player, Question } from '@/app/types';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTournamentContract } from '@/hooks/useTournamentContract';
-import { useToast } from '@/lib/hooks/use-toast';
 import { OnChainTournament, TournamentPlayer, TournamentWinner } from '@/app/types/tournament';
 import { TournamentPayoutPanel } from '@/components/TournamentPayoutPanel';
 import { WinnerSummary } from '@/components/WinnerSummary';
+import { GameDebugPanel } from '@/components/GameDebugPanel';
 
 
 
@@ -22,9 +21,9 @@ export default function GameRoom() {
     const searchParams = useSearchParams();
     const { socket, updateRoomSettings } = useSocket();
     const [isClient, setIsClient] = useState(false);
-    const { isAuthenticated } = useAuth(true, '/');
-    const address = useAddress();
-    const connectionStatus = useConnectionStatus();
+    const { authenticated: isAuthenticated, user } = usePrivy();
+    const address = user?.wallet?.address || '';
+    const connectionStatus = isAuthenticated ? 'connected' : 'disconnected';
     const tournamentId = searchParams.get('tournamentId');
     const [isTournamentMode, setIsTournamentMode] = useState(!!tournamentId);
     const [tournamentDetails, setTournamentDetails] = useState<OnChainTournament | null>(null);
@@ -106,6 +105,8 @@ export default function GameRoom() {
                     eliminated: false,
                     walletAddress: playerInfo.walletAddress || null
                 });
+                // The server is the source of truth for who the host is
+                setIsHost(playerInfo.isHost || false);
             });
 
             socket.on('player-joined', (player) => {
@@ -163,6 +164,11 @@ export default function GameRoom() {
                         const response = await fetch(
                             `/api/questions?amount=${questionCount}&category=${category}`
                         );
+
+                        if (!response.ok) {
+                            throw new Error(`API responded with status: ${response.status}`);
+                        }
+
                         const data = await response.json();
 
                         if (data.questions && data.questions.length > 0) {
@@ -191,6 +197,15 @@ export default function GameRoom() {
                 } else {
                     // Non-host players wait for questions from server
                     console.log('PLAYER: Waiting for host to load questions');
+
+                    // Set a timeout to prevent infinite waiting
+                    setTimeout(() => {
+                        if (questions.length === 0) {
+                            console.error('PLAYER: No questions received after 10 seconds, generating fallback questions');
+                            const fallbackQuestions = generateMockQuestions(10);
+                            setQuestions(fallbackQuestions);
+                        }
+                    }, 10000);
                 }
             });
 
@@ -718,8 +733,13 @@ export default function GameRoom() {
             const fetchTournamentDetails = async () => {
                 try {
                     const details = await getTournamentDetails(parseInt(tournamentId));
-                    setTournamentDetails(details);
-                    setEntryFee(details.entryFee);
+                    // Ensure details object exists before trying to access its properties
+                    if (details) {
+                        setTournamentDetails(details);
+                        setEntryFee(details.entryFee);
+                    } else {
+                        console.warn("Received null or undefined tournament details.");
+                    }
                 } catch (error) {
                     console.error("Error fetching tournament details:", error);
                 }
@@ -745,8 +765,13 @@ export default function GameRoom() {
 
                         try {
                             const details = await getTournamentDetails(parseInt(tournamentId));
-                            setTournamentDetails(details);
-                            setEntryFee(details.entryFee);
+                            // Ensure details object exists before trying to access its properties
+                            if (details) {
+                                setTournamentDetails(details);
+                                setEntryFee(details.entryFee);
+                            } else {
+                                console.warn("Received null or undefined tournament details.");
+                            }
                         } catch (error) {
                             console.error("Error fetching tournament details:", error);
                             // Add exponential backoff for retries if needed
@@ -773,20 +798,23 @@ export default function GameRoom() {
 
     // Add the function to handle joining a tournament
     const handleJoinTournament = async () => {
-        if (!tournamentId || !address || hasJoinedTournament) return;
+        if (!tournamentId || !address || hasJoinedTournament || !tournamentDetails) return;
 
         try {
-            await joinTournament(parseInt(tournamentId), entryFee);
+            // The third argument indicates if the tournament is ERC20 or not.
+            await joinTournament(parseInt(tournamentId), entryFee, tournamentDetails.isERC20);
             setHasJoinedTournament(true);
 
             alert('Successfully joined the tournament!');
 
             // Notify the host and other players
-            socket?.emit('player-joined-tournament', {
-                roomId,
-                playerId: playerId,
-                playerName: currentPlayer?.name
-            });
+            if (currentPlayer) {
+                socket?.emit('player-joined-tournament', {
+                    roomId,
+                    playerId: currentPlayer.id,
+                    playerName: currentPlayer.name
+                });
+            }
         } catch (error: any) {
             console.error("Error joining tournament:", error);
             alert(`Failed to join tournament: ${error.message || "Unknown error"}`);
@@ -916,10 +944,10 @@ export default function GameRoom() {
             {isHost && (
                 <button
                     onClick={handleStartGame}
-                    disabled={players.length < 1}
+                    disabled={players.length < 1 || isTournamentLoading}
                     className="bg-green-600 text-white py-2 px-6 rounded disabled:bg-gray-400"
                 >
-                    Start Game
+                    {isTournamentLoading ? 'Starting...' : 'Start Game'}
                 </button>
             )}
         </div>
@@ -1244,6 +1272,18 @@ export default function GameRoom() {
                     {gameStatus === 'completed' && renderGameOver()}
                 </div>
             </div>
+
+            {/* Debug Panel */}
+            <GameDebugPanel
+                gameStatus={gameStatus}
+                questions={questions}
+                currentQuestionIndex={currentQuestionIndex}
+                players={players}
+                timer={timer}
+                isHost={isHost}
+                roomId={roomId}
+                socket={socket}
+            />
         </main>
     );
 }

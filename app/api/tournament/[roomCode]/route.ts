@@ -20,10 +20,10 @@ function generateUUID() {
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: { roomCode: string } }
+    { params }: { params: Promise<{ roomCode: string }> }
 ) {
     try {
-        const roomCode = params.roomCode;
+        const { roomCode } = await params;
 
         if (!roomCode) {
             return NextResponse.json(
@@ -32,10 +32,18 @@ export async function GET(
             );
         }
 
-        // Get tournament details by room code
+        // Get tournament details by room code and join with token info
         const { data: tournament, error } = await supabaseAdmin
             .from('Tournament')
-            .select('*')
+            .select(`
+                *,
+                approved_tokens (
+                    address,
+                    symbol,
+                    decimals,
+                    is_native
+                )
+            `)
             .eq('roomCode', roomCode)
             .single();
 
@@ -54,42 +62,42 @@ export async function GET(
             );
         }
 
+        // Extract token info
+        const tokenInfo = Array.isArray(tournament.approved_tokens)
+            ? tournament.approved_tokens[0]
+            : tournament.approved_tokens;
+
+        const tokenSymbol = tokenInfo?.symbol || 'ETH';
+        const tokenDecimals = tokenInfo?.decimals || 18;
+
         // Get current participant count from the TournamentParticipant table
         const { count: currentParticipants, error: countError } = await supabaseAdmin
             .from('TournamentParticipant')
             .select('*', { count: 'exact', head: true })
-            .eq('tournamentId', tournament.tournamentId);
+            .eq('tournamentid', tournament.tournamentId);
 
         if (countError) {
             console.error('Error getting participant count:', countError);
         }
 
-        // Try to format entry fee to ETH if it's in wei format
-        let entryFeeFormatted = tournament.entryFee;
-        try {
-            // If the entry fee is a large number (wei), format it to ETH
-            if (tournament.entryFee && tournament.entryFee.toString().length > 10) {
-                entryFeeFormatted = ethers.utils.formatEther(tournament.entryFee);
-            }
-        } catch (err) {
-            console.error("Error formatting entry fee:", err);
-            // If formatting fails, just use the original value
-        }
-
         return NextResponse.json({
             isTournament: true,
-            id: tournament.id,
-            tournamentId: tournament.tournamentId.toString(),
-            entryFee: entryFeeFormatted,
-            entryFeeWei: tournament.entryFee.toString(), // Include the raw wei value for contract interactions
-            status: tournament.status,
-            maxParticipants: tournament.maxParticipants,
-            currentParticipants: currentParticipants || 0, // Calculated dynamically
-            totalPrize: tournament.totalPrize,
-            tokenAddress: tournament.tokenAddress,
-            createdAt: tournament.createdAt,
-            updatedAt: tournament.updatedAt,
-            isFull: (currentParticipants || 0) >= tournament.maxParticipants
+            details: {
+                tournamentId: tournament.tournamentId.toString(),
+                roomCode: tournament.roomCode,
+                entryFee: tournament.entryFee.toString(), // Raw value for tx
+                entryFeeFormatted: ethers.utils.formatUnits(tournament.entryFee.toString(), tokenDecimals), // Formatted for display
+                status: tournament.status,
+                maxParticipants: tournament.maxParticipants,
+                currentParticipants: currentParticipants || 0,
+                totalPrize: tournament.totalPrize.toString(), // Raw value
+                tokenAddress: tokenInfo?.address || '0x0000000000000000000000000000000000000000',
+                tokenSymbol: tokenSymbol,
+                tokenDecimals: tokenDecimals,
+                createdAt: tournament.createdAt,
+                updatedAt: tournament.updatedAt,
+                isFull: (currentParticipants || 0) >= tournament.maxParticipants,
+            }
         });
     } catch (error: any) {
         console.error('Server error:', error);
@@ -102,11 +110,13 @@ export async function GET(
 
 export async function POST(
     request: NextRequest,
-    { params }: { params: { roomCode: string } }
+    { params }: { params: Promise<{ roomCode: string }> }
 ) {
     try {
-        const roomCode = params.roomCode;
+        const { roomCode } = await params;
         const data = await request.json();
+
+        console.log('[DEBUG] RoomCode API POST called with:', { roomCode, data });
 
         if (!roomCode) {
             return NextResponse.json(
@@ -116,11 +126,14 @@ export async function POST(
         }
 
         // Get tournament by room code
+        console.log('[DEBUG] Looking up tournament by room code:', roomCode);
         const { data: tournament, error: tournamentError } = await supabaseAdmin
             .from('Tournament')
             .select('*')
             .eq('roomCode', roomCode)
             .single();
+
+        console.log('[DEBUG] Tournament lookup result:', { tournament, error: tournamentError });
 
         if (tournamentError) {
             console.error('Supabase error:', tournamentError);
@@ -131,19 +144,41 @@ export async function POST(
         }
 
         const tournamentId = tournament.tournamentId;
+        console.log('[DEBUG] Found tournament with ID:', tournamentId);
 
         // Handle join tournament action
         if (data.action === 'join' && data.walletAddress) {
+            console.log('[DEBUG] Processing join action for tournament:', tournamentId);
+
+            // Validate required fields for joining
+            if (!data.name || data.name.trim() === '') {
+                return NextResponse.json(
+                    { error: 'Player name is required to join a tournament' },
+                    { status: 400 }
+                );
+            }
+
+            // Validate name length and format
+            const trimmedName = data.name.trim();
+            if (trimmedName.length < 2 || trimmedName.length > 50) {
+                return NextResponse.json(
+                    { error: 'Player name must be between 2 and 50 characters' },
+                    { status: 400 }
+                );
+            }
+
             // Get current participant count
             const { count: currentParticipants, error: countError } = await supabaseAdmin
                 .from('TournamentParticipant')
                 .select('*', { count: 'exact', head: true })
-                .eq('tournamentId', tournamentId);
+                .eq('tournamentid', tournamentId);
 
             if (countError) {
                 console.error('Error getting participant count:', countError);
                 // Continue anyway with a fallback value
             }
+
+            console.log('[DEBUG] Current participants:', currentParticipants, 'Max participants:', tournament.maxParticipants);
 
             // Check if tournament is full
             if ((currentParticipants || 0) >= tournament.maxParticipants) {
@@ -157,9 +192,11 @@ export async function POST(
             const { data: existingParticipant, error: participantError } = await supabaseAdmin
                 .from('TournamentParticipant')
                 .select('*')
-                .eq('tournamentId', tournamentId)
-                .eq('walletAddress', data.walletAddress)
+                .eq('tournamentid', tournamentId)
+                .eq('walletaddress', data.walletAddress)
                 .single();
+
+            console.log('[DEBUG] Existing participant check:', { existingParticipant, error: participantError });
 
             if (!participantError && existingParticipant) {
                 // Participant already exists, return success
@@ -195,25 +232,29 @@ export async function POST(
             if (data.walletAddress) {
                 // Generate a UUID for the participant record
                 const participantId = generateUUID();
+                console.log('[DEBUG] Inserting participant with ID:', participantId);
 
-                const { error: participantInsertError } = await supabaseAdmin
+                const { error: insertError } = await supabaseAdmin
                     .from('TournamentParticipant')
                     .insert([
                         {
-                            id: participantId, // Include UUID for the id column
-                            tournamentId: tournamentId,
-                            walletAddress: data.walletAddress,
-                            joinedAt: now // Use the same timestamp
+                            id: participantId,
+                            tournamentid: tournamentId,
+                            walletaddress: data.walletAddress,
+                            name: trimmedName, // Use the validated and trimmed name
+                            joinedat: now
                         }
                     ]);
 
-                if (participantInsertError) {
-                    console.warn('Warning: Failed to add participant record', participantInsertError);
+                if (insertError) {
+                    console.error('Error inserting participant:', insertError);
                     return NextResponse.json(
-                        { error: `Failed to add participant: ${participantInsertError.message}` },
+                        { error: `Failed to add participant: ${insertError.message}` },
                         { status: 500 }
                     );
                 }
+
+                console.log('[DEBUG] Participant inserted successfully');
             }
 
             // Get the updated tournament

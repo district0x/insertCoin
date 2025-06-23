@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useTournamentContract } from '@/hooks/useTournamentContract';
 import { useAddress, useConnectionStatus } from "@thirdweb-dev/react";
-import { useAuth } from '@/hooks/useAuth';
+import { usePrivy } from '@privy-io/react-auth';
 import { ethers } from 'ethers';
 import { formatTournamentError } from '@/lib/tournamentDiagnostics';
 
@@ -30,7 +30,7 @@ export function EnhancedTournamentEntry({
   const { joinTournament, isEntrantInTournament, getTournamentDetails } = useTournamentContract();
   const address = useAddress();
   const connectionStatus = useConnectionStatus();
-  const { isAuthenticated, signIn } = useAuth();
+  const { authenticated: isAuthenticated, login: signIn } = usePrivy();
 
   // Formatted entry fee for display
   const formattedEntryFee = typeof entryFee === 'string' && entryFee.includes('.')

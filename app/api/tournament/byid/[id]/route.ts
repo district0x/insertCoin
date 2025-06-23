@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export async function GET(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const tournamentId = params.id;
+        const { id: tournamentId } = await params;
 
         // Query your Supabase table to find tournament info by ID
-        const { data, error } = await supabase
+        const { data, error } = await supabaseAdmin
             .from('Tournament')
             .select(`
         id,
@@ -65,10 +65,10 @@ export async function GET(
 // Update tournament status
 export async function PATCH(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const tournamentId = params.id;
+        const { id: tournamentId } = await params;
         const { status, winnerAddresses } = await request.json();
 
         // Construct update object
@@ -87,7 +87,7 @@ export async function PATCH(
         }
 
         // Update tournament
-        const { data, error } = await supabase
+        const { data, error } = await supabaseAdmin
             .from('Tournament')
             .update(updateData)
             .eq('tournamentId', tournamentId)

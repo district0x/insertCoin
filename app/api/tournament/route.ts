@@ -93,6 +93,23 @@ function generateUUID() {
     });
 }
 
+// Helper function to format entry fee from WEI to ETH
+function formatEntryFee(entryFee: string): string {
+    try {
+        // If the entry fee is already in ETH format (small number), return as is
+        if (parseFloat(entryFee) < 1000000) {
+            return entryFee;
+        }
+
+        // Convert from WEI to ETH
+        const entryFeeBN = ethers.BigNumber.from(entryFee);
+        return ethers.utils.formatEther(entryFeeBN);
+    } catch (error) {
+        console.error('Error formatting entry fee:', error);
+        return entryFee; // Return original value if conversion fails
+    }
+}
+
 export async function POST(request: NextRequest) {
     // Apply rate limiting
     const { allowed, headers } = checkRateLimit(request);
@@ -111,67 +128,60 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const data = await request.json();
-        console.log("Tournament API received data:", data);
+        const body = await request.json();
+        const { tournamentId, roomCode, entryFee, maxParticipants, tokenAddress } = body;
+
+        // Validate entry fee is in WEI
+        try {
+            const entryFeeBN = ethers.BigNumber.from(entryFee);
+            if (entryFeeBN.lt(0)) {
+                return NextResponse.json(
+                    { error: 'Entry fee must be a positive number' },
+                    { status: 400, headers }
+                );
+            }
+        } catch (error) {
+            return NextResponse.json(
+                { error: 'Invalid entry fee format. Must be a valid WEI amount as a string' },
+                { status: 400, headers }
+            );
+        }
 
         // Validate required fields
-        if (!data.roomCode || !data.tournamentId || !data.maxParticipants) {
+        if (!roomCode || !tournamentId || !maxParticipants) {
             return NextResponse.json(
                 { error: 'Missing required fields' },
                 { status: 400, headers }
             );
         }
 
-        // Format entry fee for storage - ensure it's a string
-        let entryFeeWei = data.entryFee;
-        let entryFeeEth = "0";
-
-        try {
-            // If the entry fee is already in wei (large number), just store it as is
-            if (data.entryFee && data.entryFee.toString().length > 10) {
-                entryFeeWei = data.entryFee.toString();
-                entryFeeEth = ethers.utils.formatEther(entryFeeWei);
-            } else {
-                // If it's a decimal (like "0.01"), convert to wei
-                entryFeeWei = ethers.utils.parseEther(data.entryFee).toString();
-                entryFeeEth = data.entryFee;
-            }
-        } catch (err) {
-            console.error("Error parsing entry fee:", err);
-            // If parsing fails, just store as string and handle the error gracefully
-            entryFeeWei = data.entryFee.toString();
-            entryFeeEth = data.entryFee.toString();
-        }
-
         // Calculate total prize based on entry fee and max participants
-        const totalPrize = parseFloat(entryFeeEth) * data.maxParticipants;
+        // Convert entry fee from WEI to ETH for calculation
+        const entryFeeInEth = parseFloat(ethers.utils.formatEther(entryFee));
+        const totalPrize = entryFeeInEth * maxParticipants;
 
-        // Generate a UUID for the id column - CRITICAL for Supabase tables with UUID primary keys
+        // Generate a UUID for the id column
         const uuid = generateUUID();
-        console.log("Generated UUID for new tournament:", uuid);
-
-        // Get current timestamp for created/updated fields
         const now = new Date().toISOString();
 
-        // Insert tournament data with admin client
-        const { data: insertedData, error } = await supabaseAdmin
+        // Insert the tournament
+        const { data, error } = await supabaseAdmin
             .from('Tournament')
             .insert([
                 {
-                    id: uuid, // Provide the UUID for the id column
-                    roomCode: data.roomCode,
-                    tournamentId: data.tournamentId.toString(),
-                    entryFee: entryFeeWei,
-                    tokenAddress: data.tokenAddress || "0x0000000000000000000000000000000000000000",
-                    maxParticipants: data.maxParticipants,
-                    totalPrize: totalPrize,
+                    id: uuid,
+                    roomCode,
+                    tournamentId,
+                    entryFee: entryFee.toString(), // Store as string in WEI
+                    tokenAddress: tokenAddress || "0x0000000000000000000000000000000000000000",
+                    maxParticipants,
+                    totalPrize,
                     status: 'FILLING',
                     createdAt: now,
-                    updatedAt: now // Add the updatedAt timestamp
+                    updatedAt: now
                 }
             ])
-            .select()
-            .single();
+            .select();
 
         if (error) {
             console.error('Supabase error:', error);
@@ -181,7 +191,10 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        console.log("Tournament created successfully with ID:", insertedData?.id);
+        const newTournament = data?.[0];
+
+        console.log("Tournament created successfully with ID:", newTournament?.id);
+        console.log("Full tournament data created:", newTournament);
 
         // Set cache-related headers to prevent stale data
         const responseHeaders = {
@@ -194,9 +207,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
             {
                 success: true,
-                tournamentId: data.tournamentId,
-                tournament: insertedData,
-                entryFeeEth,
+                tournamentId,
+                tournament: newTournament,
+                entryFee,
                 totalPrize
             },
             { headers: responseHeaders }
@@ -228,12 +241,44 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        // Get active tournaments for display
-        const { data: tournaments, error } = await supabaseAdmin
+        // Get query parameters
+        const { searchParams } = new URL(request.url);
+        const page = parseInt(searchParams.get('page') || '1');
+        const limit = parseInt(searchParams.get('limit') || '10');
+        const status = searchParams.get('status');
+        const search = searchParams.get('search') || '';
+        const sortBy = searchParams.get('sortBy') || 'createdAt';
+        const sortOrder = searchParams.get('sortOrder') || 'desc';
+
+        // Calculate offset
+        const offset = (page - 1) * limit;
+
+        // Build query
+        let query = supabaseAdmin
             .from('Tournament')
-            .select('*')
-            .in('status', ['ACTIVE', 'FILLING'])
-            .order('createdAt', { ascending: false });
+            .select('*', { count: 'exact' });
+
+        // Apply filters
+        if (status) {
+            query = query.in('status', status.split(','));
+        } else {
+            // Show all tournaments including completed ones to see the latest matches
+            query = query.in('status', ['ACTIVE', 'FILLING', 'COMPLETED']);
+        }
+
+        // Apply search if provided
+        if (search) {
+            query = query.or(`roomCode.ilike.%${search}%,tournamentId.ilike.%${search}%`);
+        }
+
+        // Apply sorting
+        query = query.order(sortBy, { ascending: sortOrder === 'asc' });
+
+        // Apply pagination
+        query = query.range(offset, offset + limit - 1);
+
+        // Execute query
+        const { data: tournaments, error, count } = await query;
 
         if (error) {
             console.error('Supabase error:', error);
@@ -243,21 +288,74 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        // Format the entry fee for display
+        // Get participant counts for all tournaments
+        const tournamentIds = tournaments?.map(t => t.tournamentId) || [];
+
+        // Create a map to store participant counts
+        const participantCountMap = new Map();
+
+        // Get participant counts for each tournament
+        for (const tournamentId of tournamentIds) {
+            const { count: participantCount, error: countError } = await supabaseAdmin
+                .from('TournamentParticipant')
+                .select('*', { count: 'exact', head: true })
+                .eq('tournamentid', tournamentId);
+
+            if (countError) {
+                console.error(`Error getting participant count for tournament ${tournamentId}:`, countError);
+                participantCountMap.set(tournamentId, 0);
+            } else {
+                participantCountMap.set(tournamentId, participantCount || 0);
+            }
+        }
+
+        // Format the entry fee and add participant count
         const formattedTournaments = tournaments?.map(t => {
             try {
-                // If the entry fee is a large number (wei), format it to ETH
-                if (t.entryFee && t.entryFee.toString().length > 10) {
-                    return {
-                        ...t,
-                        entryFeeFormatted: ethers.utils.formatEther(t.entryFee)
-                    };
-                }
-                return t;
+                const currentParticipants = participantCountMap.get(t.tournamentId) || 0;
+                const entryFeeFormatted = formatEntryFee(t.entryFee);
+
+                return {
+                    ...t,
+                    entryFeeFormatted,
+                    currentParticipants
+                };
             } catch (err) {
+                console.error('Error formatting tournament:', err);
                 return t;
             }
         });
+
+        // Get winner information for completed tournaments
+        const tournamentsWithWinners = await Promise.all(
+            formattedTournaments?.map(async (tournament) => {
+                if (tournament.status === 'COMPLETED' && tournament.winnerAddresses) {
+                    try {
+                        // Get winner details from TournamentParticipant table
+                        const { data: winners, error: winnersError } = await supabaseAdmin
+                            .from('TournamentParticipant')
+                            .select('name, walletaddress, winningrank')
+                            .eq('tournamentid', tournament.tournamentId)
+                            .in('walletaddress', tournament.winnerAddresses)
+                            .order('winningrank', { ascending: true });
+
+                        if (!winnersError && winners) {
+                            return {
+                                ...tournament,
+                                winners: winners.map(winner => ({
+                                    name: winner.name || 'Anonymous',
+                                    address: winner.walletaddress,
+                                    rank: winner.winningrank
+                                }))
+                            };
+                        }
+                    } catch (err) {
+                        console.error(`Error fetching winners for tournament ${tournament.tournamentId}:`, err);
+                    }
+                }
+                return tournament;
+            }) || []
+        );
 
         // Set cache-related headers to prevent stale data
         const responseHeaders = {
@@ -267,7 +365,15 @@ export async function GET(request: NextRequest) {
         };
 
         return NextResponse.json(
-            { tournaments: formattedTournaments },
+            {
+                tournaments: tournamentsWithWinners,
+                pagination: {
+                    total: count || 0,
+                    page,
+                    limit,
+                    totalPages: Math.ceil((count || 0) / limit)
+                }
+            },
             { headers: responseHeaders }
         );
     } catch (error: any) {

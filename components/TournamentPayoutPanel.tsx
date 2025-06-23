@@ -234,6 +234,12 @@ export const TournamentPayoutPanel = ({
                     };
                 });
 
+                console.log('Updating tournament results in database:', {
+                    tournamentId,
+                    winners: winnerData,
+                    txHash: txResult.hash
+                });
+
                 const apiResponse = await fetch(`/api/tournament/byid/${tournamentId}/results`, {
                     method: 'POST',
                     headers: {
@@ -246,13 +252,44 @@ export const TournamentPayoutPanel = ({
                 });
 
                 if (!apiResponse.ok) {
-                    console.warn("API update failed, but blockchain transaction succeeded");
+                    const errorData = await apiResponse.json();
+                    console.warn("API update failed, but blockchain transaction succeeded:", errorData);
+                    throw new Error(`Database update failed: ${errorData.error || 'Unknown error'}`);
                 } else {
-                    console.log("API update successful");
+                    const responseData = await apiResponse.json();
+                    console.log("Tournament status updated successfully:", responseData);
                 }
-            } catch (apiError) {
-                console.warn("Error updating API:", apiError);
-                // Don't fail the whole operation if just the API call fails
+
+                // Also trigger blockchain event processing to ensure consistency
+                try {
+                    const eventResponse = await fetch('/api/blockchain-events', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            action: 'process_historical',
+                            fromBlock: 'latest',
+                            toBlock: 'latest'
+                        })
+                    });
+
+                    if (eventResponse.ok) {
+                        const eventData = await eventResponse.json();
+                        console.log("Blockchain events processed:", eventData);
+                    } else {
+                        console.warn("Blockchain event processing failed, but payout was successful");
+                    }
+                } catch (eventError) {
+                    console.warn("Error processing blockchain events:", eventError);
+                    // Don't fail the payout if event processing fails
+                }
+
+            } catch (apiError: any) {
+                console.error("Error updating tournament results:", apiError);
+                // Still notify parent of successful payout since blockchain transaction succeeded
+                // but log the database update failure
+                setError(`Payout completed on blockchain, but database update failed: ${apiError.message}`);
             }
 
             // Notify parent of successful payout

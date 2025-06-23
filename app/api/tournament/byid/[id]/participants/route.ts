@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export async function POST(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const tournamentId = params.id;
+        const { id: tournamentId } = await params;
         const { walletAddress, txHash } = await request.json();
 
         if (!walletAddress) {
@@ -17,7 +17,7 @@ export async function POST(
         }
 
         // First get the tournament to check if it exists and isn't full
-        const { data: tournament, error: tournamentError } = await supabase
+        const { data: tournament, error: tournamentError } = await supabaseAdmin
             .from('Tournament')
             .select('currentParticipants, maxParticipants, status')
             .eq('tournamentId', tournamentId)
@@ -39,11 +39,11 @@ export async function POST(
         }
 
         // Check if participant already exists
-        const { data: existingParticipant, error: participantError } = await supabase
+        const { data: existingParticipant, error: participantError } = await supabaseAdmin
             .from('TournamentParticipant')
             .select('id')
-            .eq('tournamentId', tournamentId)
-            .eq('walletAddress', walletAddress)
+            .eq('tournamentid', tournamentId)
+            .eq('walletaddress', walletAddress)
             .maybeSingle();
 
         if (existingParticipant) {
@@ -54,12 +54,12 @@ export async function POST(
         }
 
         // Add participant
-        const { data: participant, error: insertError } = await supabase
+        const { data: participant, error: insertError } = await supabaseAdmin
             .from('TournamentParticipant')
             .insert({
-                tournamentId: parseInt(tournamentId),
-                walletAddress,
-                joinedAt: new Date().toISOString(),
+                tournamentid: parseInt(tournamentId),
+                walletaddress: walletAddress,
+                joinedat: new Date().toISOString(),
                 txHash
             })
             .select()
@@ -74,7 +74,7 @@ export async function POST(
         }
 
         // Update tournament participant count
-        const { data: updatedTournament, error: updateError } = await supabase
+        const { data: updatedTournament, error: updateError } = await supabaseAdmin
             .from('Tournament')
             .update({
                 currentParticipants: (tournament.currentParticipants || 0) + 1,
@@ -111,16 +111,16 @@ export async function POST(
 // Get all participants for a tournament
 export async function GET(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const tournamentId = params.id;
+        const { id: tournamentId } = await params;
 
-        const { data, error } = await supabase
+        const { data, error } = await supabaseAdmin
             .from('TournamentParticipant')
-            .select('walletAddress, joinedAt, isWinner, winningRank')
-            .eq('tournamentId', tournamentId)
-            .order('joinedAt', { ascending: true });
+            .select('walletaddress, joinedat, iswinner, winningrank')
+            .eq('tournamentid', tournamentId)
+            .order('joinedat', { ascending: true });
 
         if (error) {
             console.error('Error fetching participants:', error);

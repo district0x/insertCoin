@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAddress, useConnectionStatus } from "@thirdweb-dev/react";
-import { WalletConnectWrapper } from '@/components/WalletConnectWrapper';
 import { AuthButton } from '@/components/AuthButton';
-import { useAuth } from '@/hooks/useAuth';
+import { usePrivy } from '@privy-io/react-auth';
 import { useTournamentContract } from '@/hooks/useTournamentContract';
 import Link from 'next/link';
 import { ethers } from 'ethers';
+import PrivyLogin from '@/components/PrivyLogin';
 
 export default function AdminSettings() {
     const router = useRouter();
@@ -22,7 +22,7 @@ export default function AdminSettings() {
 
     const address = useAddress();
     const connectionStatus = useConnectionStatus();
-    const { isAuthenticated, signIn } = useAuth();
+    const { authenticated: isAuthenticated, login: signIn } = usePrivy();
     const { isAdmin: checkIsAdmin } = useTournamentContract();
 
     // Check if current user is admin on component mount
@@ -119,7 +119,7 @@ export default function AdminSettings() {
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <WalletConnectWrapper />
+                        <PrivyLogin />
                         {address && <AuthButton />}
                     </div>
                 </div>
@@ -129,7 +129,7 @@ export default function AdminSettings() {
                     <div className="bg-yellow-50 p-6 rounded-lg border border-yellow-200 mb-6">
                         <h2 className="text-xl font-semibold text-yellow-800 mb-2">Authentication Required</h2>
                         <p className="mb-4">Please connect your wallet to access the admin settings.</p>
-                        <WalletConnectWrapper />
+                        <PrivyLogin />
                     </div>
                 )}
 
@@ -197,8 +197,8 @@ export default function AdminSettings() {
                                         type="submit"
                                         disabled={isProcessing}
                                         className={`w-full py-2 px-4 rounded font-medium ${isProcessing
-                                                ? 'bg-gray-400 cursor-not-allowed text-white'
-                                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                                            ? 'bg-gray-400 cursor-not-allowed text-white'
+                                            : 'bg-blue-600 text-white hover:bg-blue-700'
                                             }`}
                                     >
                                         {isProcessing ? 'Processing...' : 'Add Admin'}
@@ -231,8 +231,8 @@ export default function AdminSettings() {
                                         type="submit"
                                         disabled={isProcessing}
                                         className={`w-full py-2 px-4 rounded font-medium ${isProcessing
-                                                ? 'bg-gray-400 cursor-not-allowed text-white'
-                                                : 'bg-green-600 text-white hover:bg-green-700'
+                                            ? 'bg-gray-400 cursor-not-allowed text-white'
+                                            : 'bg-green-600 text-white hover:bg-green-700'
                                             }`}
                                     >
                                         {isProcessing ? 'Processing...' : 'Update Multisig'}

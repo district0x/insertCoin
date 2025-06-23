@@ -1,35 +1,27 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export async function POST(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const tournamentId = params.id;
-        const {
-            winners,
-            txHash
-        } = await request.json();
+        const { id: tournamentId } = await params;
+        const { winners, txHash } = await request.json();
 
-        // Validate required fields
-        if (!tournamentId || !Array.isArray(winners) || winners.length === 0) {
+        if (!winners || !Array.isArray(winners)) {
             return NextResponse.json(
-                { error: 'Missing required fields or invalid winners format' },
+                { error: 'Winners array is required' },
                 { status: 400 }
             );
         }
 
-        // Extract wallet addresses from winners array
-        const winnerAddresses = winners.map(w => w.address);
-
-        // Update tournament record in Supabase
-        const { data, error } = await supabase
+        // Update tournament status
+        const { data, error } = await supabaseAdmin
             .from('Tournament')
             .update({
                 status: 'COMPLETED',
-                winnerAddresses,
-                updatedAt: new Date().toISOString()
+                completed_at: new Date().toISOString()
             })
             .eq('tournamentId', tournamentId)
             .select()
@@ -47,23 +39,57 @@ export async function POST(
         for (let i = 0; i < winners.length; i++) {
             const winner = winners[i];
             try {
-                await supabase
+                await supabaseAdmin
                     .from('TournamentParticipant')
                     .update({
-                        isWinner: true,
-                        winningRank: i + 1
+                        is_winner: true,
+                        prize_amount: winner.amount || '0'
                     })
-                    .eq('tournamentId', tournamentId)
-                    .eq('walletAddress', winner.address);
+                    .eq('tournamentid', tournamentId)
+                    .eq('walletaddress', winner.address);
             } catch (err) {
                 console.warn(`Warning: Failed to update participant status for ${winner.address}`, err);
                 // Continue with other winners even if one update fails
             }
         }
 
+        // ADDITION: Insert records into winner_payments for reliability
+        try {
+            const { data: tournamentData } = await supabaseAdmin
+                .from('Tournament')
+                .select('totalPrize, tokenAddress')
+                .eq('tournamentId', tournamentId)
+                .single();
+
+            if (tournamentData) {
+                const winnerPaymentRecords = winners.map(winner => ({
+                    tournament_id: tournamentId,
+                    winner_address: winner.address,
+                    winner_name: winner.name,
+                    amount: winner.amount || '0',
+                    percentage: winner.percentage,
+                    token_address: tournamentData.tokenAddress,
+                    transaction_hash: txHash,
+                    game_type: 'tournament',
+                    total_prize_pool: tournamentData.totalPrize,
+                }));
+
+                const { error: paymentError } = await supabaseAdmin
+                    .from('winner_payments')
+                    .insert(winnerPaymentRecords);
+
+                if (paymentError) {
+                    console.error('Error inserting into winner_payments:', paymentError);
+                    // Non-fatal: Log error but don't block the response
+                }
+            }
+        } catch (paymentInsertError) {
+            console.error('Failed to prepare or insert winner payments:', paymentInsertError);
+        }
+
         // Insert results into game history/leaderboard
         try {
-            await supabase
+            await supabaseAdmin
                 .from('GameResults')
                 .insert([{
                     tournamentId,
@@ -100,13 +126,13 @@ export async function POST(
 // Get tournament results by tournamentId
 export async function GET(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const tournamentId = params.id;
+        const { id: tournamentId } = await params;
 
         // Get tournament details
-        const { data: tournament, error: tournamentError } = await supabase
+        const { data: tournament, error: tournamentError } = await supabaseAdmin
             .from('Tournament')
             .select('*')
             .eq('tournamentId', tournamentId)
@@ -123,7 +149,7 @@ export async function GET(
         // Get winners if available
         let winners = [];
         if (tournament.winnerAddresses && tournament.winnerAddresses.length > 0) {
-            const { data: winnerParticipants, error: winnersError } = await supabase
+            const { data: winnerParticipants, error: winnersError } = await supabaseAdmin
                 .from('TournamentParticipant')
                 .select('*')
                 .eq('tournamentId', tournamentId)
@@ -136,7 +162,7 @@ export async function GET(
         }
 
         // Get game results
-        const { data: gameResults, error: gameResultsError } = await supabase
+        const { data: gameResults, error: gameResultsError } = await supabaseAdmin
             .from('GameResults')
             .select('*')
             .eq('tournamentId', tournamentId)

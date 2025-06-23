@@ -150,6 +150,7 @@ app.prepare().then(() => {
                     id: existingPlayer.id,
                     name: playerName,
                     roomId,
+                    isHost: socket.id === room.hostSocketId,
                     walletAddress: existingPlayer.walletAddress // Include wallet address in info
                 });
 
@@ -181,6 +182,7 @@ app.prepare().then(() => {
                     id: playerId,
                     name: playerName,
                     roomId,
+                    isHost: socket.id === room.hostSocketId,
                     walletAddress // Include wallet address in player info
                 });
 
@@ -229,6 +231,7 @@ app.prepare().then(() => {
                     socket.emit('player-info', {
                         id: playerId,
                         name: playerName,
+                        isHost: socket.id === room.hostSocketId,
                         roomId
                     });
 
@@ -308,12 +311,12 @@ app.prepare().then(() => {
 
         // Handle game start
         socket.on('start-game', (roomId) => {
-            console.log(`GAME STARTED - Room: ${roomId}`);
+            console.log(`🎮 GAME STARTED - Room: ${roomId}`);
 
             if (gameRooms.has(roomId)) {
                 const room = gameRooms.get(roomId);
-                console.log(`Current room settings for ${roomId}:`, room.settings);
-                console.log(`Current players in room ${roomId}:`, room.players.map(p => p.name));
+                console.log(`📊 Current room settings for ${roomId}:`, room.settings);
+                console.log(`👥 Current players in room ${roomId}:`, room.players.map(p => p.name));
                 room.status = 'in-progress';
 
                 // Reset all players' eliminated status and scores when starting a new game
@@ -322,27 +325,52 @@ app.prepare().then(() => {
                     player.score = 0;
                 });
 
+                // Reset question state
+                room.questions = [];
+                room.currentQuestionIndex = 0;
+                room.playerAnswers = new Set();
+                room.questionsLoaded = false;
+                room.gameEnding = false;
+
                 gameRooms.set(roomId, room);
-                console.log(`Broadcasting game-started event to room ${roomId}`);
+                console.log(`📡 Broadcasting game-started event to room ${roomId}`);
                 io.to(roomId).emit('game-started');
+            } else {
+                console.error(`❌ Room ${roomId} not found when starting game`);
             }
         });
 
         // Store questions received from client
         socket.on('questions-loaded', (roomId, questions) => {
-            console.log(`QUESTIONS LOADED - Room: ${roomId}, Count: ${questions.length}`);
+            console.log(`📚 QUESTIONS LOADED - Room: ${roomId}, Count: ${questions.length}`);
 
             if (gameRooms.has(roomId)) {
                 const room = gameRooms.get(roomId);
+
+                // Validate questions data
+                if (!questions || !Array.isArray(questions) || questions.length === 0) {
+                    console.error(`❌ Invalid questions data received for room ${roomId}:`, questions);
+                    return;
+                }
+
+                console.log(`✅ Valid questions received for room ${roomId}:`, {
+                    count: questions.length,
+                    firstQuestion: questions[0]?.question?.substring(0, 50) + '...',
+                    categories: [...new Set(questions.map(q => q.category))]
+                });
+
                 room.questions = questions;
                 room.currentQuestionIndex = 0;
                 room.playerAnswers = new Set(); // Initialize answer tracking
+                room.questionsLoaded = true; // Mark that questions are loaded
 
                 gameRooms.set(roomId, room);
 
                 // Broadcast to all clients that questions have been loaded
-                console.log(`Broadcasting ${questions.length} questions to all players in room ${roomId}`);
+                console.log(`📡 Broadcasting ${questions.length} questions to all players in room ${roomId}`);
                 io.to(roomId).emit('questions-ready', room.currentQuestionIndex, questions);
+            } else {
+                console.error(`❌ Room ${roomId} not found when loading questions`);
             }
         });
 
@@ -369,17 +397,32 @@ app.prepare().then(() => {
 
         // Handle player answers
         socket.on('answer-submitted', (roomId, playerId, playerName, isCorrect, score, isEliminated) => {
-            console.log(`ANSWER SUBMITTED - Room: ${roomId}, Player: ${playerName}(${playerId}), Correct: ${isCorrect}, Score: ${score}, Eliminated: ${isEliminated ? 'YES' : 'NO'}`);
+            console.log(`🎯 ANSWER SUBMITTED - Room: ${roomId}, Player: ${playerName}(${playerId}), Correct: ${isCorrect}, Score: ${score}, Eliminated: ${isEliminated ? 'YES' : 'NO'}`);
 
             // Log what the client sent for debugging
-            console.log(`Time received: ${new Date().toISOString()}`);
+            console.log(`⏰ Time received: ${new Date().toISOString()}`);
 
             if (gameRooms.has(roomId)) {
                 const room = gameRooms.get(roomId);
 
+                // CRITICAL FIX: Do not process answers if questions have not been loaded for the room.
+                // This prevents the game from ending prematurely if there's a race condition.
+                if (!room.questions || room.questions.length === 0) {
+                    console.error(`🚨 [CRITICAL] Answer submitted for room ${roomId}, but no questions are loaded. Aborting.`);
+                    console.error(`📊 Room state:`, {
+                        questionsLoaded: room.questionsLoaded,
+                        questionsCount: room.questions?.length || 0,
+                        currentQuestionIndex: room.currentQuestionIndex,
+                        gameStatus: room.status
+                    });
+                    return;
+                }
+
+                console.log(`✅ Questions available for room ${roomId}: ${room.questions.length} questions, current index: ${room.currentQuestionIndex}`);
+
                 // Check if this answer was already processed (prevent duplicates)
                 if (room.playerAnswers && room.playerAnswers.has(playerId)) {
-                    console.log(`DUPLICATE ANSWER from ${playerName} - ignoring`);
+                    console.log(`🔄 DUPLICATE ANSWER from ${playerName} - ignoring`);
                     return;
                 }
 
@@ -432,27 +475,37 @@ app.prepare().then(() => {
 
                 // If all players have answered, tell clients they can proceed
                 if (allPlayersAnswered) {
-                    console.log(`All players (${room.playerAnswers.size}/${activePlayerCount}) have answered. Sending all-answered signal.`);
+                    console.log(`✅ All players (${room.playerAnswers.size}/${activePlayerCount}) have answered. Sending all-answered signal.`);
                     io.to(roomId).emit('all-players-answered');
 
                     // Only check for game end when all players have answered 
                     // AND if we're on the last question
                     if (room.currentQuestionIndex >= room.questions.length - 1) {
                         // Only the host should trigger the game end
-                        console.log(`Final question completed and all players answered. Signaling game end.`);
+                        console.log(`🏁 Final question completed and all players answered. Signaling game end.`);
+                        console.log(`📊 Game end check:`, {
+                            currentQuestionIndex: room.currentQuestionIndex,
+                            totalQuestions: room.questions.length,
+                            isLastQuestion: room.currentQuestionIndex >= room.questions.length - 1,
+                            gameEnding: room.gameEnding
+                        });
 
                         if (!room.gameEnding) {
                             room.gameEnding = true;
                             gameRooms.set(roomId, room);
 
-                            console.log(`Game ended in room ${roomId}`);
+                            console.log(`🎉 Game ended in room ${roomId}`);
                             room.status = 'completed';
                             storeGameResult(roomId, room.players);
                             io.to(roomId).emit('game-over', room.players);
                         } else {
-                            console.log(`Game end already in progress for room ${roomId} - ignoring duplicate trigger`);
+                            console.log(`⚠️ Game end already in progress for room ${roomId} - ignoring duplicate trigger`);
                         }
+                    } else {
+                        console.log(`⏭️ Not the last question yet. Current: ${room.currentQuestionIndex + 1}/${room.questions.length}`);
                     }
+                } else {
+                    console.log(`⏳ Waiting for more answers. ${room.playerAnswers.size}/${activePlayerCount} players have answered.`);
                 }
             }
         });

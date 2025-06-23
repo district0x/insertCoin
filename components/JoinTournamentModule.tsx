@@ -2,19 +2,23 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAddress, useConnectionStatus } from "@thirdweb-dev/react";
 import { useTournamentJoin } from '@/hooks/useTournamentJoin';
 import { ethers } from 'ethers';
+import { usePrivy } from '@privy-io/react-auth';
 
 interface TournamentJoinModalProps {
     isOpen: boolean;
     onClose: () => void;
     tournamentDetails: {
         tournamentId: string;
-        entryFee: string;
+        entryFee: string; // Keep as raw value for the transaction
+        entryFeeFormatted: string; // For display
+        tokenAddress: string; // Crucial for approval flow
+        tokenSymbol: string; // For display
+        tokenDecimals: number; // To format the prize pool
         maxParticipants: number;
         currentParticipants: number;
-        totalPrize: number;
+        totalPrize: string; // Now a raw string value
         status: string;
         roomCode: string;
     };
@@ -39,17 +43,26 @@ export function TournamentJoinModal({
         joinTournamentGame
     } = useTournamentJoin();
 
-    const address = useAddress();
-    const connectionStatus = useConnectionStatus();
+    const { authenticated: isAuthenticated, user, login } = usePrivy();
+    console.log('[DEBUG] TournamentJoinModal - Privy state:', { isAuthenticated, user });
 
-    // Format entry fee and total prize for display
-    const formattedEntryFee = typeof tournamentDetails.entryFee === 'string' && tournamentDetails.entryFee.includes('.')
-        ? tournamentDetails.entryFee // Already formatted
-        : ethers.utils.formatEther(tournamentDetails.entryFee.toString() || '0'); // Format from Wei
-    const formattedTotalPrize = tournamentDetails.totalPrize.toFixed(4);
+    // Use the formatted values passed in from props
+    const {
+        entryFeeFormatted,
+        tokenSymbol,
+        totalPrize,
+        status,
+        currentParticipants,
+        maxParticipants,
+        tokenDecimals
+    } = tournamentDetails;
+
+    // Format the prize pool using the correct decimals
+    const formattedTotalPrize = ethers.utils.formatUnits(totalPrize.toString() || '0', tokenDecimals);
 
     // Reset state when modal opens
     useEffect(() => {
+        console.log('[DEBUG] TournamentJoinModal - Modal opened, resetting state');
         if (isOpen) {
             resetState();
         }
@@ -57,6 +70,7 @@ export function TournamentJoinModal({
 
     // Start join process when the modal opens
     useEffect(() => {
+        console.log('[DEBUG] TournamentJoinModal - Starting join process, step:', step);
         if (isOpen && step === 'initial') {
             startJoinProcess();
         }
@@ -64,13 +78,31 @@ export function TournamentJoinModal({
 
     // Close modal and notify parent of success
     const handleSuccess = () => {
+        console.log('[DEBUG] TournamentJoinModal - Join successful, calling onJoinSuccess');
         onJoinSuccess();
         onClose();
     };
 
     // Handle joining the tournament
     const handleJoin = async () => {
-        const success = await joinTournamentGame(tournamentDetails, playerName);
+        console.log('[DEBUG] TournamentJoinModal - handleJoin called');
+        if (!isAuthenticated) {
+            console.log('[DEBUG] TournamentJoinModal - User not authenticated, prompting login');
+            alert('Please sign in with your wallet to join a tournament');
+            await login();
+            return;
+        }
+        if (!user?.wallet?.address) {
+            console.log('[DEBUG] TournamentJoinModal - No wallet address available');
+            alert('Please connect your wallet to join a tournament');
+            return;
+        }
+        console.log('[DEBUG] Calling joinTournamentGame with:', tournamentDetails);
+        const success = await joinTournamentGame(
+            tournamentDetails, // This object contains the required `tokenAddress`
+            playerName
+        );
+        console.log('[DEBUG] TournamentJoinModal - joinTournamentGame result:', success);
         if (success) {
             handleSuccess();
         }
@@ -78,10 +110,13 @@ export function TournamentJoinModal({
 
     // Handle authentication
     const handleAuthenticate = async () => {
-        await authenticate();
+        console.log('[DEBUG] TournamentJoinModal - handleAuthenticate called');
+        await login();
     };
 
     if (!isOpen) return null;
+
+    console.log('[DEBUG] TournamentJoinModal - Rendering modal with step:', step);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
@@ -91,19 +126,19 @@ export function TournamentJoinModal({
                 <div className="mb-6 space-y-3">
                     <div className="flex justify-between">
                         <span className="font-medium">Entry Fee:</span>
-                        <span>{formattedEntryFee} ETH</span>
+                        <span>{entryFeeFormatted} {tokenSymbol}</span>
                     </div>
                     <div className="flex justify-between">
                         <span className="font-medium">Total Prize Pool:</span>
-                        <span>{formattedTotalPrize} ETH</span>
+                        <span>{formattedTotalPrize} {tokenSymbol}</span>
                     </div>
                     <div className="flex justify-between">
                         <span className="font-medium">Players:</span>
-                        <span>{tournamentDetails.currentParticipants} / {tournamentDetails.maxParticipants}</span>
+                        <span>{currentParticipants} / {maxParticipants}</span>
                     </div>
                     <div className="flex justify-between">
                         <span className="font-medium">Status:</span>
-                        <span className="capitalize">{tournamentDetails.status.toLowerCase()}</span>
+                        <span className="capitalize">{status.toLowerCase()}</span>
                     </div>
                 </div>
 
@@ -114,7 +149,7 @@ export function TournamentJoinModal({
                 )}
 
                 <div className="space-y-4">
-                    {step === 'connecting' && connectionStatus !== "connected" && (
+                    {step === 'connecting' && (
                         <div className="text-center">
                             <p className="mb-2">Please connect your wallet to continue</p>
                             <p className="text-sm text-gray-500">If a wallet connection dialog doesn't appear, please check your wallet extension</p>
@@ -131,6 +166,20 @@ export function TournamentJoinModal({
                         </button>
                     )}
 
+                    {step === 'approving' && (
+                        <div className="text-center p-2 bg-blue-50 text-blue-700 rounded-md">
+                            <div className="font-bold">Permission Required</div>
+                            <p className="text-sm">Please approve the transaction in your wallet to allow the contract to use your {tournamentDetails.tokenSymbol}.</p>
+                        </div>
+                    )}
+
+                    {step === 'approved' && (
+                        <div className="text-center p-2 bg-green-50 text-green-700 rounded-md">
+                            <div className="font-bold">Approval Successful!</div>
+                            <p className="text-sm">You can now join the tournament.</p>
+                        </div>
+                    )}
+
                     {step === 'joining' && (
                         <button
                             className={`w-full py-2 px-4 rounded font-medium ${isLoading
@@ -140,7 +189,7 @@ export function TournamentJoinModal({
                             onClick={handleJoin}
                             disabled={isLoading}
                         >
-                            {isLoading ? 'Joining Tournament...' : `Join Tournament (${formattedEntryFee} ETH)`}
+                            {isLoading ? 'Joining Tournament...' : `Join Tournament (${entryFeeFormatted} ${tokenSymbol})`}
                         </button>
                     )}
 

@@ -2,9 +2,9 @@
 'use client';
 
 import React from 'react';
-import { ThirdwebProvider, metamaskWallet, coinbaseWallet, walletConnect } from "@thirdweb-dev/react";
-import { BaseSepoliaTestnet } from "@thirdweb-dev/chains";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { PrivyProvider } from '@privy-io/react-auth';
+import { privyConfig } from '@/lib/privy';
 
 // Create a shared QueryClient instance that all components will use
 const queryClient = new QueryClient({
@@ -19,18 +19,22 @@ const queryClient = new QueryClient({
 export function Providers({ children }: { children: React.ReactNode }) {
     return (
         <QueryClientProvider client={queryClient}>
-            <ThirdwebProvider
-                clientId={process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || ""}
-                activeChain={BaseSepoliaTestnet}
-                supportedWallets={[
-                    metamaskWallet(),
-                    coinbaseWallet(),
-                    walletConnect()
-                ]}
-                queryClient={queryClient} // Pass the queryClient to ThirdwebProvider
+            <PrivyProvider
+                appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || ""}
+                config={{
+                    ...privyConfig,
+                    appearance: {
+                        ...privyConfig.appearance,
+                        showWalletLoginFirst: false,
+                    },
+                    embeddedWallets: {
+                        ...privyConfig.embeddedWallets,
+                        createOnLogin: 'all-users',
+                    },
+                }}
             >
                 {children}
-            </ThirdwebProvider>
+            </PrivyProvider>
         </QueryClientProvider>
     );
 }
