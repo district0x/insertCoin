@@ -19,8 +19,12 @@ def create_match_embed(match, creator: discord.User) -> discord.Embed:
         "FIVE_V_FIVE": "5v5"
     }
     
+    # Use Room ID for display and URLs
+    room_id_display = match.roomId[:8] + "..." if match.roomId else "N/A"
+    match_id_display = f"#{match.matchId}" if match.matchId else "Pending"
+    
     embed = discord.Embed(
-        title=f"Match #{match.matchId}",
+        title=f"Room {room_id_display} ({match_id_display})",
         description=(
             f"A new {match_types.get(match.matchType, match.matchType)} match has been created!\n"
             f"Join this match to compete and win rewards!"
@@ -36,7 +40,8 @@ def create_match_embed(match, creator: discord.User) -> discord.Embed:
             f"**Status:** {match.status}\n"
             f"**Stake:** {match.stake} ETH\n"
             f"**Prize Pool:** {match.stake} ETH\n"
-            f"**Created By** {creator.mention}"
+            f"**Created By:** {creator.mention}\n"
+            f"**Room ID:** `{match.roomId}`"
         ),
         inline=False
     )
@@ -61,8 +66,79 @@ def create_match_embed(match, creator: discord.User) -> discord.Embed:
         inline=False
     )
     
-    # Add footer with match ID and timestamp
-    embed.set_footer(text=f"Match ID: {match.matchId}. Created {discord.utils.format_dt(match.createdAt, style='R')}")
+    # Add footer with Room ID and timestamp
+    embed.set_footer(text=f"Room ID: {match.roomId}. Created {discord.utils.format_dt(match.createdAt, style='R')}")
+    
+    return embed
+
+def create_enhanced_match_embed(match, creator: discord.User) -> discord.Embed:
+    """Create an enhanced embed for match information with more details."""
+    status_colors = {
+        "PENDING": discord.Color.yellow(),
+        "OPEN": discord.Color.green(),
+        "FILLED": discord.Color.blue(),
+        "COMPLETED": discord.Color.purple(),
+        "CANCELLED": discord.Color.red()
+    }
+    
+    match_types = {
+        "ONE_V_ONE": "1v1",
+        "TWO_V_TWO": "2v2",
+        "FIVE_V_FIVE": "5v5"
+    }
+    
+    # Use Room ID for display and URLs
+    room_id_display = match.roomId[:8] + "..." if match.roomId else "N/A"
+    match_id_display = f"#{match.matchId}" if match.matchId else "Pending"
+    
+    embed = discord.Embed(
+        title=f"🎮 {match_types.get(match.matchType, match.matchType)} Match Created!",
+        description=(
+            f"**Room {room_id_display} ({match_id_display})**\n\n"
+            f"A new competitive match has been set up! Ready to challenge your opponent?"
+        ),
+        color=status_colors.get(match.status, discord.Color.blue())
+    )
+    
+    # Game Details Section
+    if match.game and match.platform:
+        embed.add_field(
+            name="🎯 Game Details",
+            value=(
+                f"**Game:** {match.game}\n"
+                f"**Category:** {match.gameCategory}\n"
+                f"**Platform:** {match.platform}\n"
+                f"**Match Amount:** ${match.matchAmountUsd} USD"
+            ),
+            inline=True
+        )
+    
+    # Match Details Section
+    embed.add_field(
+        name="💰 Match Details",
+        value=(
+            f"**Type:** {match_types.get(match.matchType, match.matchType)}\n"
+            f"**Status:** {match.status}\n"
+            f"**Stake:** {match.stake} ETH\n"
+            f"**Prize Pool:** {match.totalPrize} ETH\n"
+            f"**Created By:** {creator.mention}"
+        ),
+        inline=True
+    )
+    
+    # Room ID Section
+    embed.add_field(
+        name="🔑 Room Information",
+        value=(
+            f"**Room ID:** `{match.roomId}`\n"
+            f"**Channel:** <#{match.discordChannelId}>\n"
+            f"**Created:** {discord.utils.format_dt(match.createdAt, style='R')}"
+        ),
+        inline=False
+    )
+    
+    # Add footer with Room ID and timestamp
+    embed.set_footer(text=f"Room ID: {match.roomId} • Created {discord.utils.format_dt(match.createdAt, style='R')}")
     
     return embed
 
@@ -220,8 +296,12 @@ def create_match_info_embed(match, creator: discord.User) -> discord.Embed:
         "FIVE_V_FIVE": "5v5"
     }
     
+    # Use Room ID for display and URLs
+    room_id_display = match.roomId[:8] + "..." if match.roomId else "N/A"
+    match_id_display = f"#{match.matchId}" if match.matchId else "Pending"
+    
     embed = discord.Embed(
-        title=f"Match #{match.matchId}",
+        title=f"Room {room_id_display} ({match_id_display})",
         description=f"{match_types.get(match.matchType, match.matchType)} Match Details",
         color=status_colors.get(match.status, discord.Color.default())
     )
@@ -236,7 +316,8 @@ def create_match_info_embed(match, creator: discord.User) -> discord.Embed:
             f"**Prize Pool:** {match.totalPrize} ETH\n"
             f"**Platform:** {match.platform}\n"
             f"**Game:** {match.game} ({match.gameCategory})\n"
-            f"**Match Amount:** ${match.matchAmountUsd} USD"
+            f"**Match Amount:** ${match.matchAmountUsd} USD\n"
+            f"**Room ID:** `{match.roomId}`"
         ),
         inline=False
     )
@@ -257,15 +338,22 @@ def create_match_info_embed(match, creator: discord.User) -> discord.Embed:
         inline=False
     )
     
-    # Match Link
-    frontend_match_url = config.get_frontend_url(f"matches/{match.matchId}")
-    embed.add_field(
-        name="Match Link",
-        value=f"[View Match on Website]({frontend_match_url})",
-        inline=False
-    )
+    # Match Link - use matchId if available, otherwise show pending message
+    if match.matchId:
+        frontend_match_url = config.get_frontend_url(f"matches/{match.matchId}")
+        embed.add_field(
+            name="Match Link",
+            value=f"[View Match on Website]({frontend_match_url})",
+            inline=False
+        )
+    else:
+        embed.add_field(
+            name="Match Status",
+            value="⏳ Match is pending creation on the blockchain. Use the setup button to create it.",
+            inline=False
+        )
     
-    # Add footer with match ID and timestamp
-    embed.set_footer(text=f"Match ID: {match.matchId}. Created {discord.utils.format_dt(match.createdAt, style='R')}")
+    # Add footer with Room ID and timestamp
+    embed.set_footer(text=f"Room ID: {match.roomId}. Created {discord.utils.format_dt(match.createdAt, style='R')}")
     
     return embed

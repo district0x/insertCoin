@@ -72,14 +72,14 @@ class MatchCog(commands.Cog, name="Match"):
         )
 
     @app_commands.command(name="match-info")
-    @app_commands.describe(match_id="ID of the match to get info about")
+    @app_commands.describe(room_id="Room ID of the match to get info about")
     async def match_info(
         self,
         interaction: discord.Interaction,
-        match_id: str
+        room_id: str
     ):
         """Get information about a specific match."""
-        await handle_match_info(interaction, self.bot, match_id)
+        await handle_match_info(interaction, self.bot, room_id)
 
     @app_commands.command(name="stats")
     async def stats(self, interaction: discord.Interaction):

@@ -77,18 +77,18 @@ async def handle_create_match(
 async def handle_match_info(
     interaction: discord.Interaction,
     bot,
-    match_id: str
+    room_id: str
 ):
     """Handle the match-info command."""
     await interaction.response.defer()
     
     try:
-        logger.info(f"Handling match info request for match ID: {match_id}")
-        match = await get_match_info(match_id)
+        logger.info(f"Handling match info request for Room ID: {room_id}")
+        match = await get_match_info(room_id)
         
         if not match:
             await interaction.followup.send(
-                f"Match #{match_id} not found. Please check the match ID and try again.",
+                f"Match with Room ID {room_id} not found. Please check the Room ID and try again.",
                 ephemeral=True
             )
             return
@@ -109,13 +109,8 @@ async def handle_match_info(
         # Use create_match_info_embed for viewing match details
         embed = create_match_info_embed(match, creator)
         await interaction.followup.send(embed=embed)
-        logger.info(f"Successfully sent match info for match #{match_id}")
+        logger.info(f"Successfully sent match info for Room ID {room_id}")
         
-    except ValueError:
-        await interaction.followup.send(
-            "Invalid match ID format. Please provide a valid number.",
-            ephemeral=True
-        )
     except Exception as e:
         logger.error(f"Error handling match info: {e}", exc_info=True)
         await interaction.followup.send(

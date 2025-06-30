@@ -95,12 +95,16 @@ class ContractClient:
             raise RuntimeError("Web3 not initialized. Call connect() first.")
         return self._w3
         
-    def verify_wallet(self, address: str, signature: str) -> bool:
+    def verify_wallet(self, address: str, signature: str, message: str = None) -> bool:
         """Verify wallet ownership using signature."""
         try:
             self.ensure_connection()
+            
+            # Use custom message if provided, otherwise use default
+            if message is None:
+                message = f"Link Discord account to wallet {address}"
+            
             # Create message hash
-            message = f"Link Discord account to wallet {address}"
             message_hash = encode_defunct(text=message)
             
             # Recover signer address

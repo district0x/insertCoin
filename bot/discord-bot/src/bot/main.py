@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 
 from src.db.prisma import prisma
 from src.web3.contract import contract
+from src.utils.config import config
 
 # Load environment variables
 env_path = Path(__file__).parent.parent.parent / '.env'
@@ -35,17 +36,18 @@ class OneVOneBot(commands.Bot):
         
     async def setup_hook(self):
         """Setup hook that runs when the bot starts."""
-        # Initialize database connection
-        prisma.connect()
+        # Initialize database connection with proper connection string FIRST
+        prisma.connect(config.DATABASE_URL)
         logger.info("Database connection initialized")
         
         # Initialize blockchain connection
         contract.connect()
         logger.info("Blockchain connection initialized")
         
-        # Load cogs
+        # Load cogs AFTER database is connected
         await self.load_extension('src.bot.cogs.match')
         await self.load_extension('src.bot.cogs.utils')
+        # Removed wallet_verification cog - wallet linking system removed
         logger.info('Bot cogs loaded successfully')
         
         # Sync commands with Discord

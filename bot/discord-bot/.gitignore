@@ -67,4 +67,23 @@ config.json
 token.txt
 *.db
 *.sqlite
-*.sqlite3 
+*.sqlite3
+
+# Test scripts and old helpers
+run_migration.py
+run_cleanup.py
+test_*.py
+src/bot/cogs/simple_wallet_linking.py
+src/bot/cogs/wallet_verification.py
+
+# Prisma migrations (if not needed in repo)
+prisma/migrations/
+
+# Local environment files
+.env
+.env.*
+
+# VSCode and OS files
+.vscode/
+.DS_Store
+Thumbs.db 

@@ -1,13 +1,15 @@
-"""Utility functions for match-related functionality."""
-
 import logging
+import time
+import uuid
 from dataclasses import dataclass
-from typing import Optional, List, Dict
+from typing import Dict, List, Optional
 
 import discord
+from discord.ext import commands
+
 from src.db.prisma import prisma
-from src.web3.contract import contract
-from src.utils.embeds import create_match_embed, create_match_info_embed
+from src.utils.embeds import create_enhanced_match_embed
+from .components import MatchSetupView
 
 logger = logging.getLogger(__name__)
 
@@ -18,20 +20,38 @@ class ChannelInfo:
     category: discord.CategoryChannel
 
 async def create_match_channel(interaction: discord.Interaction) -> ChannelInfo:
-    """Create a match channel and return channel info."""
-    logger.info("Creating match channel...")
-    category = discord.utils.get(interaction.guild.categories, name="Matches")
-    if not category:
-        logger.info("Matches category not found, creating new one...")
-        category = await interaction.guild.create_category("Matches")
+    """Create a dedicated channel for the match."""
+    try:
+        # Get the guild and category
+        guild = interaction.guild
+        if not guild:
+            raise Exception("Guild not found")
         
-    channel = await interaction.guild.create_text_channel(
-        name=f"match-pending",
-        category=category
-    )
-    logger.info(f"Created channel: {channel.name}")
-    
-    return ChannelInfo(channel=channel, category=category)
+        # Find or create the "OneVOne Matches" category
+        category_name = "OneVOne Matches"
+        category = discord.utils.get(guild.categories, name=category_name)
+        
+        if not category:
+            category = await guild.create_category(category_name)
+            logger.info(f"Created new category: {category_name}")
+        
+        # Create a unique channel name
+        timestamp = int(time.time())
+        channel_name = f"match-{timestamp}"
+        
+        # Create the channel
+        channel = await guild.create_text_channel(
+            name=channel_name,
+            category=category,
+            topic=f"Match channel created by {interaction.user.display_name}"
+        )
+        
+        logger.info(f"Created match channel: {channel.name}")
+        return ChannelInfo(channel=channel, category=category)
+        
+    except Exception as e:
+        logger.error(f"Error creating match channel: {e}", exc_info=True)
+        raise
 
 async def create_match_in_db(
     interaction: discord.Interaction,
@@ -43,47 +63,65 @@ async def create_match_in_db(
     amount: Optional[float],
     channel_info: ChannelInfo
 ) -> dict:
-    """Create a match in the database."""
-    logger.info("Getting next match ID from contract...")
-    try:
-        next_match_id = contract.contract.functions.nextMatchId().call()
-        logger.info(f"Next match ID from contract: {next_match_id}")
-    except Exception as e:
-        logger.error(f"Error getting next match ID: {e}", exc_info=True)
-        raise
+    """Create a match in the database with retry logic."""
+    max_retries = 3
     
-    match_data = {
-        "matchId": next_match_id,
-        "matchType": match_type,
-        "status": "PENDING",
-        "stake": amount or 0.0,
-        "creatorDiscordId": str(interaction.user.id),
-        "totalPrize": amount or 0.0,
-        "discordChannelId": str(channel_info.channel.id),
-        "platform": platform,
-        "gameCategory": category,
-        "game": game,
-        "matchAmountUsd": match_amount_usd
-    }
-    logger.info(f"Match data to be created: {match_data}")
-    
-    match = prisma.match.create(data=match_data)
-    logger.info(f"Match created in database: {match}")
-    
-    # Update channel name with match ID
-    await channel_info.channel.edit(name=f"match-{match.id[:8]}")
-    
-    return match
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Creating match in database (attempt {attempt + 1})")
+            
+            # Generate a unique Room ID (UUID)
+            room_id = str(uuid.uuid4())
+            logger.info(f"Generated Room ID: {room_id}")
+            
+            # Create match data with roomId instead of matchId
+            match_data = {
+                "roomId": room_id,
+                "matchType": match_type,
+                "status": "PENDING",
+                "creatorDiscordId": str(interaction.user.id),
+                "stake": amount or 0.0,
+                "totalPrize": amount or 0.0,
+                "discordChannelId": str(channel_info.channel.id),
+                "game": game,
+                "gameCategory": category,
+                "matchAmountUsd": match_amount_usd,
+                "platform": platform,
+            }
+            
+            # Create the match
+            match = prisma.match.create(data=match_data)
+            logger.info(f"Successfully created match with Room ID: {room_id}")
+            return match
+            
+        except Exception as e:
+            error_msg = str(e)
+            logger.warning(f"Attempt {attempt + 1} failed: {error_msg}")
+            
+            if "prepared statement" in error_msg and attempt < max_retries - 1:
+                logger.info(f"Prepared statement error, resetting connection and retrying...")
+                prisma.reset_connection()
+                time.sleep(2 ** attempt)  # Exponential backoff
+                continue
+            elif attempt < max_retries - 1:
+                logger.info(f"Database error, retrying in {2 ** attempt} seconds...")
+                time.sleep(2 ** attempt)  # Exponential backoff
+                continue
+            else:
+                logger.error(f"Failed to create match after {max_retries} attempts: {e}")
+                raise
 
 async def create_match_embeds(
     interaction: discord.Interaction,
     match: dict,
     channel_info: ChannelInfo
 ):
-    """Create and send match embeds."""
-    # Create and send match embed for new match creation
-    embed = create_match_embed(match, interaction.user)  # Use create_match_embed for new match creation
-    match_message = await channel_info.channel.send(embed=embed)
+    """Create and send enhanced match embeds with setup button."""
+    # Create and send enhanced match embed with button
+    embed = create_enhanced_match_embed(match, interaction.user)
+    view = MatchSetupView(match.roomId, match.matchAmountUsd or 0)
+    
+    match_message = await channel_info.channel.send(embed=embed, view=view)
     await match_message.pin()
     
     # Send welcome message with game details
@@ -94,10 +132,12 @@ async def create_match_embeds(
             "1️⃣ **Match Details**\n"
             f"• Platform: {match.platform}\n"
             f"• Game: {match.game} ({match.gameCategory})\n"
-            f"• Match Amount: ${match.matchAmountUsd} USD\n\n"
-            "2️⃣ **Create the Match on Website**\n"
-            f"• Use the link in the pinned message above to create your match\n"
-            "• Set your match parameters and stake amount\n\n"
+            f"• Match Amount: ${match.matchAmountUsd} USD\n"
+            f"• Room ID: `{match.roomId}`\n\n"
+            "2️⃣ **Setup Your Match**\n"
+            f"• Click the '⚡ Setup Match' button above\n"
+            f"• Follow the instructions in the modal\n"
+            f"• Connect your wallet and set stake amount\n\n"
             "3️⃣ **Share with Opponent**\n"
             "• Once created, share the match link with your opponent\n"
             "• Use this channel to coordinate game details\n\n"
@@ -241,13 +281,13 @@ async def get_opponent_record(user_id: str, opponent_id: str) -> Optional[Dict]:
         "recent_matches": recent_matches
     }
 
-async def get_match_info(match_id: str) -> Optional[Dict]:
-    """Get information about a specific match."""
+async def get_match_info(room_id: str) -> Optional[Dict]:
+    """Get information about a specific match by Room ID."""
     try:
-        logger.info(f"Fetching match info for match ID: {match_id}")
+        logger.info(f"Fetching match info for Room ID: {room_id}")
         match = prisma.match.find_first(
             where={
-                "matchId": int(match_id)  # Convert string ID to integer
+                "roomId": room_id
             }
         )
         logger.info(f"Found match: {match}")

@@ -8,6 +8,7 @@ datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+  relationMode = "prisma"
 }
 
 model User {
@@ -21,14 +22,16 @@ model User {
   totalWins             Int                     @default(0)
   totalLosses           Int                     @default(0)
   matchesCreated        Match[]                 @relation("Creator")
+  participatedMatches   Match[]                 @relation("Participant")
   TeamMember            TeamMember[]
-  Participant           Participant[]
   TournamentParticipant TournamentParticipant[]
+  verificationTransactions VerificationTransaction[]
 }
 
 model Match {
   id                String        @id @default(uuid())
-  matchId           Int           @unique
+  roomId            String?       @unique
+  matchId           Int?          @unique
   matchType         MatchType
   status            MatchStatus   @default(PENDING)
   createdAt         DateTime      @default(now())
@@ -47,10 +50,11 @@ model Match {
   platform          String?
   winnerId          String?
   creator           User?         @relation("Creator", fields: [creatorId], references: [id])
+  participants      User[]        @relation("Participant")
   teams             Team[]
-  Participant       Participant[]
 
   @@index([matchId])
+  @@index([roomId])
   @@index([creatorDiscordId])
   @@index([discordChannelId])
   @@index([opponentDiscordId])
@@ -92,17 +96,6 @@ model TeamMember {
   @@unique([teamId, userId])
 }
 
-model Participant {
-  A     String
-  B     String
-  Match Match  @relation(fields: [A], references: [id], onDelete: Cascade)
-  User  User   @relation(fields: [B], references: [id], onDelete: Cascade)
-
-  @@id([A, B], map: "_Participant_AB_pkey")
-  @@index([B], map: "_Participant_B_index")
-  @@map("_Participant")
-}
-
 model TournamentParticipant {
   A          String
   B          String
@@ -112,6 +105,24 @@ model TournamentParticipant {
   @@id([A, B], map: "_TournamentParticipant_AB_pkey")
   @@index([B], map: "_TournamentParticipant_B_index")
   @@map("_TournamentParticipant")
+}
+
+model VerificationTransaction {
+  id            String                @id @default(cuid())
+  txHash        String                @unique
+  discordId     String
+  walletAddress String
+  amount        String
+  status        VerificationStatus    @default(PENDING)
+  createdAt     DateTime              @default(now())
+  verifiedAt    DateTime?
+  
+  user          User                  @relation(fields: [discordId], references: [discordId])
+
+  @@index([txHash])
+  @@index([discordId])
+  @@index([walletAddress])
+  @@index([status])
 }
 
 enum MatchType {
@@ -134,4 +145,10 @@ enum TournamentStatus {
   IN_PROGRESS
   COMPLETED
   CANCELLED
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  FAILED
 }
