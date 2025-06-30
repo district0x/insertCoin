@@ -1,11 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { usePrivy } from "@privy-io/react-auth";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { Menu, X, LogOut, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 interface NavItem {
   href: string;
@@ -15,6 +16,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: "/matches", label: "Matches" },
   { href: "/tournaments", label: "Tournaments" },
+  { href: "/link-wallet", label: "Link Wallet" },
   { href: "/how-it-works", label: "How It Works" },
   { href: "/community", label: "Community" },
   { href: "/about", label: "About One v One" },
@@ -23,6 +25,7 @@ const navItems: NavItem[] = [
 export function Navbar() {
   const [isOpen, setIsOpen] = React.useState<boolean>(false);
   const pathname = usePathname();
+  const { login, logout, authenticated, user, ready } = usePrivy();
 
   const isActive = (path: string): boolean => pathname === path;
 
@@ -48,6 +51,14 @@ export function Navbar() {
   React.useEffect(() => {
     setIsOpen(false);
   }, [pathname]);
+
+  const handleAuthClick = () => {
+    if (authenticated) {
+      logout();
+    } else {
+      login();
+    }
+  };
 
   return (
     <header className="border-b bg-gray-900 text-white">
@@ -76,7 +87,36 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-4">
-          <ConnectButton />
+          {ready && (
+            <>
+              {authenticated ? (
+                <div className="flex items-center gap-3">
+                  <div className="hidden sm:flex items-center gap-2 text-sm">
+                    <User className="h-4 w-4" />
+                    <span>
+                      {user?.email?.address || user?.wallet?.address?.slice(0, 6) + "..." + user?.wallet?.address?.slice(-4) || "User"}
+                    </span>
+                  </div>
+                  <Button
+                    onClick={handleAuthClick}
+                    variant="outline"
+                    size="sm"
+                    className="text-white border-white/20 hover:bg-white/10"
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Disconnect
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  onClick={handleAuthClick}
+                  className="bg-indigo-600 hover:bg-indigo-700"
+                >
+                  Connect Wallet
+                </Button>
+              )}
+            </>
+          )}
 
           {/* Mobile Menu Button */}
           <button
@@ -119,6 +159,39 @@ export function Navbar() {
                 {item.label}
               </Link>
             ))}
+            {ready && (
+              <div className="pt-3 border-t border-gray-800">
+                {authenticated ? (
+                  <div className="space-y-2">
+                    <div className="px-3 py-2 text-sm text-gray-300">
+                      {user?.email?.address || user?.wallet?.address?.slice(0, 6) + "..." + user?.wallet?.address?.slice(-4) || "User"}
+                    </div>
+                    <Button
+                      onClick={() => {
+                        handleAuthClick();
+                        setIsOpen(false);
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-white border-white/20 hover:bg-white/10"
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Disconnect
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    onClick={() => {
+                      handleAuthClick();
+                      setIsOpen(false);
+                    }}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    Connect Wallet
+                  </Button>
+                )}
+              </div>
+            )}
           </nav>
         </div>
       )}

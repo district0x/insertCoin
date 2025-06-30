@@ -1,4 +1,3 @@
-import "@rainbow-me/rainbowkit/styles.css";
 import { Providers } from "@/components/providers";
 import { Navbar } from "@/components/layout/navbar";
 import { Inter } from "next/font/google";
@@ -21,7 +20,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="h-full">
-      <body className={`${inter.className} min-h-screen flex flex-col`}>
+      <body
+        className={`${inter.className} min-h-screen flex flex-col`}
+        suppressHydrationWarning={true}
+      >
         <Providers>
           <WalletGuardProvider>
             <div className="flex flex-col min-h-screen">

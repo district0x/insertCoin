@@ -3,22 +3,29 @@
 import * as React from "react";
 import Link from "next/link";
 import { useContract } from "@/lib/hooks/useContract";
-import { usePublicClient } from "wagmi";
-import { formatEther } from "viem";
+import { formatEther, createPublicClient, http } from "viem";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { OnChainTournament, TournamentStatus } from "../../types/tournament";
+import { OnChainTournament, TournamentStatus } from "@/types/tournament";
+import { baseSepolia } from "@/lib/config/chains";
 
 export default function TournamentsPage() {
   const { toast } = useToast();
   const contract = useContract();
-  const publicClient = usePublicClient();
   const [tournaments, setTournaments] = React.useState<OnChainTournament[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const hasFetchedRef = React.useRef(false);
 
-  // Fetch tournaments from the contract
+  // Create a public client for reading contract state
+  const publicClient = React.useMemo(() => {
+    return createPublicClient({
+      chain: baseSepolia,
+      transport: http(process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL!),
+    });
+  }, []);
+
+  // Fetch tournament data
   React.useEffect(() => {
     // Prevent multiple fetch attempts
     if (hasFetchedRef.current) return;
@@ -33,12 +40,11 @@ export default function TournamentsPage() {
     }, 15000); // 15 second timeout
 
     async function fetchTournaments() {
-      if (!contract || !publicClient) return;
+      if (!contract) return;
 
       try {
         hasFetchedRef.current = true;
         setIsLoading(true);
-        setError(null);
 
         // Get the next tournament ID to know how many tournaments exist
         const nextTournamentId = await publicClient.readContract({
@@ -47,25 +53,19 @@ export default function TournamentsPage() {
           functionName: "nextTournamentId",
         });
 
-        const tournamentPromises = [];
         // Fetch all tournaments
+        const tournamentPromises = [];
         for (let i = 1; i < Number(nextTournamentId); i++) {
           tournamentPromises.push(fetchTournament(i));
         }
 
         const fetchedTournaments = await Promise.all(tournamentPromises);
-        // Filter out null results
         setTournaments(
           fetchedTournaments.filter(Boolean) as OnChainTournament[]
         );
-      } catch (error) {
-        console.error("Error fetching tournaments:", error);
-        setError("Failed to load tournaments. Please try again later.");
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to fetch tournaments. Please try again later.",
-        });
+      } catch (err) {
+        console.error("Error fetching tournaments:", err);
+        setError("Failed to load tournaments");
       } finally {
         setIsLoading(false);
       }
@@ -75,7 +75,7 @@ export default function TournamentsPage() {
       tournamentId: number
     ): Promise<OnChainTournament | null> {
       try {
-        if (!publicClient || !contract) return null;
+        if (!contract) return null;
 
         const tournament = (await publicClient.readContract({
           address: contract.address,
@@ -83,22 +83,49 @@ export default function TournamentsPage() {
           functionName: "tournaments",
           args: [tournamentId],
         })) as [
-          number, // winnersPercentage
-          number, // multisigPercentage
-          boolean, // isActive
-          boolean, // hasStarted
-          boolean, // isERC20
-          boolean, // hasEntryFee
-          bigint, // numEntrants
-          bigint, // totalDonations
-          bigint, // totalTokenDonations
-          bigint, // remainingBalance
-          bigint, // entryFee
-          `0x${string}` // token
-        ];
+            number,
+            number,
+            boolean,
+            boolean,
+            boolean,
+            boolean,
+            bigint,
+            bigint,
+            bigint,
+            bigint,
+            bigint,
+            `0x${string}`
+          ];
 
-        // Get number of entrants for this tournament
-        const entrantsCount = await getEntrantsCount(tournamentId);
+        // Count current entrants by checking each entrant slot
+        // This is a bit inefficient but necessary since we need
+        // to check each entrant slot until you find an empty one
+        let entrantsCount = 0;
+        try {
+          if (!contract) return null;
+
+          const maxEntrants = 64; // Arbitrary upper limit
+
+          for (let i = 0; i < maxEntrants; i++) {
+            const entrant = await publicClient.readContract({
+              address: contract.address,
+              abi: contract.abi,
+              functionName: "tournamentEntrants",
+              args: [tournamentId, i],
+            });
+
+            if (entrant === "0x0000000000000000000000000000000000000000") {
+              break;
+            }
+            entrantsCount++;
+          }
+        } catch (e) {
+          console.error(
+            `Error counting entrants for tournament ${tournamentId}:`,
+            e
+          );
+          entrantsCount = 0;
+        }
 
         return {
           id: BigInt(tournamentId),
@@ -122,42 +149,9 @@ export default function TournamentsPage() {
             Number(tournament[6])
           ),
         };
-      } catch (error) {
-        console.error(`Error fetching tournament ${tournamentId}:`, error);
+      } catch (e) {
+        console.error(`Error fetching tournament ${tournamentId}:`, e);
         return null;
-      }
-    }
-
-    async function getEntrantsCount(tournamentId: number): Promise<number> {
-      // This is a simplification - in a real implementation, you'd need
-      // to check each entrant slot until you find an empty one
-      try {
-        if (!publicClient || !contract) return 0;
-
-        let count = 0;
-        const maxEntrants = 64; // Arbitrary upper limit
-
-        for (let i = 0; i < maxEntrants; i++) {
-          const entrant = await publicClient.readContract({
-            address: contract.address,
-            abi: contract.abi,
-            functionName: "tournamentEntrants",
-            args: [tournamentId, i],
-          });
-
-          if (entrant === "0x0000000000000000000000000000000000000000") {
-            break;
-          }
-          count++;
-        }
-
-        return count;
-      } catch (error) {
-        console.error(
-          `Error getting entrants count for tournament ${tournamentId}:`,
-          error
-        );
-        return 0;
       }
     }
 
@@ -249,7 +243,7 @@ export default function TournamentsPage() {
                       Prize Pool:{" "}
                       {formatEther(
                         tournament.totalDonations +
-                          tournament.entryFee * BigInt(tournament.numEntrants)
+                        tournament.entryFee * BigInt(tournament.numEntrants)
                       )}
                       {tournament.isERC20 ? " Tokens" : " ETH"}
                     </p>

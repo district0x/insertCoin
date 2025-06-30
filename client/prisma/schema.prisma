@@ -32,7 +32,8 @@ model User {
 // Match model
 model Match {
   id               String        @id @default(uuid())
-  matchId          Int           @unique
+  roomId           String?       @unique // Unique room ID for Discord matches
+  matchId          Int?          // Now nullable, populated after contract creation
   matchType        MatchType
   status           MatchStatus   @default(PENDING)
   createdAt        DateTime      @default(now())
@@ -65,6 +66,7 @@ model Match {
   participants     User[]        @relation("Participant")
   
   @@index([matchId])
+  @@index([roomId])
   @@index([creatorDiscordId])
   @@index([discordChannelId])
   @@index([opponentDiscordId])

@@ -3,13 +3,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { useContract } from "@/lib/hooks/useContract";
-import { usePublicClient } from "wagmi";
-import { formatEther } from "viem";
+import { formatEther, createPublicClient, http } from "viem";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import useSWR from "swr";
 import { fetchMatches } from "@/lib/match";
 import { OnChainMatch } from "@/types/match";
+import { baseSepolia } from "@/lib/config/chains";
 
 // Components
 import Welcome from "@/components/home/welcome";
@@ -17,6 +17,7 @@ import Features from "@/components/home/features";
 import TwitchCard from "@/components/home/twitch-card";
 import Tournaments from "@/components/home/tournaments";
 import { MatchStatusBadge } from "@/components/match/match-status-badge";
+
 const INITIAL_MATCHES_COUNT = 7;
 const POLLING_INTERVAL = 30000; // 30 seconds
 let lastFetchTime = 0;
@@ -24,14 +25,21 @@ let lastFetchTime = 0;
 export default function Home() {
   const { toast } = useToast();
   const contract = useContract();
-  const publicClient = usePublicClient();
   const [allMatches, setAllMatches] = React.useState<OnChainMatch[]>([]);
   const [isLoadingMore, setIsLoadingMore] = React.useState(false);
   const [hasLoadedAll, setHasLoadedAll] = React.useState(false);
 
+  // Create a public client for reading contract state
+  const publicClient = React.useMemo(() => {
+    return createPublicClient({
+      chain: baseSepolia,
+      transport: http(process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL!),
+    });
+  }, []);
+
   // Fetch initial matches using SWR for caching and revalidation
   const fetchInitialMatches = React.useCallback(async () => {
-    if (!contract || !publicClient) return [];
+    if (!contract) return [];
 
     // Rate limiting protection
     const now = Date.now();
@@ -73,7 +81,7 @@ export default function Home() {
   // Load remaining matches in the background
   React.useEffect(() => {
     const loadRemainingMatches = async () => {
-      if (!contract || !publicClient || isLoadingMore || hasLoadedAll) return;
+      if (!contract || isLoadingMore || hasLoadedAll) return;
 
       try {
         setIsLoadingMore(true);
@@ -211,11 +219,11 @@ export default function Home() {
   };
 
   return (
-		<div>
-			<Welcome />
-			<Features />
+    <div>
+      <Welcome />
+      <Features />
 
-			{/* <section className="py-20">
+      {/* <section className="py-20">
 				<div className="container mx-auto px-4">
 					<h3 className="text-3xl font-bold text-center mb-12">
 						Support the Players
@@ -232,22 +240,22 @@ export default function Home() {
 				</div>
 			</section> */}
 
-			<div className="space-y-6 max-w-7xl mx-auto px-2 mb-10">
-				<div className="flex justify-between items-center py-10">
-					<h2 className="text-3xl font-bold">Active Matches</h2>
-					<Link
-						href="/matches/create"
-						className="inline-block px-4 py-2 bg-primary text-primary-foreground rounded-md"
-					>
-						Create Match
-					</Link>
-				</div>
+      <div className="space-y-6 max-w-7xl mx-auto px-2 mb-10">
+        <div className="flex justify-between items-center py-10">
+          <h2 className="text-3xl font-bold">Active Matches</h2>
+          <Link
+            href="/matches/create"
+            className="inline-block px-4 py-2 bg-primary text-primary-foreground rounded-md"
+          >
+            Create Match
+          </Link>
+        </div>
 
-				{renderContent()}
-			</div>
+        {renderContent()}
+      </div>
 
-			<Tournaments />
-			<TwitchCard />
-		</div>
+      <Tournaments />
+      <TwitchCard />
+    </div>
   );
 }

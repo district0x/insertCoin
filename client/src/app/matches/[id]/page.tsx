@@ -3,10 +3,11 @@
 import * as React from "react";
 import { useParams } from "next/navigation";
 import { useContract } from "@/lib/hooks/useContract";
-import { usePublicClient, useWalletClient } from "wagmi";
+import { createPublicClient, http } from "viem";
 import { useWalletConnection } from "@/lib/hooks/useWalletConnection";
 import { useVisibilityChange } from "@/lib/hooks/useVisibilityChange";
 import { useEthPrice } from "@/lib/hooks/useEthPrice";
+import { baseSepolia } from "@/lib/config/chains";
 import { Card } from "@/components/ui/card";
 import { MatchDonationSuccessDialog } from "@/components/match/match-donation-success-dialog";
 import { useMatchData } from "@/hooks/useMatchData";
@@ -19,25 +20,34 @@ export default function MatchPage() {
   const params = useParams();
   const matchId = params.id as string;
   const contract = useContract();
-  const publicClient = usePublicClient();
-  const { data: walletClient } = useWalletClient();
+
+  // Create a public client for reading contract state
+  const publicClient = React.useMemo(() => {
+    return createPublicClient({
+      chain: baseSepolia,
+      transport: http(process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL!),
+    });
+  }, []);
+
   const { address } = useWalletConnection();
   const { convertEthToUsd } = useEthPrice();
   const isVisible = useVisibilityChange();
 
-  console.log("[MatchPage] Initial render:", {
-    matchId,
-    hasContract: !!contract,
-    hasPublicClient: !!publicClient,
-    hasWallet: !!walletClient,
-    userAddress: address,
-  });
+  // Debug logging
+  React.useEffect(() => {
+    console.log("Match page debug info:", {
+      matchId,
+      hasContract: !!contract,
+      hasPublicClient: !!publicClient,
+      userAddress: address,
+    });
+  }, [matchId, contract, publicClient, address]);
 
   // Fetch match data
   const { match, error, mutate } = useMatchData({
     matchId,
-            contract,
-            publicClient,
+    contract,
+    publicClient,
     isVisible
   });
 
@@ -52,23 +62,21 @@ export default function MatchPage() {
     lastDonationAmount,
     showSuccessDialog,
     displayMatch,
-    
+
     // Setters
     setDonationEthAmount,
     setShowJoinConfirmation,
     setShowCloseConfirmation,
     setSelectedWinner,
     setShowSuccessDialog,
-    
+
     // Handlers
     handleJoinMatch,
     handleDonateToMatch,
     handleCloseMatch
   } = useMatchActions({
-        contract,
-        publicClient,
-        walletClient,
-    address,
+    contract,
+    publicClient,
     match,
     onSuccess: () => mutate()
   });
@@ -99,23 +107,23 @@ export default function MatchPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <MatchDetailHeader 
-        match={displayMatch} 
-        convertEthToUsd={convertEthToUsd} 
+      <MatchDetailHeader
+        match={displayMatch}
+        convertEthToUsd={convertEthToUsd}
       />
 
       <Card>
         <MatchDetailContent
-                  match={displayMatch}
-                  isProcessing={isProcessing}
-                  userAddress={address}
-                donationEthAmount={donationEthAmount}
-                onDonationEthChange={setDonationEthAmount}
-                onDonate={handleDonateToMatch}
-                  selectedWinner={selectedWinner}
-                  onSelectWinner={setSelectedWinner}
+          match={displayMatch}
+          isProcessing={isProcessing}
+          userAddress={address?.startsWith('0x') ? address as `0x${string}` : undefined}
+          donationEthAmount={donationEthAmount}
+          onDonationEthChange={setDonationEthAmount}
+          onDonate={handleDonateToMatch}
+          selectedWinner={selectedWinner}
+          onSelectWinner={setSelectedWinner}
           onJoin={handleJoinMatch}
-                  onClose={handleCloseMatch}
+          onClose={handleCloseMatch}
           showJoinConfirmation={showJoinConfirmation}
           setShowJoinConfirmation={setShowJoinConfirmation}
           showCloseConfirmation={showCloseConfirmation}

@@ -1,30 +1,54 @@
 "use client";
 
 import { useEffect, useCallback, useRef } from "react";
-import { useAccount, useConnect, useDisconnect, usePublicClient } from "wagmi";
+import { usePrivy } from "@privy-io/react-auth";
 import { useToast } from "@/lib/hooks/use-toast";
 import { saveWalletToDb } from "@/lib/actions/wallet";
 import { MTK_TOKEN } from "@/lib/constants/tokens";
 
 export function useWalletConnection() {
-  const { address, isConnected, status } = useAccount();
+  const {
+    user,
+    authenticated,
+    login,
+    logout,
+    ready,
+    sendTransaction
+  } = usePrivy();
   const { toast } = useToast();
   const savedAddressRef = useRef<string | null>(null);
   const initializedRef = useRef(false);
   const hasShownToastRef = useRef(false);
-  const { connect } = useConnect();
-  const { disconnect } = useDisconnect();
-  const publicClient = usePublicClient();
+
+  // Get the user's connected external wallet address
+  const getConnectedWalletAddress = useCallback(() => {
+    if (!user) return null;
+
+    // Only return external wallet addresses, never embedded wallets
+    if (user.linkedAccounts && user.linkedAccounts.length > 0) {
+      const walletAccount = user.linkedAccounts.find(account =>
+        account.type === 'wallet' && account.verifiedAt
+      );
+      if (walletAccount && 'address' in walletAccount) {
+        console.log("Found external wallet:", walletAccount.address);
+        return walletAccount.address;
+      }
+    }
+
+    // Don't fall back to embedded wallet - require external wallet connection
+    console.log("No external wallet found. User needs to connect an external wallet.");
+    return null;
+  }, [user]);
 
   const addTokenToWallet = useCallback(async () => {
-    if (!window.ethereum) {
-      console.warn("MetaMask not found");
+    if (!user?.wallet) {
+      console.warn("No wallet found");
       return;
     }
 
     try {
       // Request to add the token to the user's wallet
-      await window.ethereum.request({
+      await (user.wallet as any).request({
         method: "wallet_watchAsset",
         params: {
           type: "ERC20",
@@ -54,30 +78,26 @@ export function useWalletConnection() {
           "Failed to add MTK token to your wallet. You can add it manually.",
       });
     }
-  }, [toast]);
+  }, [user?.wallet, toast]);
 
   const checkAndAddToken = useCallback(async () => {
-    if (!address || !publicClient) return;
+    if (!user?.wallet?.address) return;
 
     try {
-      // Check if the user already has MTK token balance or allowance
-      const tokenBalance = await publicClient.readContract({
-        address: MTK_TOKEN.address,
-        abi: [
+      // Check if the user already has MTK token balance
+      const tokenBalance = await (user.wallet as any).request({
+        method: "eth_call",
+        params: [
           {
-            name: "balanceOf",
-            type: "function",
-            stateMutability: "view",
-            inputs: [{ name: "account", type: "address" }],
-            outputs: [{ name: "", type: "uint256" }],
+            to: MTK_TOKEN.address,
+            data: `0x70a08231000000000000000000000000${user.wallet.address.slice(2)}`,
           },
+          "latest",
         ],
-        functionName: "balanceOf",
-        args: [address],
       });
 
       // If user has no balance, prompt to add token
-      if (tokenBalance === 0n) {
+      if (tokenBalance === "0x0") {
         await addTokenToWallet();
       }
     } catch (error) {
@@ -85,7 +105,7 @@ export function useWalletConnection() {
       // If there's an error reading the balance, still try to add the token
       await addTokenToWallet();
     }
-  }, [address, publicClient, addTokenToWallet]);
+  }, [user?.wallet, addTokenToWallet]);
 
   const saveWallet = useCallback(async (address: string) => {
     try {
@@ -100,8 +120,13 @@ export function useWalletConnection() {
   }, []);
 
   useEffect(() => {
-    // Skip if we're still connecting or already initialized this address
-    if (status === "connecting" || !isConnected || !address) {
+    // Skip if not ready or not authenticated
+    if (!ready || !authenticated) {
+      return;
+    }
+
+    const address = getConnectedWalletAddress();
+    if (!address) {
       return;
     }
 
@@ -147,12 +172,17 @@ export function useWalletConnection() {
     };
 
     handleWalletConnection();
-  }, [address, isConnected, status, toast, saveWallet, checkAndAddToken]);
+  }, [ready, authenticated, getConnectedWalletAddress, toast, saveWallet, checkAndAddToken]);
 
   return {
-    address,
-    isConnected,
-    connect,
-    disconnect,
+    address: getConnectedWalletAddress(),
+    isConnected: authenticated && !!getConnectedWalletAddress(),
+    connect: login,
+    disconnect: logout,
+    user,
+    authenticated,
+    ready,
+    sendTransaction,
+    getConnectedWalletAddress,
   };
 }

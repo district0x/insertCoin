@@ -4,20 +4,29 @@ import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useContract } from "@/lib/hooks/useContract";
-import { usePublicClient, useWalletClient, useAccount } from "wagmi";
+import { usePrivy } from "@privy-io/react-auth";
+import { createPublicClient, http } from "viem";
+import { baseSepolia } from "@/lib/config/chains";
 import { formatEther, parseEther } from "viem";
 import { Loader2, ArrowLeft, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { OnChainTournament, TournamentStatus } from "../../../types/tournament";
+import { simulateAndSendTransaction } from "@/lib/utils/transaction";
 
 export default function TournamentDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
   const contract = useContract();
-  const publicClient = usePublicClient();
-  const { data: walletClient } = useWalletClient();
-  const { address } = useAccount();
+  const { user, sendTransaction } = usePrivy();
+
+  // Create public client directly
+  const publicClient = createPublicClient({
+    chain: baseSepolia,
+    transport: http(process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL!),
+  });
+
+  const address = user?.wallet?.address as `0x${string}` | undefined;
 
   const [tournament, setTournament] = React.useState<OnChainTournament | null>(
     null
@@ -73,19 +82,19 @@ export default function TournamentDetailPage() {
           functionName: "tournaments",
           args: [tournamentId],
         })) as [
-          number, // winnersPercentage
-          number, // multisigPercentage
-          boolean, // isActive
-          boolean, // hasStarted
-          boolean, // isERC20
-          boolean, // hasEntryFee
-          bigint, // numEntrants
-          bigint, // totalDonations
-          bigint, // totalTokenDonations
-          bigint, // remainingBalance
-          bigint, // entryFee
-          `0x${string}` // token
-        ];
+            number, // winnersPercentage
+            number, // multisigPercentage
+            boolean, // isActive
+            boolean, // hasStarted
+            boolean, // isERC20
+            boolean, // hasEntryFee
+            bigint, // numEntrants
+            bigint, // totalDonations
+            bigint, // totalTokenDonations
+            bigint, // remainingBalance
+            bigint, // entryFee
+            `0x${string}` // token
+          ];
 
         // Get entrants
         const fetchedEntrants = await fetchEntrants(tournamentId);
@@ -230,10 +239,9 @@ export default function TournamentDetailPage() {
 
     if (
       !contract ||
-      !walletClient ||
+      !publicClient ||
       !address ||
       !tournamentId ||
-      !publicClient ||
       !tournament
     ) {
       toast({
@@ -259,24 +267,24 @@ export default function TournamentDetailPage() {
       // Convert donation to wei
       const donationWei = parseEther(donationAmount);
 
-      // Donate to tournament
-      const { request } = await publicClient.simulateContract({
-        address: contract.address,
-        abi: contract.abi,
-        functionName: "donate",
-        args: [BigInt(tournamentId)],
-        account: address,
-        value: donationWei,
-      });
-
-      const hash = await walletClient.writeContract(request);
+      // Donate to tournament using type-safe wrapper
+      const hash = await simulateAndSendTransaction(
+        () => contract.simulate.donate(
+          [BigInt(tournamentId)],
+          {
+            account: address as `0x${string}`,
+            value: donationWei,
+          }
+        ),
+        sendTransaction
+      );
 
       toast({
         title: "Transaction Submitted",
         description: "Your donation transaction has been submitted.",
       });
 
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: hash as `0x${string}` });
 
       if (receipt.status === "success") {
         // Update total prize in the database
@@ -339,10 +347,9 @@ export default function TournamentDetailPage() {
   const handleJoinTournament = async () => {
     if (
       !contract ||
-      !walletClient ||
+      !publicClient ||
       !address ||
-      !tournament ||
-      !publicClient
+      !tournament
     ) {
       toast({
         variant: "destructive",
@@ -355,24 +362,24 @@ export default function TournamentDetailPage() {
     try {
       setIsJoining(true);
 
-      // Join tournament
-      const { request } = await publicClient.simulateContract({
-        address: contract.address,
-        abi: contract.abi,
-        functionName: "joinTournament",
-        args: [tournament.id],
-        account: address,
-        value: tournament.entryFee,
-      });
-
-      const hash = await walletClient.writeContract(request);
+      // Join tournament using type-safe wrapper
+      const hash = await simulateAndSendTransaction(
+        () => contract.simulate.joinTournament(
+          [tournament.id],
+          {
+            account: address as `0x${string}`,
+            value: tournament.entryFee,
+          }
+        ),
+        sendTransaction
+      );
 
       toast({
         title: "Transaction Submitted",
         description: "Your tournament join transaction has been submitted.",
       });
 
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: hash as `0x${string}` });
 
       if (receipt.status === "success") {
         // Sync with database - add participant
@@ -512,8 +519,8 @@ export default function TournamentDetailPage() {
                     <p className="text-2xl font-bold">
                       {formatEther(
                         tournament.totalDonations +
-                          tournament.entryFee *
-                            BigInt(tournament.currentEntrants)
+                        tournament.entryFee *
+                        BigInt(tournament.currentEntrants)
                       )}
                       {tournament.isERC20 ? " Tokens" : " ETH"}
                     </p>
@@ -579,11 +586,10 @@ export default function TournamentDetailPage() {
                       {entrants.map((entrant) => (
                         <div
                           key={entrant}
-                          className={`p-2 text-sm rounded ${
-                            entrant.toLowerCase() === address?.toLowerCase()
-                              ? "bg-primary/10"
-                              : "bg-gray-100"
-                          }`}
+                          className={`p-2 text-sm rounded ${entrant.toLowerCase() === address?.toLowerCase()
+                            ? "bg-primary/10"
+                            : "bg-gray-100"
+                            }`}
                         >
                           {truncateAddress(entrant)}
                           {entrant.toLowerCase() === address?.toLowerCase() &&

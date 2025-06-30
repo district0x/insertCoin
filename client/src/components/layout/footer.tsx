@@ -9,6 +9,11 @@ export default function Footer() {
 						<h4 className="font-bold mb-4">Platform</h4>
 						<ul className="space-y-2">
 							<li>
+								<Link href="/wallet-signature" className="hover:underline">
+									Link Wallet
+								</Link>
+							</li>
+							<li>
 								<Link href="#" className="hover:underline">
 									How It Works
 								</Link>

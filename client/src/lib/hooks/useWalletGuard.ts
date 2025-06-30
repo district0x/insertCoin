@@ -1,9 +1,9 @@
 import { useEffect } from "react";
-import { useAccount } from "wagmi";
+import { usePrivy } from "@privy-io/react-auth";
 import { useRouter, usePathname } from "next/navigation";
 
 export function useWalletGuard() {
-  const { isConnected } = useAccount();
+  const { authenticated, ready } = usePrivy();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -11,13 +11,16 @@ export function useWalletGuard() {
     // Skip redirection for home page
     if (pathname === "/") return;
 
+    // Wait for Privy to be ready before checking authentication
+    if (!ready) return;
+
     // Redirect to home if wallet is not connected
-    if (!isConnected) {
+    if (!authenticated) {
       router.replace("/");
     }
-  }, [isConnected, pathname, router]);
+  }, [authenticated, ready, pathname, router]);
 
   return {
-    isConnected,
+    isConnected: authenticated,
   };
 }
