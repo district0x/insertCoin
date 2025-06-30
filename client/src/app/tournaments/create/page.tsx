@@ -3,18 +3,27 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useContract } from "@/lib/hooks/useContract";
-import { usePublicClient, useWalletClient, useAccount } from "wagmi";
+import { usePrivy } from "@privy-io/react-auth";
+import { createPublicClient, http } from "viem";
+import { baseSepolia } from "@/lib/config/chains";
 import { parseEther } from "viem";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { simulateAndSendTransaction } from "@/lib/utils/transaction";
 
 export default function CreateTournament() {
   const router = useRouter();
   const { toast } = useToast();
   const contract = useContract();
-  const publicClient = usePublicClient();
-  const { data: walletClient } = useWalletClient();
-  const { address } = useAccount();
+  const { user, sendTransaction } = usePrivy();
+
+  // Create public client directly
+  const publicClient = createPublicClient({
+    chain: baseSepolia,
+    transport: http(process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL!),
+  });
+
+  const address = user?.wallet?.address as `0x${string}` | undefined;
 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [formData, setFormData] = React.useState({
@@ -47,7 +56,7 @@ export default function CreateTournament() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!contract || !walletClient || !address || !publicClient) {
+    if (!contract || !address || !publicClient) {
       toast({
         variant: "destructive",
         title: "Error",
@@ -71,22 +80,22 @@ export default function CreateTournament() {
       // Convert entry fee to wei
       const entryFeeWei = parseEther(formData.entryFee);
 
-      // Create tournament transaction
-      const { request } = await publicClient.simulateContract({
-        address: contract.address,
-        abi: contract.abi,
-        functionName: "createTournament",
-        args: [
-          BigInt(formData.numEntrants),
-          formData.winnersPercentage,
-          formData.multisigPercentage,
-          formData.token as `0x${string}`,
-          entryFeeWei,
-        ],
-        account: address,
-      });
-
-      const hash = await walletClient.writeContract(request);
+      // Create tournament transaction using type-safe wrapper
+      const hash = await simulateAndSendTransaction(
+        () => contract.simulate.createTournament(
+          [
+            BigInt(formData.numEntrants),
+            formData.winnersPercentage,
+            formData.multisigPercentage,
+            formData.token as `0x${string}`,
+            entryFeeWei,
+          ],
+          {
+            account: address as `0x${string}`,
+          }
+        ),
+        sendTransaction
+      );
 
       toast({
         title: "Transaction Submitted",

@@ -1,30 +1,24 @@
 "use client";
 
 import { useEffect } from "react";
-import { useConnect, useAccount } from "wagmi";
-import { injected } from "wagmi/connectors";
+import { usePrivy } from "@privy-io/react-auth";
 import { useLocalStorage } from "./useLocalStorage";
 
 export function useAutoConnect() {
-  const { connect } = useConnect();
-  const { isConnected } = useAccount();
+  const { authenticated } = usePrivy();
   const [shouldAutoConnect, setShouldAutoConnect] = useLocalStorage(
     "shouldAutoConnect",
     true
   );
 
+  // Privy handles auto-connection automatically, so we just need to track the state
   useEffect(() => {
-    // Only attempt to connect if:
-    // 1. We're not already connected
-    // 2. User hasn't explicitly disabled auto-connect
-    // 3. MetaMask is available
-    if (!isConnected && shouldAutoConnect && window.ethereum) {
-      connect({ connector: injected() });
-    }
-  }, [connect, isConnected, shouldAutoConnect]);
+    // Privy will automatically attempt to reconnect if the user was previously authenticated
+    // We don't need to manually trigger connection like with wagmi
+  }, [shouldAutoConnect]);
 
   return {
-    isConnected,
+    isConnected: authenticated,
     shouldAutoConnect,
     setShouldAutoConnect,
   };

@@ -1,70 +1,22 @@
-import { GetContractReturnType, PublicClient, WalletClient } from "viem";
+import { GetContractReturnType, PublicClient } from "viem";
 import { ONEVONE_ABI } from "../contracts/abis/ABI";
-import { ERC20_APPROVAL_ABI } from "../constants/tokens";
 
-// Helper function to check if a match uses ERC20 tokens and approve if needed
-async function checkAndApproveERC20(
-  publicClient: PublicClient,
-  walletClient: WalletClient,
-  matchId: bigint,
-  tokenAddress: `0x${string}`,
-  contractAddress: `0x${string}`,
-  amount: bigint
-) {
-  if (!walletClient.account) {
-    throw new Error("No wallet account connected");
-  }
-
-  // Check allowance first
-  const allowance = await publicClient.readContract({
-    address: tokenAddress,
-    abi: ERC20_APPROVAL_ABI,
-    functionName: "allowance",
-    args: [walletClient.account.address, contractAddress]
-  });
-
-  if (allowance >= amount) {
-    console.log(`Sufficient allowance (${allowance} >= ${amount}) for token ${tokenAddress}`);
-    return true;
-  }
-
-  console.log(`Approving ${amount} tokens at address ${tokenAddress} for contract ${contractAddress}`);
-  
-  // Need to approve tokens
-  const { request } = await publicClient.simulateContract({
-    address: tokenAddress,
-    abi: ERC20_APPROVAL_ABI,
-    functionName: "approve",
-    args: [contractAddress, amount],
-    account: walletClient.account.address
-  });
-
-  const hash = await walletClient.writeContract(request);
-  
-  // Wait for approval transaction to complete
-  const receipt = await publicClient.waitForTransactionReceipt({ 
-    hash,
-    timeout: 60000
-  });
-  
-  if (receipt.status !== "success") {
-    throw new Error("Token approval failed");
-  }
-  
-  return true;
-}
+// Type for Privy's sendTransaction function - using a more specific type
+type SendTransactionFunction = (request: {
+  address: `0x${string}`;
+  abi: unknown;
+  functionName: string;
+  args?: readonly unknown[];
+  value?: bigint;
+}) => Promise<`0x${string}`>;
 
 export async function joinMatch(
   contract: GetContractReturnType<typeof ONEVONE_ABI>,
   publicClient: PublicClient,
-  walletClient: WalletClient,
+  sendTransaction: SendTransactionFunction,
   matchId: bigint,
   amount: bigint
 ) {
-  if (!walletClient.account) {
-    throw new Error("No wallet account connected");
-  }
-
   // Get match details to check if it uses ERC20 tokens
   const match = await publicClient.readContract({
     address: contract.address,
@@ -85,30 +37,20 @@ export async function joinMatch(
 
   const isERC20 = match[7];
   const tokenAddress = match[8];
-  
+
   console.log(`Match ${matchId} is ${isERC20 ? "an ERC20" : "an ETH"} match with token ${tokenAddress}`);
 
   // If it's an ERC20 match, approve tokens first
   if (isERC20 && tokenAddress !== "0x0000000000000000000000000000000000000000") {
-    await checkAndApproveERC20(
-      publicClient,
-      walletClient,
-      matchId,
-      tokenAddress,
-      contract.address,
-      amount
-    );
-    
-    // For ERC20 matches, send without ETH value
+    // For ERC20 matches, we need the user's address - this will be handled by the calling component
     const { request } = await publicClient.simulateContract({
       address: contract.address,
       abi: contract.abi,
       functionName: "joinMatch",
       args: [matchId],
-      account: walletClient.account.address,
     });
 
-    return walletClient.writeContract(request);
+    return sendTransaction(request);
   } else {
     // For ETH matches, include the ETH value
     const { request } = await publicClient.simulateContract({
@@ -117,25 +59,20 @@ export async function joinMatch(
       functionName: "joinMatch",
       args: [matchId],
       value: amount,
-      account: walletClient.account.address,
     });
 
-    return walletClient.writeContract(request);
+    return sendTransaction(request);
   }
 }
 
 export async function join2v2Team(
   contract: GetContractReturnType<typeof ONEVONE_ABI>,
   publicClient: PublicClient,
-  walletClient: WalletClient,
+  sendTransaction: SendTransactionFunction,
   matchId: bigint,
   isTeamA: boolean,
   amount: bigint
 ) {
-  if (!walletClient.account) {
-    throw new Error("No wallet account connected");
-  }
-
   // Get match details to check if it uses ERC20 tokens
   const match = await publicClient.readContract({
     address: contract.address,
@@ -158,30 +95,20 @@ export async function join2v2Team(
 
   const isERC20 = match[9];
   const tokenAddress = match[10];
-  
+
   console.log(`2v2 Match ${matchId} is ${isERC20 ? "an ERC20" : "an ETH"} match with token ${tokenAddress}`);
 
   // If it's an ERC20 match, approve tokens first
   if (isERC20 && tokenAddress !== "0x0000000000000000000000000000000000000000") {
-    await checkAndApproveERC20(
-      publicClient,
-      walletClient,
-      matchId,
-      tokenAddress,
-      contract.address,
-      amount
-    );
-    
     // For ERC20 matches, send without ETH value
     const { request } = await publicClient.simulateContract({
       address: contract.address,
       abi: contract.abi,
       functionName: "join2v2Team",
       args: [matchId, isTeamA],
-      account: walletClient.account.address,
     });
 
-    return walletClient.writeContract(request);
+    return sendTransaction(request);
   } else {
     // For ETH matches, include the ETH value
     const { request } = await publicClient.simulateContract({
@@ -190,25 +117,20 @@ export async function join2v2Team(
       functionName: "join2v2Team",
       args: [matchId, isTeamA],
       value: amount,
-      account: walletClient.account.address,
     });
 
-    return walletClient.writeContract(request);
+    return sendTransaction(request);
   }
 }
 
 export async function join5v5Team(
   contract: GetContractReturnType<typeof ONEVONE_ABI>,
   publicClient: PublicClient,
-  walletClient: WalletClient,
+  sendTransaction: SendTransactionFunction,
   matchId: bigint,
   isTeamA: boolean,
   amount: bigint
 ) {
-  if (!walletClient.account) {
-    throw new Error("No wallet account connected");
-  }
-
   // Get match details to check if it uses ERC20 tokens
   const match5v5 = await publicClient.readContract({
     address: contract.address,
@@ -232,37 +154,27 @@ export async function join5v5Team(
     boolean, // isERC20
     boolean // isOpen
   ];
-  
+
   if (!match5v5) {
     throw new Error("Match not found");
   }
 
   const isERC20 = match5v5[13];
   const tokenAddress = match5v5[12];
-  
+
   console.log(`5v5 Match ${matchId} is ${isERC20 ? "an ERC20" : "an ETH"} match with token ${tokenAddress}`);
 
   // If it's an ERC20 match, approve tokens first
   if (isERC20 && tokenAddress !== "0x0000000000000000000000000000000000000000") {
-    await checkAndApproveERC20(
-      publicClient,
-      walletClient,
-      matchId,
-      tokenAddress,
-      contract.address,
-      amount
-    );
-    
     // For ERC20 matches, send without ETH value
     const { request } = await publicClient.simulateContract({
       address: contract.address,
       abi: contract.abi,
       functionName: "join5v5Team",
       args: [matchId, isTeamA],
-      account: walletClient.account.address,
     });
 
-    return walletClient.writeContract(request);
+    return sendTransaction(request);
   } else {
     // For ETH matches, include the ETH value
     const { request } = await publicClient.simulateContract({
@@ -271,24 +183,19 @@ export async function join5v5Team(
       functionName: "join5v5Team",
       args: [matchId, isTeamA],
       value: amount,
-      account: walletClient.account.address,
     });
 
-    return walletClient.writeContract(request);
+    return sendTransaction(request);
   }
 }
 
 export async function donateToMatch(
   contract: GetContractReturnType<typeof ONEVONE_ABI>,
   publicClient: PublicClient,
-  walletClient: WalletClient,
+  sendTransaction: SendTransactionFunction,
   matchId: bigint,
   amount: bigint
 ) {
-  if (!walletClient.account) {
-    throw new Error("No wallet account connected");
-  }
-
   // Check match state in all match types to determine if it's open
   const [match1v1, match2v2, match5v5] = await Promise.all([
     // Check 1v1 match
@@ -371,30 +278,24 @@ export async function donateToMatch(
     functionName: "donateToMatch",
     args: [matchId, amount],
     value: amount,
-    account: walletClient.account.address,
   });
 
-  return walletClient.writeContract(request);
+  return sendTransaction(request);
 }
 
 export async function closeMatch(
   contract: GetContractReturnType<typeof ONEVONE_ABI>,
   publicClient: PublicClient,
-  walletClient: WalletClient,
+  sendTransaction: SendTransactionFunction,
   matchId: bigint,
   winner: `0x${string}`
 ) {
-  if (!walletClient.account) {
-    throw new Error("No wallet account connected");
-  }
-
   const { request } = await publicClient.simulateContract({
     address: contract.address,
     abi: contract.abi,
     functionName: "closeMatch",
     args: [matchId, winner],
-    account: walletClient.account.address,
   });
 
-  return walletClient.writeContract(request);
+  return sendTransaction(request);
 }

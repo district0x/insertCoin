@@ -39,3 +39,24 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Node modules and build artifacts
+node_modules/
+.next/
+dist/
+build/
+
+# Test files
+src/**/*.test.*
+check_balance.js
+
+# Prisma migrations (if not needed in repo)
+prisma/migrations/
+
+# Local environment files
+.env.local
+.env.*.local
+
+# VSCode and OS files
+.vscode/
+Thumbs.db

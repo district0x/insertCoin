@@ -1,0 +1,13 @@
+{
+    "extends": [
+        "next/core-web-vitals"
+    ],
+    "ignorePatterns": [
+        "src/app/tournaments/**/*",
+        "src/components/tournaments/**/*"
+    ],
+    "rules": {
+        "@typescript-eslint/no-unused-vars": "warn",
+        "react-hooks/exhaustive-deps": "warn"
+    }
+}

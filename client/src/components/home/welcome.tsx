@@ -1,66 +1,56 @@
-import { MessageSquare } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { ArrowRight, Shield, Users, Trophy } from "lucide-react";
 // import MatchingPoolDisplay from "./MatchingPool";
 
 export default function Welcome() {
 	return (
-		<section className="relative py-20 overflow-hidden">
-			<div className="absolute inset-0 z-0">
-				<div className="w-full h-full bg-black">
-					<div className="absolute inset-0 bg-blue-500 opacity-20">
-						<div
-							className="absolute inset-0"
-							style={{
-								backgroundImage: `url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/R881563d6444b370fa4ceea0c3183bb4c-OAU5qkVuIr7kjqtrNuC1QXC6EAI0Za.gif')`,
-								backgroundSize: "cover",
-								backgroundPosition: "center",
-								mixBlendMode: "screen",
-							}}
-						></div>
-					</div>
-				</div>
-			</div>
-			<div className="container mx-auto px-4 relative z-10">
-				<div className="max-w-3xl mx-auto text-center text-white">
-					<h2 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
-						Crowdfund Your Esports Dreams
-					</h2>
-					<p className="text-xl md:text-2xl mb-8 leading-relaxed">
-						Fuel your competitive spirit with community-backed
-						tournaments.
-					</p>
-					{/* <MatchingPoolDisplay /> */}
-					<div className="flex justify-center">
-						<Button
-							size="lg"
-							className="bg-yellow-400 text-black hover:bg-yellow-300 transition-all duration-300 flex items-center"
-							style={{
-								fontFamily: "'Press Start 2P', cursive",
-								padding: "1rem 2rem",
-								fontSize: "1.5rem",
-								textShadow: "2px 2px 0px rgba(0,0,0,0.2)",
-								boxShadow:
-									"0 0 10px rgba(255,255,0,0.5), 0 0 20px rgba(255,255,0,0.3), 0 0 30px rgba(255,255,0,0.1)",
-								animation: "glow 2s ease-in-out infinite",
-							}}
-						>
-							Press Start
-							<MessageSquare className="ml-2 h-6 w-6" />
+		<section className="bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 text-white py-20">
+			<div className="container mx-auto px-4 text-center">
+				<h1 className="text-5xl md:text-6xl font-bold mb-6">
+					One v One
+				</h1>
+				<p className="text-xl md:text-2xl mb-8 text-gray-200 max-w-3xl mx-auto">
+					The ultimate Web3 gaming platform for competitive 1v1, 2v2, and 5v5 matches with real prizes
+				</p>
+
+				<div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+					<Link href="/matches/create">
+						<Button size="lg" className="bg-white text-indigo-900 hover:bg-gray-100">
+							Create Match
+							<ArrowRight className="ml-2 h-5 w-5" />
 						</Button>
+					</Link>
+					<Link href="/wallet-signature">
+						<Button size="lg" variant="outline" className="border-white text-white hover:bg-white hover:text-indigo-900">
+							<Shield className="mr-2 h-5 w-5" />
+							Link Discord Wallet
+						</Button>
+					</Link>
+				</div>
+
+				<div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+					<div className="flex flex-col items-center">
+						<Shield className="h-12 w-12 mb-4 text-blue-300" />
+						<h3 className="text-xl font-semibold mb-2">Secure & Fair</h3>
+						<p className="text-gray-300">
+							Blockchain-powered matches with transparent prize distribution
+						</p>
 					</div>
-					<style jsx>{`
-						@keyframes glow {
-							0%,
-							100% {
-								opacity: 1;
-								transform: scale(1);
-							}
-							50% {
-								opacity: 0.8;
-								transform: scale(0.98);
-							}
-						}
-					`}</style>
+					<div className="flex flex-col items-center">
+						<Users className="h-12 w-12 mb-4 text-green-300" />
+						<h3 className="text-xl font-semibold mb-2">Community Driven</h3>
+						<p className="text-gray-300">
+							Join our Discord community and compete with players worldwide
+						</p>
+					</div>
+					<div className="flex flex-col items-center">
+						<Trophy className="h-12 w-12 mb-4 text-yellow-300" />
+						<h3 className="text-xl font-semibold mb-2">Win Real Prizes</h3>
+						<p className="text-gray-300">
+							Earn ETH and tokens by winning competitive matches
+						</p>
+					</div>
 				</div>
 			</div>
 		</section>

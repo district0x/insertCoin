@@ -3,8 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useContract } from "@/lib/hooks/useContract";
-import { usePublicClient } from "wagmi";
-import { formatEther } from "viem";
+import { formatEther, createPublicClient, http } from "viem";
 import { Loader2 } from "lucide-react";
 import {
   Card,
@@ -16,14 +15,22 @@ import {
 import { Button } from "@/components/ui/button";
 import { OnChainTournament, TournamentStatus } from "../../types/tournament";
 import Image from "next/image";
+import { baseSepolia } from "@/lib/config/chains";
 
 export default function Tournaments() {
   const contract = useContract();
-  const publicClient = usePublicClient();
   const [tournaments, setTournaments] = React.useState<OnChainTournament[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const hasFetchedRef = React.useRef(false);
+
+  // Create a public client for reading contract state
+  const publicClient = React.useMemo(() => {
+    return createPublicClient({
+      chain: baseSepolia,
+      transport: http(process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL!),
+    });
+  }, []);
 
   // Fetch tournament data
   React.useEffect(() => {
@@ -85,19 +92,19 @@ export default function Tournaments() {
           functionName: "tournaments",
           args: [tournamentId],
         })) as [
-          number,
-          number,
-          boolean,
-          boolean,
-          boolean,
-          boolean,
-          bigint,
-          bigint,
-          bigint,
-          bigint,
-          bigint,
-          `0x${string}`
-        ];
+            number,
+            number,
+            boolean,
+            boolean,
+            boolean,
+            boolean,
+            bigint,
+            bigint,
+            bigint,
+            bigint,
+            bigint,
+            `0x${string}`
+          ];
 
         // Get number of entrants
         let entrantsCount = 0;
@@ -280,8 +287,8 @@ export default function Tournaments() {
                         Prize Pool:{" "}
                         {formatEther(
                           tournament.totalDonations +
-                            tournament.entryFee *
-                              BigInt(tournament.currentEntrants)
+                          tournament.entryFee *
+                          BigInt(tournament.currentEntrants)
                         )}
                         {tournament.isERC20 ? " Tokens" : " ETH"}
                       </p>
@@ -298,7 +305,7 @@ export default function Tournaments() {
                             100,
                             (tournament.currentEntrants /
                               Number(tournament.numEntrants)) *
-                              100
+                            100
                           )}%`,
                         }}
                       ></div>

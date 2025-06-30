@@ -6,8 +6,9 @@ import { useMatch } from "@/lib/hooks/useMatch";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useWalletConnection } from "@/lib/hooks/useWalletConnection";
-import { usePublicClient } from "wagmi";
-import { updateMatchWithWallet, createMatchInDb } from "@/lib/services/match";
+import { createPublicClient, http } from "viem";
+import { baseSepolia } from "@/lib/config/chains";
+import { updateMatchWithWallet, createMatchInDb, updateMatchWithContractId } from "@/lib/services/match";
 import { formatEther, decodeEventLog } from "viem";
 import { MatchType } from "@/types/match";
 import { UsdInput } from "@/components/ui/usd-input";
@@ -31,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { MTK_TOKEN, TokenOption, TOKEN_OPTIONS } from "@/lib/constants/tokens";
+import { usePrivy } from "@privy-io/react-auth";
 
 // type MatchEventArgs = {
 //   matchId: bigint;
@@ -45,18 +47,60 @@ function CreateMatchForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const { address } = useWalletConnection();
-  const publicClient = usePublicClient();
+  const { address, isConnected, ready } = useWalletConnection();
+  const { user } = usePrivy();
+
+  // Debug logging
+  console.log("CreateMatchForm - address from useWalletConnection:", address);
+  console.log("CreateMatchForm - user.wallet.address:", user?.wallet?.address);
+  console.log("CreateMatchForm - isConnected:", isConnected);
+  console.log("CreateMatchForm - ready:", ready);
+
+  // Get roomId and ethAmount from URL
+  const roomId = searchParams.get("roomId");
+  const ethAmountParam = searchParams.get("ethAmount");
   const [matchType, setMatchType] = React.useState<MatchType>("ONE_V_ONE");
   const [ethAmount, setEthAmount] = React.useState<bigint>(BigInt(0));
   const [isLoading, setIsLoading] = React.useState(false);
   const [txHash, setTxHash] = React.useState<string | null>(null);
   const [isWaitingForTx, setIsWaitingForTx] = React.useState(false);
   const [selectedToken, setSelectedToken] = React.useState<TokenOption>("ETH");
+  const [paramError, setParamError] = React.useState<string | null>(null);
   const { createMatch, create2v2Match, create5v5Match } = useMatch();
 
-  // Get matchId from URL if it exists (coming from Discord)
-  const matchId = searchParams.get("matchId");
+  // Get the actual wallet address to use (fallback to user.wallet.address if address is null)
+  const walletAddress = address || user?.wallet?.address;
+
+  // On mount, set ethAmount from URL if roomId is present
+  React.useEffect(() => {
+    if (roomId) {
+      if (!ethAmountParam || isNaN(Number(ethAmountParam)) || Number(ethAmountParam) <= 0) {
+        setParamError("Invalid or missing match amount. Please use a valid Discord match link.");
+        setEthAmount(BigInt(0));
+      } else {
+        setEthAmount(BigInt(Math.floor(Number(ethAmountParam) * 1e18)));
+        setParamError(null);
+      }
+    }
+  }, [roomId, ethAmountParam]);
+
+  // Create public client directly
+  const publicClient = createPublicClient({
+    chain: baseSepolia,
+    transport: http(process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL!),
+  });
+
+  // Check if user is connected when accessing the page
+  React.useEffect(() => {
+    if (ready && !isConnected) {
+      toast({
+        title: "Wallet Connection Required",
+        description: "Please connect your wallet to create a match.",
+        variant: "destructive",
+        duration: 5000,
+      });
+    }
+  }, [ready, isConnected, toast]);
 
   // Watch for transaction confirmation
   React.useEffect(() => {
@@ -133,14 +177,28 @@ function CreateMatchForm() {
           // The first argument is the match ID
           const onChainMatchId = decoded.args[0].toString();
 
-          // Now create the database entry with the correct match ID
-          await createMatchInDb({
-            walletAddress: address as string,
-            matchType,
-            stake: formatEther(ethAmount),
-            matchId: Number(onChainMatchId),
-            tokenAddress: selectedToken === "MTK" ? MTK_TOKEN.address : null,
-          });
+          // If this was a Discord-created match, update it with the contract match ID
+          if (roomId) {
+            try {
+              await updateMatchWithContractId({
+                roomId,
+                contractMatchId: Number(onChainMatchId),
+              });
+              console.log(`Updated Discord match ${roomId} with contract match ID ${onChainMatchId}`);
+            } catch (error) {
+              console.error("Error updating Discord match with contract ID:", error);
+              // Don't fail the whole process if this update fails
+            }
+          } else {
+            // Regular match creation - create database entry
+            await createMatchInDb({
+              walletAddress: walletAddress as string,
+              matchType,
+              stake: formatEther(ethAmount),
+              matchId: Number(onChainMatchId),
+              tokenAddress: selectedToken === "MTK" ? MTK_TOKEN.address : null,
+            });
+          }
 
           toast({
             title: "Match Created Successfully!",
@@ -188,15 +246,27 @@ function CreateMatchForm() {
     txHash,
     publicClient,
     matchType,
-    address,
+    walletAddress,
     ethAmount,
     router,
     toast,
     selectedToken,
+    roomId,
   ]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!isConnected || !walletAddress) {
+      toast({
+        title: "External Wallet Required",
+        description: "Please connect your external wallet (like MetaMask) to create matches. Embedded wallets are not supported.",
+        variant: "destructive",
+        duration: 5000,
+      });
+      return;
+    }
+
     if (isLoading) return;
 
     if (ethAmount <= 0n) {
@@ -223,15 +293,22 @@ function CreateMatchForm() {
     setIsLoading(true);
 
     try {
-      // If matchId exists, this is a Discord-created match
-      if (matchId) {
-        if (!address) {
+      // If roomId exists, this is a Discord-created match
+      if (roomId) {
+        if (!walletAddress) {
           throw new Error("Wallet address is required");
         }
 
+        console.log("About to call updateMatchWithWallet with:", {
+          roomId,
+          walletAddress,
+          roomIdType: typeof roomId,
+          walletAddressType: typeof walletAddress
+        });
+
         const updatedMatch = await updateMatchWithWallet({
-          matchId,
-          walletAddress: address as string,
+          roomId,
+          walletAddress: walletAddress as string,
         });
 
         if (!updatedMatch) {
@@ -239,7 +316,7 @@ function CreateMatchForm() {
         }
 
         // For Discord-created matches, we currently only support ETH
-        const hash = await createMatch(BigInt(updatedMatch.stake));
+        const hash = await createMatch(ethAmount);
         if (!hash) throw new Error("Failed to create match");
 
         setTxHash(hash);
@@ -250,48 +327,39 @@ function CreateMatchForm() {
           duration: 10000, // Show for longer since blockchain confirmations take time
         });
       } else {
-        // Regular match creation flow
-        try {
-          let hash: `0x${string}` | undefined;
-          // Get token address if MTK is selected
-          const tokenAddress =
-            selectedToken === "MTK" ? MTK_TOKEN.address : undefined;
+        // Regular match creation (not from Discord)
+        let hash: string | null = null;
 
-          switch (matchType) {
-            case "TWO_V_TWO":
-              hash = await create2v2Match(ethAmount, tokenAddress);
-              break;
-            case "FIVE_V_FIVE":
-              hash = await create5v5Match(ethAmount, tokenAddress);
-              break;
-            default:
-              hash = await createMatch(ethAmount, tokenAddress);
-          }
-
-          if (!hash) throw new Error("Failed to create match");
-
-          // Now hash is guaranteed to be a `0x${string}` and not undefined
-          setTxHash(hash);
-          toast({
-            title: "Transaction Submitted",
-            description: `Your transaction has been submitted to the network. Please confirm it in your wallet and wait for blockchain confirmation.`,
-            duration: 10000, // Show for longer since blockchain confirmations take time
-          });
-        } catch (err) {
-          throw err;
+        if (matchType === "ONE_V_ONE") {
+          hash = await createMatch(ethAmount);
+        } else if (matchType === "TWO_V_TWO") {
+          hash = await create2v2Match(ethAmount);
+        } else if (matchType === "FIVE_V_FIVE") {
+          hash = await create5v5Match(ethAmount);
         }
+
+        if (!hash) throw new Error("Failed to create match");
+
+        setTxHash(hash);
+
+        toast({
+          title: "Transaction Submitted",
+          description: `Creating your ${matchType.toLowerCase()} match. Please wait for blockchain confirmation...`,
+          duration: 10000,
+        });
       }
     } catch (error) {
       setIsLoading(false);
       console.error("Error creating match:", error);
+
       toast({
-        title: "Match Creation Error",
+        title: "Error Creating Match",
         description:
           error instanceof Error
-            ? `${error.message}`
-            : "Failed to create match. Please check your wallet connection and try again.",
+            ? error.message
+            : "An unexpected error occurred. Please try again.",
         variant: "destructive",
-        duration: 7000, // Show longer for errors
+        duration: 5000,
       });
     }
   };
@@ -312,17 +380,34 @@ function CreateMatchForm() {
         <Card className="shadow-md border-opacity-50">
           <CardHeader className="pb-4">
             <CardTitle className="text-2xl">
-              {matchId ? "Link Wallet to Discord Match" : "Create New Match"}
+              {roomId ? "Link Wallet to Discord Match" : "Create New Match"}
             </CardTitle>
             <CardDescription className="text-base">
-              {matchId
+              {roomId
                 ? "Connect your wallet to create the match from Discord"
                 : "Choose your match type and stake amount"}
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {paramError && (
+              <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
+                {paramError}
+              </div>
+            )}
+            {!isConnected && (
+              <div className="mb-4 p-3 bg-yellow-100 text-yellow-700 rounded">
+                Please connect your external wallet to continue.
+              </div>
+            )}
+            {isConnected && !address && (
+              <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
+                <strong>External Wallet Required</strong><br />
+                You need to connect an external wallet (like MetaMask) to create matches.
+                Embedded wallets are not supported for transactions.
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-8">
-              {!matchId && (
+              {!roomId && (
                 <>
                   <div className="space-y-3">
                     <label className="text-sm font-medium">Match Type</label>
@@ -400,11 +485,21 @@ function CreateMatchForm() {
                   </div>
                 </>
               )}
-
+              {roomId && (
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Stake Amount (ETH)</Label>
+                  <input
+                    type="text"
+                    value={ethAmountParam || ""}
+                    disabled
+                    className="w-full px-3 py-2 border rounded bg-gray-100 text-gray-700 cursor-not-allowed"
+                  />
+                </div>
+              )}
               <Button
                 type="submit"
                 className="w-full py-6 text-base font-medium"
-                disabled={isLoading || (!matchId && ethAmount === BigInt(0))}
+                disabled={isLoading || (!roomId && ethAmount === BigInt(0)) || !!paramError || !isConnected}
               >
                 {isLoading ? (
                   <span className="flex items-center justify-center">
@@ -413,7 +508,7 @@ function CreateMatchForm() {
                       ? "Waiting for confirmation..."
                       : "Creating match..."}
                   </span>
-                ) : matchId ? (
+                ) : roomId ? (
                   "Link Wallet and Create Match"
                 ) : (
                   "Create Match"
@@ -450,7 +545,53 @@ export default function CreateMatchPage() {
         </div>
       }
     >
-      <CreateMatchForm />
+      <ErrorBoundary
+        fallback={
+          <div className="flex justify-center items-center min-h-[calc(100vh-80px)]">
+            <div className="text-center">
+              <h2 className="text-xl font-semibold mb-2">Something went wrong</h2>
+              <p className="text-muted-foreground mb-4">
+                There was an error loading the match creation page.
+              </p>
+              <Button onClick={() => window.location.reload()}>
+                Try Again
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <CreateMatchForm />
+      </ErrorBoundary>
     </React.Suspense>
   );
+}
+
+// Error Boundary Component
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallback: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode; fallback: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(_error: Error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(_error: Error, _errorInfo: React.ErrorInfo) {
+    // Log error to console in development
+    if (process.env.NODE_ENV === 'development') {
+      console.error('ErrorBoundary caught an error:', _error, _errorInfo);
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+
+    return this.props.children;
+  }
 }

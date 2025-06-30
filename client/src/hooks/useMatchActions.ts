@@ -1,7 +1,8 @@
 import { useState, useCallback } from "react";
 import { OnChainMatch } from "@/types/match";
 import { useToast } from "@/hooks/use-toast";
-import { GetContractReturnType, PublicClient, WalletClient } from "viem";
+import { GetContractReturnType, PublicClient } from "viem";
+import { usePrivy } from "@privy-io/react-auth";
 import { ONEVONE_ABI } from "@/lib/contracts/abis/ABI";
 import { getMaxPlayers, getMatchStatus } from "@/lib/match/types";
 import {
@@ -16,8 +17,6 @@ import { joinMatchInDb } from "@/lib/services/match";
 interface UseMatchActionsProps {
   contract: GetContractReturnType<typeof ONEVONE_ABI> | null;
   publicClient: PublicClient | undefined;
-  walletClient: WalletClient | undefined;
-  address: `0x${string}` | undefined;
   match: OnChainMatch | null;
   onSuccess?: () => void;
 }
@@ -25,12 +24,13 @@ interface UseMatchActionsProps {
 export function useMatchActions({
   contract,
   publicClient,
-  walletClient,
-  address,
   match,
   onSuccess
 }: UseMatchActionsProps) {
   const { toast } = useToast();
+  const { user, sendTransaction } = usePrivy();
+  const address = user?.wallet?.address as `0x${string}` | undefined;
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [donationEthAmount, setDonationEthAmount] = useState<bigint>(BigInt(0));
   const [showJoinConfirmation, setShowJoinConfirmation] = useState(false);
@@ -45,7 +45,7 @@ export function useMatchActions({
 
   // Handle joining a match
   const handleJoinMatch = useCallback(async () => {
-    if (!contract || !walletClient || !address || !publicClient || !displayMatch) {
+    if (!contract || !address || !publicClient || !displayMatch) {
       toast({
         variant: "destructive",
         title: "Error",
@@ -84,7 +84,7 @@ export function useMatchActions({
           hash = await joinMatch(
             contract,
             publicClient,
-            walletClient,
+            sendTransaction,
             displayMatch.id,
             displayMatch.player1Amount
           );
@@ -93,7 +93,7 @@ export function useMatchActions({
           hash = await join2v2Team(
             contract,
             publicClient,
-            walletClient,
+            sendTransaction,
             displayMatch.id,
             isTeamA,
             displayMatch.player1Amount
@@ -103,7 +103,7 @@ export function useMatchActions({
           hash = await join5v5Team(
             contract,
             publicClient,
-            walletClient,
+            sendTransaction,
             displayMatch.id,
             isTeamA,
             displayMatch.player1Amount
@@ -176,13 +176,12 @@ export function useMatchActions({
       setIsProcessing(false);
       setShowJoinConfirmation(false);
     }
-  }, [contract, walletClient, address, publicClient, displayMatch, toast, onSuccess]);
+  }, [contract, address, publicClient, displayMatch, toast, onSuccess, sendTransaction]);
 
   // Handle donating to a match
   const handleDonateToMatch = useCallback(async () => {
     if (
       !contract ||
-      !walletClient ||
       !address ||
       !donationEthAmount ||
       !displayMatch ||
@@ -221,7 +220,7 @@ export function useMatchActions({
       const hash = await donateToMatch(
         contract,
         publicClient,
-        walletClient,
+        sendTransaction,
         displayMatch.id,
         donationEthAmount
       );
@@ -242,12 +241,13 @@ export function useMatchActions({
         }) as [
             `0x${string}`, // player1
             `0x${string}`, // player2
-            boolean,       // isComplete
-            `0x${string}`, // winner
-            bigint,        // matchAmount
-            bigint,        // donatedAmount
-            boolean,       // isERC20
-            `0x${string}`  // token
+            bigint, // player1Amount
+            bigint, // player2Amount
+            bigint, // totalAmount
+            bigint, // donatedAmount
+            boolean, // isOpen
+            boolean, // isERC20
+            `0x${string}` // token
           ];
 
         const newDonationAmount = updatedMatch[5] - displayMatch.donatedAmount;
@@ -288,16 +288,15 @@ export function useMatchActions({
     } finally {
       setIsProcessing(false);
     }
-  }, [contract, walletClient, address, donationEthAmount, displayMatch, publicClient, toast, onSuccess]);
+  }, [contract, address, donationEthAmount, displayMatch, publicClient, toast, onSuccess, sendTransaction]);
 
   // Handle closing a match (declaring a winner)
   const handleCloseMatch = useCallback(async () => {
     if (
       !contract ||
-      !walletClient ||
-      !address ||
+      !selectedWinner ||
       !displayMatch ||
-      !selectedWinner
+      !publicClient
     ) {
       toast({
         variant: "destructive",
@@ -313,8 +312,8 @@ export function useMatchActions({
 
       const hash = await closeMatch(
         contract,
-        publicClient!,
-        walletClient,
+        publicClient,
+        sendTransaction,
         displayMatch.id,
         selectedWinner
       );
@@ -325,7 +324,7 @@ export function useMatchActions({
           "Your request to close the match has been submitted.",
       });
 
-      const receipt = await publicClient!.waitForTransactionReceipt({ hash });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
       if (receipt.status === "success") {
         // Update the database with the match completion
         try {
@@ -374,13 +373,12 @@ export function useMatchActions({
     }
   }, [
     contract,
-    walletClient,
-    address,
     publicClient,
     displayMatch,
     selectedWinner,
     toast,
     onSuccess,
+    sendTransaction,
   ]);
 
   return {
@@ -407,4 +405,4 @@ export function useMatchActions({
     handleDonateToMatch,
     handleCloseMatch
   };
-} 
+}
