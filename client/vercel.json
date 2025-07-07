@@ -3,7 +3,6 @@
     "outputDirectory": ".next",
     "framework": "nextjs",
     "installCommand": "npm install",
-    "packageManager": "npm",
     "env": {
         "NEXT_PUBLIC_CONTRACT_ADDRESS": "@next_public_contract_address",
         "NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL": "@next_public_base_sepolia_rpc_url",
