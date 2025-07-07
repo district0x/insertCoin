@@ -1,0 +1,22 @@
+{
+    "buildCommand": "npm run build",
+    "outputDirectory": ".next",
+    "framework": "nextjs",
+    "installCommand": "npm install",
+    "packageManager": "npm",
+    "env": {
+        "NEXT_PUBLIC_CONTRACT_ADDRESS": "@next_public_contract_address",
+        "NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL": "@next_public_base_sepolia_rpc_url",
+        "NEXT_PUBLIC_SUPABASE_URL": "@next_public_supabase_url",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@next_public_supabase_anon_key",
+        "NEXT_PUBLIC_PRIVY_APP_ID": "@next_public_privy_app_id",
+        "DATABASE_URL": "@database_url",
+        "DIRECT_URL": "@direct_url",
+        "SUPABASE_SERVICE_ROLE_KEY": "@supabase_service_role_key"
+    },
+    "functions": {
+        "src/app/api/**/*.ts": {
+            "maxDuration": 30
+        }
+    }
+}

@@ -8,109 +8,116 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// User model
 model User {
-  id            String    @id @default(uuid())
-  address       String?   @unique // Ethereum address
-  discordId     String?   @unique // Discord user ID
-  username      String?   @unique
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  // Stats and profile
-  totalMatches  Int       @default(0)
-  totalWins     Int       @default(0)
-  totalLosses   Int       @default(0)
-  
-  // Relations
-  matchesCreated    Match[]    @relation("Creator")
-  participatedMatches Match[]  @relation("Participant")
-  tournamentsJoined Tournament[] @relation("TournamentParticipant")
-  teamMemberships   TeamMember[]
+  id           String   @id @default(uuid())
+  address      String?  @unique
+  discordId    String?  @unique
+  username     String?  @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  totalMatches Int      @default(0)
+  totalWins    Int      @default(0)
+  totalLosses  Int      @default(0)
+  createdMatches Match[] @relation("Creator")
 }
 
-// Match model
 model Match {
-  id               String        @id @default(uuid())
-  roomId           String?       @unique // Unique room ID for Discord matches
-  matchId          Int?          // Now nullable, populated after contract creation
-  matchType        MatchType
-  status           MatchStatus   @default(PENDING)
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  
-  // Creator details
-  creatorId        String?
-  creator          User?         @relation("Creator", fields: [creatorId], references: [id])
-  creatorDiscordId String?
-  
-  // Match details
-  stake            Float
-  tokenAddress     String?       // null for ETH
-  totalPrize       Float
-  winnerAddress    String?
-  discordChannelId String?       // Discord channel ID for match notifications
-  
-  // Game details
-  platform         String?       // PS5, PC
-  gameCategory     String?       // Sports, Fighting, Racing
-  game            String?       // Specific game name
-  matchAmountUsd   Int?         // Match amount in USD
-  
-  // Opponent details
-  opponentDiscordId String?     // Discord ID of the opponent
-  winnerId         String?      // Discord ID of the winner
-  
-  // Relations
-  teams            Team[]
-  participants     User[]        @relation("Participant")
-  
+  id                String      @id @default(uuid())
+  matchId           Int?        @unique
+  matchType         MatchType
+  status            MatchStatus @default(PENDING)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  creatorId         String?
+  creatorDiscordId  String?
+  creatorAddress    String?
+  stake             Float
+  tokenAddress      String?
+  totalPrize        Float
+  winnerAddress     String?
+  discordChannelId  String?
+  game              String?
+  gameCategory      String?
+  matchAmountUsd    Int?
+  opponentDiscordId String?
+  player2Address    String?
+  platform          String?
+  winnerId          String?
+  roomId            String?     @unique
+  creator           User?       @relation("Creator", fields: [creatorId], references: [id])
+
   @@index([matchId])
   @@index([roomId])
   @@index([creatorDiscordId])
   @@index([discordChannelId])
   @@index([opponentDiscordId])
   @@index([winnerId])
+  @@index([creatorAddress])
+  @@index([player2Address])
 }
 
-// Tournament model
 model Tournament {
-  id              String    @id @default(uuid())
-  tournamentId    Int       @unique
+  id              String           @id @default(uuid())
+  tournamentId    Int              @unique
   status          TournamentStatus
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
-  entryFee       Float
-  tokenAddress   String?
-  totalPrize     Float
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  entryFee        Float
+  tokenAddress    String?
+  totalPrize      Float
   maxParticipants Int
-  
-  participants    User[]    @relation("TournamentParticipant")
-  
+
   @@index([tournamentId])
 }
 
-// Team model
 model Team {
-  id            String        @id @default(uuid())
-  matchId       String
-  match         Match         @relation(fields: [matchId], references: [id])
-  isTeamA       Boolean
-  members       TeamMember[]
-  
+  id      String  @id @default(uuid())
+  matchId String
+  isTeamA Boolean
+
   @@unique([matchId, isTeamA])
 }
 
-// TeamMember model for many-to-many relation between Team and User
 model TeamMember {
-  id        String   @id @default(uuid())
-  teamId    String
-  userId    String
-  team      Team     @relation(fields: [teamId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
-  
+  id     String @id @default(uuid())
+  teamId String
+  userId String
+
   @@unique([teamId, userId])
+}
+
+model VerificationTransaction {
+  id            String             @id
+  txHash        String             @unique
+  discordId     String
+  walletAddress String
+  amount        String
+  status        VerificationStatus @default(PENDING)
+  createdAt     DateTime           @default(now())
+  verifiedAt    DateTime?
+
+  @@index([discordId])
+  @@index([status])
+  @@index([txHash])
+  @@index([walletAddress])
+}
+
+model Participant {
+  A String
+  B String
+
+  @@unique([A, B], map: "_Participant_AB_unique")
+  @@index([B], map: "_Participant_B_index")
+  @@map("_Participant")
+}
+
+model TournamentParticipant {
+  A String
+  B String
+
+  @@id([A, B], map: "_TournamentParticipant_AB_pkey")
+  @@index([B], map: "_TournamentParticipant_B_index")
+  @@map("_TournamentParticipant")
 }
 
 enum MatchType {
@@ -120,11 +127,11 @@ enum MatchType {
 }
 
 enum MatchStatus {
-  PENDING     // Created by Discord bot, waiting for on-chain creation
-  OPEN        // Created on-chain, waiting for players
-  FILLED      // All players joined
-  COMPLETED   // Match finished
-  CANCELLED   // Match cancelled
+  PENDING
+  OPEN
+  FILLED
+  COMPLETED
+  CANCELLED
 }
 
 enum TournamentStatus {
@@ -133,4 +140,10 @@ enum TournamentStatus {
   IN_PROGRESS
   COMPLETED
   CANCELLED
-} 
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  FAILED
+}

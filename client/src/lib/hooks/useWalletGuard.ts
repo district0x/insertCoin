@@ -8,13 +8,13 @@ export function useWalletGuard() {
   const pathname = usePathname();
 
   useEffect(() => {
-    // Skip redirection for home page
-    if (pathname === "/") return;
+    // Skip redirection for home page and match creation page
+    if (pathname === "/" || pathname === "/matches/create") return;
 
     // Wait for Privy to be ready before checking authentication
     if (!ready) return;
 
-    // Redirect to home if wallet is not connected
+    // Redirect to home if wallet is not connected (except for pages where users can connect)
     if (!authenticated) {
       router.replace("/");
     }

@@ -21,7 +21,7 @@ export default function Welcome() {
 							<ArrowRight className="ml-2 h-5 w-5" />
 						</Button>
 					</Link>
-					<Link href="/wallet-signature">
+					<Link href="/link-wallet">
 						<Button size="lg" variant="outline" className="border-white text-white hover:bg-white hover:text-indigo-900">
 							<Shield className="mr-2 h-5 w-5" />
 							Link Discord Wallet

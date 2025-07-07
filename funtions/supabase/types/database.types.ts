@@ -58,10 +58,20 @@ export interface Database {
           updatedAt: string
           creatorId: string | null
           creatorDiscordId: string | null
+          creatorAddress: string | null
           stake: number
           tokenAddress: string | null
           totalPrize: number
           winnerAddress: string | null
+          discordChannelId: string | null
+          game: string | null
+          gameCategory: string | null
+          matchAmountUsd: number | null
+          opponentDiscordId: string | null
+          player2Address: string | null
+          platform: string | null
+          winnerId: string | null
+          roomId: string | null
         }
         Insert: {
           id?: string
@@ -72,10 +82,20 @@ export interface Database {
           updatedAt?: string
           creatorId?: string | null
           creatorDiscordId?: string | null
+          creatorAddress?: string | null
           stake: number
           tokenAddress?: string | null
           totalPrize: number
           winnerAddress?: string | null
+          discordChannelId?: string | null
+          game?: string | null
+          gameCategory?: string | null
+          matchAmountUsd?: number | null
+          opponentDiscordId?: string | null
+          player2Address?: string | null
+          platform?: string | null
+          winnerId?: string | null
+          roomId?: string | null
         }
         Update: {
           id?: string
@@ -86,10 +106,20 @@ export interface Database {
           updatedAt?: string
           creatorId?: string | null
           creatorDiscordId?: string | null
+          creatorAddress?: string | null
           stake?: number
           tokenAddress?: string | null
           totalPrize?: number
           winnerAddress?: string | null
+          discordChannelId?: string | null
+          game?: string | null
+          gameCategory?: string | null
+          matchAmountUsd?: number | null
+          opponentDiscordId?: string | null
+          player2Address?: string | null
+          platform?: string | null
+          winnerId?: string | null
+          roomId?: string | null
         }
       }
       Team: {

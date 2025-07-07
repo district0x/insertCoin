@@ -15,6 +15,8 @@ import { useMatchActions } from "@/hooks/useMatchActions";
 import MatchDetailHeader from "@/components/match/match-detail-header";
 import MatchDetailContent from "@/components/match/match-detail-content";
 import MatchDetailSkeleton from "@/components/match/match-detail-skeleton";
+import { useState } from "react";
+import { ethers } from "ethers";
 
 export default function MatchPage() {
   const params = useParams();
@@ -78,8 +80,15 @@ export default function MatchPage() {
     contract,
     publicClient,
     match,
+    address: address as `0x${string}` | undefined,
     onSuccess: () => mutate()
   });
+
+  const [closeMatchResult, setCloseMatchResult] = useState<{
+    winnerAmount: string;
+    poolAmount: string;
+    isOpen: boolean;
+  }>({ winnerAmount: '', poolAmount: '', isOpen: false });
 
   if (error) {
     console.log("[MatchPage] Rendering error state");
@@ -105,6 +114,18 @@ export default function MatchPage() {
     teamB: displayMatch.teamB,
   });
 
+  // Pass a callback to handleCloseMatch to set the result
+  const handleCloseMatchWithResult = async (...args) => {
+    const result = await handleCloseMatch(...args);
+    if (result && result.winnerAmount && result.poolAmount) {
+      setCloseMatchResult({
+        winnerAmount: result.winnerAmount,
+        poolAmount: result.poolAmount,
+        isOpen: true,
+      });
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <MatchDetailHeader
@@ -123,7 +144,7 @@ export default function MatchPage() {
           selectedWinner={selectedWinner}
           onSelectWinner={setSelectedWinner}
           onJoin={handleJoinMatch}
-          onClose={handleCloseMatch}
+          onClose={handleCloseMatchWithResult}
           showJoinConfirmation={showJoinConfirmation}
           setShowJoinConfirmation={setShowJoinConfirmation}
           showCloseConfirmation={showCloseConfirmation}
@@ -139,6 +160,22 @@ export default function MatchPage() {
         onOpenChange={setShowSuccessDialog}
         convertToUsd={convertEthToUsd}
       />
+
+      {/* Custom modal for match close result */}
+      {closeMatchResult.isOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2>Match Closed!</h2>
+            <p>
+              Winner Paid: <b>${convertEthToUsd(BigInt(Math.floor(Number(closeMatchResult.winnerAmount) * 1e18))).toFixed(2)} USD</b> (<b>{closeMatchResult.winnerAmount} ETH</b>)
+            </p>
+            <p>
+              Pool Paid: <b>${convertEthToUsd(BigInt(Math.floor(Number(closeMatchResult.poolAmount) * 1e18))).toFixed(2)} USD</b> (<b>{closeMatchResult.poolAmount} ETH</b>)
+            </p>
+            <button onClick={() => setCloseMatchResult({ ...closeMatchResult, isOpen: false })}>Close</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -699,9 +699,7 @@ export const ONEVONE_ABI = [
         type: "function",
     },
     {
-        inputs: [
-            { internalType: "uint256", name: "_tournamentId", type: "uint256" },
-        ],
+        inputs: [{ internalType: "uint256", name: "_tournamentId", type: "uint256" }],
         name: "allocateMatchingPoolToTournament",
         outputs: [],
         stateMutability: "nonpayable",
@@ -727,11 +725,7 @@ export const ONEVONE_ABI = [
     {
         inputs: [
             { internalType: "uint256", name: "_matchId", type: "uint256" },
-            {
-                internalType: "address",
-                name: "_winningTeamPlayer",
-                type: "address",
-            },
+            { internalType: "address", name: "_winningTeamPlayer", type: "address" },
         ],
         name: "close2v2Match",
         outputs: [],
@@ -761,21 +755,9 @@ export const ONEVONE_ABI = [
     {
         inputs: [
             { internalType: "uint256", name: "_numEntrants", type: "uint256" },
-            {
-                internalType: "uint8",
-                name: "_winnersPercentage",
-                type: "uint8",
-            },
-            {
-                internalType: "uint8",
-                name: "_multisigPercentage",
-                type: "uint8",
-            },
-            {
-                internalType: "contract IERC20",
-                name: "_token",
-                type: "address",
-            },
+            { internalType: "uint8", name: "_winnersPercentage", type: "uint8" },
+            { internalType: "uint8", name: "_multisigPercentage", type: "uint8" },
+            { internalType: "contract IERC20", name: "_token", type: "address" },
             { internalType: "uint256", name: "_entryFee", type: "uint256" },
         ],
         name: "createTournament",
@@ -791,9 +773,7 @@ export const ONEVONE_ABI = [
         type: "function",
     },
     {
-        inputs: [
-            { internalType: "uint256", name: "_tournamentId", type: "uint256" },
-        ],
+        inputs: [{ internalType: "uint256", name: "_tournamentId", type: "uint256" }],
         name: "donate",
         outputs: [],
         stateMutability: "payable",
@@ -834,11 +814,7 @@ export const ONEVONE_ABI = [
         inputs: [
             { internalType: "uint256", name: "_tournamentId", type: "uint256" },
             { internalType: "address[]", name: "winners", type: "address[]" },
-            {
-                internalType: "uint8[]",
-                name: "winnersPercentages",
-                type: "uint8[]",
-            },
+            { internalType: "uint8[]", name: "winnersPercentages", type: "uint8[]" },
         ],
         name: "endTournament",
         outputs: [],
@@ -981,9 +957,7 @@ export const ONEVONE_ABI = [
         type: "function",
     },
     {
-        inputs: [
-            { internalType: "uint256", name: "_tournamentId", type: "uint256" },
-        ],
+        inputs: [{ internalType: "uint256", name: "_tournamentId", type: "uint256" }],
         name: "joinTournament",
         outputs: [],
         stateMutability: "payable",
@@ -1112,13 +1086,7 @@ export const ONEVONE_ABI = [
         type: "function",
     },
     {
-        inputs: [
-            {
-                internalType: "address",
-                name: "_multisigAddress",
-                type: "address",
-            },
-        ],
+        inputs: [{ internalType: "address", name: "_multisigAddress", type: "address" }],
         name: "setMultisigAddress",
         outputs: [],
         stateMutability: "nonpayable",
@@ -1155,9 +1123,7 @@ export const ONEVONE_ABI = [
         type: "function",
     },
     {
-        inputs: [
-            { internalType: "uint256", name: "_tournamentId", type: "uint256" },
-        ],
+        inputs: [{ internalType: "uint256", name: "_tournamentId", type: "uint256" }],
         name: "startTournament",
         outputs: [],
         stateMutability: "nonpayable",
@@ -1198,31 +1164,15 @@ export const ONEVONE_ABI = [
         name: "tournaments",
         outputs: [
             { internalType: "uint8", name: "winnersPercentage", type: "uint8" },
-            {
-                internalType: "uint8",
-                name: "multisigPercentage",
-                type: "uint8",
-            },
+            { internalType: "uint8", name: "multisigPercentage", type: "uint8" },
             { internalType: "bool", name: "isActive", type: "bool" },
             { internalType: "bool", name: "hasStarted", type: "bool" },
             { internalType: "bool", name: "isERC20", type: "bool" },
             { internalType: "bool", name: "hasEntryFee", type: "bool" },
             { internalType: "uint256", name: "numEntrants", type: "uint256" },
-            {
-                internalType: "uint256",
-                name: "totalDonations",
-                type: "uint256",
-            },
-            {
-                internalType: "uint256",
-                name: "totalTokenDonations",
-                type: "uint256",
-            },
-            {
-                internalType: "uint256",
-                name: "remainingBalance",
-                type: "uint256",
-            },
+            { internalType: "uint256", name: "totalDonations", type: "uint256" },
+            { internalType: "uint256", name: "totalTokenDonations", type: "uint256" },
+            { internalType: "uint256", name: "remainingBalance", type: "uint256" },
             { internalType: "uint256", name: "entryFee", type: "uint256" },
             { internalType: "contract IERC20", name: "token", type: "address" },
         ],

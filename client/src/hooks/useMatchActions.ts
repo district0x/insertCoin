@@ -18,6 +18,7 @@ interface UseMatchActionsProps {
   contract: GetContractReturnType<typeof ONEVONE_ABI> | null;
   publicClient: PublicClient | undefined;
   match: OnChainMatch | null;
+  address?: `0x${string}`;
   onSuccess?: () => void;
 }
 
@@ -25,11 +26,12 @@ export function useMatchActions({
   contract,
   publicClient,
   match,
+  address: userAddress,
   onSuccess
 }: UseMatchActionsProps) {
   const { toast } = useToast();
   const { user, sendTransaction } = usePrivy();
-  const address = user?.wallet?.address as `0x${string}` | undefined;
+  const address = userAddress || (user?.wallet?.address as `0x${string}` | undefined);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [donationEthAmount, setDonationEthAmount] = useState<bigint>(BigInt(0));
@@ -309,27 +311,66 @@ export function useMatchActions({
 
     try {
       setIsProcessing(true);
-
+      console.log(`[HANDLE-CLOSE-MATCH] Attempting to close match`, {
+        matchId: displayMatch.id,
+        selectedWinner,
+        contractAddress: contract.address
+      });
+      const userAddress = address as `0x${string}`;
       const hash = await closeMatch(
         contract,
         publicClient,
         sendTransaction,
         displayMatch.id,
-        selectedWinner
+        selectedWinner,
+        userAddress
       );
-
+      console.log(`[HANDLE-CLOSE-MATCH] closeMatch returned hash:`, hash);
       toast({
         title: "Transaction Submitted",
         description:
           "Your request to close the match has been submitted.",
       });
-
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      console.log(`[HANDLE-CLOSE-MATCH] Transaction receipt:`, receipt);
+
+      // Parse logs for MatchClosed event and show winner payout
+      let winnerPaidEth = null;
+      let poolPaidEth = null;
+      try {
+        const { ethers } = await import("ethers");
+        const iface = new ethers.utils.Interface(contract.abi);
+        for (const log of receipt.logs) {
+          try {
+            const parsed = iface.parseLog(log);
+            if (parsed.name === "MatchClosed") {
+              winnerPaidEth = ethers.utils.formatEther(parsed.args.winnerAmount.toString());
+              poolPaidEth = ethers.utils.formatEther(parsed.args.poolAmount.toString());
+              break;
+            }
+          } catch (e) { }
+        }
+      } catch (parseErr) {
+        console.error("[HANDLE-CLOSE-MATCH] Error parsing MatchClosed event:", parseErr);
+      }
+
+      if (winnerPaidEth && poolPaidEth) {
+        toast({
+          title: "Match Completed",
+          description: `Winner paid: ${winnerPaidEth} ETH`,
+          variant: "success",
+        });
+      } else {
+        toast({
+          title: "Match Completed",
+          description: `Match has been completed. The winner is ${selectedWinner.slice(0, 6)}...${selectedWinner.slice(-4)}`,
+          variant: "success",
+        });
+      }
+
       if (receipt.status === "success") {
-        // Update the database with the match completion
         try {
-          // Update the match in the database
-          await fetch('/api/matches/complete', {
+          const dbRes = await fetch('/api/matches/complete', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -339,17 +380,11 @@ export function useMatchActions({
               winnerAddress: selectedWinner,
             }),
           });
-
-          toast({
-            title: "Match Completed",
-            description: `Match has been completed. The winner is ${selectedWinner.slice(0, 6)}...${selectedWinner.slice(-4)}`,
-            variant: "success",
-          });
-
-          setShowSuccessDialog(true);
+          const dbData = await dbRes.json();
+          console.log(`[HANDLE-CLOSE-MATCH] /api/matches/complete response:`, dbData);
           onSuccess?.();
         } catch (dbError) {
-          console.error("Error updating match in database:", dbError);
+          console.error("[HANDLE-CLOSE-MATCH] Error updating match in database:", dbError);
           toast({
             variant: "destructive",
             title: "Database Update Error",
@@ -357,8 +392,10 @@ export function useMatchActions({
           });
         }
       }
+      // Return payout info for modal
+      return { winnerAmount: winnerPaidEth, poolAmount: poolPaidEth };
     } catch (error) {
-      console.error("Error closing match:", error);
+      console.error("[HANDLE-CLOSE-MATCH] Error closing match:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -376,6 +413,7 @@ export function useMatchActions({
     publicClient,
     displayMatch,
     selectedWinner,
+    address,
     toast,
     onSuccess,
     sendTransaction,

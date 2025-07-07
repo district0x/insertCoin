@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useRef, useMemo } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useToast } from "@/lib/hooks/use-toast";
 import { saveWalletToDb } from "@/lib/actions/wallet";
@@ -20,24 +20,32 @@ export function useWalletConnection() {
   const initializedRef = useRef(false);
   const hasShownToastRef = useRef(false);
 
-  // Get the user's connected external wallet address
-  const getConnectedWalletAddress = useCallback(() => {
+  // Get the connected external wallet address with priority system
+  const address = useMemo(() => {
     if (!user) return null;
 
-    // Only return external wallet addresses, never embedded wallets
+    // Priority order: User's linked external wallet > null
     if (user.linkedAccounts && user.linkedAccounts.length > 0) {
       const walletAccount = user.linkedAccounts.find(account =>
         account.type === 'wallet' && account.verifiedAt
       );
       if (walletAccount && 'address' in walletAccount) {
-        console.log("Found external wallet:", walletAccount.address);
-        return walletAccount.address;
+        console.log("Found linked external wallet:", walletAccount.address);
+        return walletAccount.address as `0x${string}`;
       }
     }
 
     // Don't fall back to embedded wallet - require external wallet connection
     console.log("No external wallet found. User needs to connect an external wallet.");
     return null;
+  }, [user]);
+
+  // Check if the user has an external wallet connected
+  const isExternalWallet = useMemo(() => {
+    if (!user?.linkedAccounts) return false;
+    return user.linkedAccounts.some(account =>
+      account.type === 'wallet' && account.verifiedAt
+    );
   }, [user]);
 
   const addTokenToWallet = useCallback(async () => {
@@ -125,7 +133,6 @@ export function useWalletConnection() {
       return;
     }
 
-    const address = getConnectedWalletAddress();
     if (!address) {
       return;
     }
@@ -155,7 +162,7 @@ export function useWalletConnection() {
           toast({
             title: "Wallet Connected",
             description:
-              "Your wallet has been successfully connected and saved.",
+              "Your external wallet has been successfully connected and saved.",
           });
           hasShownToastRef.current = true;
         }
@@ -172,17 +179,17 @@ export function useWalletConnection() {
     };
 
     handleWalletConnection();
-  }, [ready, authenticated, getConnectedWalletAddress, toast, saveWallet, checkAndAddToken]);
+  }, [ready, authenticated, address, toast, saveWallet, checkAndAddToken]);
 
   return {
-    address: getConnectedWalletAddress(),
-    isConnected: authenticated && !!getConnectedWalletAddress(),
+    address,
+    isConnected: authenticated && !!address,
+    isExternalWallet,
     connect: login,
     disconnect: logout,
     user,
     authenticated,
     ready,
     sendTransaction,
-    getConnectedWalletAddress,
   };
 }

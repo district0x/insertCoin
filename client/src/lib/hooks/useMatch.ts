@@ -1,16 +1,21 @@
 import { useContract } from "./useContract";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { BaseError, formatEther, createPublicClient, http } from "viem";
 import { ERC20_APPROVAL_ABI, ZERO_ADDRESS } from "@/lib/constants/tokens";
 import { useToast } from "@/hooks/use-toast";
 import { baseSepolia } from "@/lib/config/chains";
+import { useWalletConnection } from "./useWalletConnection";
+import { ethers } from "ethers";
+import { ONEVONE_ABI } from "@/lib/contracts/abis/ABI";
 
 // Remove the MTK_TOKEN and ERC20_APPROVAL_ABI constants as they're now imported
 
 export function useMatch() {
   const contract = useContract();
   const { user, sendTransaction } = usePrivy();
+  const { wallets } = useWallets();
   const { toast } = useToast();
+  const { address: walletAddress, isExternalWallet } = useWalletConnection();
 
   // Create a public client for reading contract state
   const publicClient = createPublicClient({
@@ -18,27 +23,44 @@ export function useMatch() {
     transport: http(process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL!),
   });
 
-  // Get the user's connected external wallet address
-  const getConnectedWalletAddress = () => {
-    if (!user) return null;
+  // Helper function to get ethers provider and signer (like tournament project)
+  const getEthersProvider = () => {
+    if (typeof window === 'undefined' || !(window as any).ethereum) {
+      throw new Error('Ethereum provider not available. Please ensure your wallet is connected.');
+    }
+    return new ethers.providers.Web3Provider((window as any).ethereum);
+  };
 
-    // Check if user has a connected external wallet
-    if (user.linkedAccounts && user.linkedAccounts.length > 0) {
-      const walletAccount = user.linkedAccounts.find(account =>
-        account.type === 'wallet' && account.verifiedAt
-      );
-      if (walletAccount && 'address' in walletAccount) {
-        return walletAccount.address;
-      }
+  const getEthersSigner = async () => {
+    // Always use window.ethereum for ethers.js compatibility
+    const provider = getEthersProvider();
+
+    // Request accounts to ensure wallet is connected
+    await provider.send("eth_requestAccounts", []);
+
+    // Get the signer for account 0
+    return provider.getSigner(0);
+  };
+
+  // Helper function to get contract instance with ethers (like tournament project)
+  const getEthersContract = async () => {
+    if (!walletAddress) {
+      throw new Error('Wallet not connected. Please connect your wallet first.');
     }
 
-    // Fallback to embedded wallet if no external wallet is connected
-    return user.wallet?.address || null;
+    const signer = await getEthersSigner();
+    const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
+
+    if (!contractAddress) {
+      throw new Error('Contract address not configured');
+    }
+
+    return new ethers.Contract(contractAddress, ONEVONE_ABI, signer);
   };
 
   // Function to check and approve token allowance
   const checkAndApproveToken = async (tokenAddress: `0x${string}`, amount: bigint) => {
-    if (!user?.wallet || !contract) return false;
+    if (!walletAddress || !contract) return false;
 
     try {
       // Check current allowance
@@ -46,7 +68,7 @@ export function useMatch() {
         address: tokenAddress,
         abi: ERC20_APPROVAL_ABI,
         functionName: "allowance",
-        args: [user.wallet.address as `0x${string}`, contract.address]
+        args: [walletAddress as `0x${string}`, contract.address]
       });
 
       // If allowance is sufficient, return true
@@ -54,97 +76,50 @@ export function useMatch() {
         return true;
       }
 
-      // Otherwise, request approval
+      // Otherwise, request approval using ethers
       toast({
         title: "Token Approval Required",
         description: "Please approve the contract to spend your tokens.",
         duration: 10000,
       });
 
-      const { request } = await publicClient.simulateContract({
-        address: tokenAddress,
-        abi: ERC20_APPROVAL_ABI,
-        functionName: "approve",
-        args: [contract.address, amount],
-        account: user.wallet.address as `0x${string}`
-      });
+      const signer = await getEthersSigner();
+      const tokenContract = new ethers.Contract(
+        tokenAddress,
+        ERC20_APPROVAL_ABI,
+        signer
+      );
 
-      const result = await sendTransaction(request);
-      const hash = typeof result === 'string' ? result : result.hash;
+      const tx = await tokenContract.approve(contract.address, amount.toString());
+      const receipt = await tx.wait();
 
       toast({
-        title: "Approval Transaction Submitted",
-        description: "Waiting for token approval confirmation...",
-        duration: 15000,
+        title: "Token Approval Successful",
+        description: "You can now create the match.",
+        variant: "success",
+        duration: 5000,
       });
-
-      // Wait for the approval transaction to be mined
-      const receipt = await publicClient.waitForTransactionReceipt({
-        hash,
-        // Increase timeout for Base Sepolia
-        timeout: 180000, // 3 minutes
-        pollingInterval: 3000,
-        confirmations: 1
-      });
-
-      if (receipt.status === "success") {
-        toast({
-          title: "Token Approval Successful",
-          description: "You can now create the match.",
-          variant: "success",
-          duration: 5000,
-        });
-        return true;
-      } else {
-        toast({
-          title: "Token Approval Failed",
-          description: "The approval transaction failed. Please try again.",
-          variant: "destructive",
-          duration: 7000,
-        });
-        return false;
-      }
+      return true;
     } catch (error) {
       console.error("Error approving token:", error);
-
-      // Handle timeout errors specially
-      if (error instanceof Error && error.message.includes("Timed out")) {
-        toast({
-          title: "Token Approval Taking Longer Than Expected",
-          description: "The approval transaction is taking longer than expected to confirm on Base Sepolia. Please check your wallet for the transaction status.",
-          variant: "destructive",
-          duration: 10000,
-        });
-        throw new Error("Transaction confirmation timed out. The transaction might still succeed - please check your wallet or explorer.");
-      } else {
-        toast({
-          title: "Token Approval Error",
-          description: error instanceof Error ? error.message : "Failed to approve token. Please try again.",
-          variant: "destructive",
-          duration: 7000,
-        });
-        throw new Error("Failed to approve token. Please try again.");
-      }
+      toast({
+        title: "Token Approval Error",
+        description: error instanceof Error ? error.message : "Failed to approve token. Please try again.",
+        variant: "destructive",
+        duration: 7000,
+      });
+      throw new Error("Failed to approve token. Please try again.");
     }
   };
 
   const createMatch = async (amount: bigint, tokenAddress?: `0x${string}`) => {
-    if (!contract || !user?.wallet) {
-      throw new Error("No wallet available. Please connect your external wallet.");
+    if (!contract || !walletAddress) {
+      throw new Error("No external wallet available. Please connect your external wallet.");
     }
 
-    // Get the connected wallet address (prefer external wallet over embedded)
-    const walletAddress = getConnectedWalletAddress();
-    if (!walletAddress) {
-      throw new Error("No wallet address available. Please connect your external wallet.");
-    }
-
-    // Check if user is using embedded wallet (which has no funds)
-    const isUsingEmbeddedWallet = user.wallet?.address === walletAddress &&
-      (!user.linkedAccounts || user.linkedAccounts.length === 0);
-
-    if (isUsingEmbeddedWallet) {
-      throw new Error("Please connect your external wallet instead of using the embedded wallet. The embedded wallet has no funds.");
+    // Check if user has an external wallet connected
+    if (!isExternalWallet) {
+      throw new Error("Please connect an external wallet (like MetaMask) to create matches. Embedded wallets are not supported for transactions.");
     }
 
     try {
@@ -183,25 +158,26 @@ export function useMatch() {
         }
       }
 
-      // Prepare contract call parameters and handle ETH value properly
-      const { request } = await contract.simulate.startMatch(
-        [amount, token],
-        {
-          account: walletAddress as `0x${string}`,
-          // Only include value if using ETH, not for ERC20 tokens
-          value: isERC20 ? 0n : amount,
-          gas: await contract.estimateGas.startMatch(
-            [amount, token],
-            { account: walletAddress as `0x${string}`, value: isERC20 ? 0n : amount }
-          ),
-        }
-      );
+      // Use ethers contract like in tournament project
+      const ethersContract = await getEthersContract();
+
+      // Prepare transaction options
+      const txOptions: { value?: ethers.BigNumber } = {};
+      if (!isERC20) {
+        txOptions.value = ethers.BigNumber.from(amount.toString());
+      }
 
       console.log("Sending transaction to start match...");
-      const result = await sendTransaction(request);
-      const hash = typeof result === 'string' ? result : result.hash;
-      console.log("Transaction sent with hash:", hash);
-      return hash;
+      console.log("Contract address:", ethersContract.address);
+      console.log("Function parameters:", {
+        amount: amount.toString(),
+        token: token,
+        txOptions: txOptions
+      });
+      const tx = await ethersContract.startMatch(amount.toString(), token, txOptions);
+      console.log("Transaction sent with hash:", tx.hash);
+
+      return tx.hash;
     } catch (error) {
       console.error("Error creating match:", error);
       if (error instanceof BaseError) {
@@ -226,22 +202,13 @@ export function useMatch() {
   };
 
   const create2v2Match = async (amount: bigint, tokenAddress?: `0x${string}`) => {
-    if (!contract || !user?.wallet) {
-      throw new Error("No wallet available. Please connect your external wallet.");
+    if (!contract || !walletAddress) {
+      throw new Error("No external wallet available. Please connect your external wallet.");
     }
 
-    // Get the connected wallet address (prefer external wallet over embedded)
-    const walletAddress = getConnectedWalletAddress();
-    if (!walletAddress) {
-      throw new Error("No wallet address available. Please connect your external wallet.");
-    }
-
-    // Check if user is using embedded wallet (which has no funds)
-    const isUsingEmbeddedWallet = user.wallet?.address === walletAddress &&
-      (!user.linkedAccounts || user.linkedAccounts.length === 0);
-
-    if (isUsingEmbeddedWallet) {
-      throw new Error("Please connect your external wallet instead of using the embedded wallet. The embedded wallet has no funds.");
+    // Check if user has an external wallet connected
+    if (!isExternalWallet) {
+      throw new Error("Please connect an external wallet (like MetaMask) to create matches. Embedded wallets are not supported for transactions.");
     }
 
     try {
@@ -279,24 +246,20 @@ export function useMatch() {
         }
       }
 
-      const { request } = await contract.simulate.start2v2Match(
-        [amount, token],
-        {
-          account: walletAddress as `0x${string}`,
-          // Only include value if using ETH, not for ERC20 tokens
-          value: isERC20 ? 0n : amount,
-          gas: await contract.estimateGas.start2v2Match(
-            [amount, token],
-            { account: walletAddress as `0x${string}`, value: isERC20 ? 0n : amount }
-          ),
-        }
-      );
+      // Use ethers contract like in tournament project
+      const ethersContract = getEthersContract();
+
+      // Prepare transaction options
+      const txOptions: { value?: ethers.BigNumber } = {};
+      if (!isERC20) {
+        txOptions.value = ethers.BigNumber.from(amount.toString());
+      }
 
       console.log("Sending transaction to start 2v2 match...");
-      const result = await sendTransaction(request);
-      const hash = typeof result === 'string' ? result : result.hash;
-      console.log("Transaction sent with hash:", hash);
-      return hash;
+      const tx = await ethersContract.start2v2Match(amount.toString(), token, txOptions);
+      console.log("Transaction sent with hash:", tx.hash);
+
+      return tx.hash;
     } catch (error) {
       console.error("Error creating 2v2 match:", error);
       if (error instanceof BaseError) {
@@ -320,22 +283,13 @@ export function useMatch() {
   };
 
   const create5v5Match = async (amount: bigint, tokenAddress?: `0x${string}`) => {
-    if (!contract || !user?.wallet) {
-      throw new Error("No wallet available. Please connect your external wallet.");
+    if (!contract || !walletAddress) {
+      throw new Error("No external wallet available. Please connect your external wallet.");
     }
 
-    // Get the connected wallet address (prefer external wallet over embedded)
-    const walletAddress = getConnectedWalletAddress();
-    if (!walletAddress) {
-      throw new Error("No wallet address available. Please connect your external wallet.");
-    }
-
-    // Check if user is using embedded wallet (which has no funds)
-    const isUsingEmbeddedWallet = user.wallet?.address === walletAddress &&
-      (!user.linkedAccounts || user.linkedAccounts.length === 0);
-
-    if (isUsingEmbeddedWallet) {
-      throw new Error("Please connect your external wallet instead of using the embedded wallet. The embedded wallet has no funds.");
+    // Check if user has an external wallet connected
+    if (!isExternalWallet) {
+      throw new Error("Please connect an external wallet (like MetaMask) to create matches. Embedded wallets are not supported for transactions.");
     }
 
     try {
@@ -373,24 +327,20 @@ export function useMatch() {
         }
       }
 
-      const { request } = await contract.simulate.start5v5Match(
-        [amount, token],
-        {
-          account: walletAddress as `0x${string}`,
-          // Only include value if using ETH, not for ERC20 tokens
-          value: isERC20 ? 0n : amount,
-          gas: await contract.estimateGas.start5v5Match(
-            [amount, token],
-            { account: walletAddress as `0x${string}`, value: isERC20 ? 0n : amount }
-          ),
-        }
-      );
+      // Use ethers contract like in tournament project
+      const ethersContract = getEthersContract();
+
+      // Prepare transaction options
+      const txOptions: { value?: ethers.BigNumber } = {};
+      if (!isERC20) {
+        txOptions.value = ethers.BigNumber.from(amount.toString());
+      }
 
       console.log("Sending transaction to start 5v5 match...");
-      const result = await sendTransaction(request);
-      const hash = typeof result === 'string' ? result : result.hash;
-      console.log("Transaction sent with hash:", hash);
-      return hash;
+      const tx = await ethersContract.start5v5Match(amount.toString(), token, txOptions);
+      console.log("Transaction sent with hash:", tx.hash);
+
+      return tx.hash;
     } catch (error) {
       console.error("Error creating 5v5 match:", error);
       if (error instanceof BaseError) {
@@ -414,14 +364,18 @@ export function useMatch() {
   };
 
   const joinMatch = async (matchId: bigint, amount: bigint) => {
-    if (!contract || !user?.wallet) return;
+    if (!contract || !walletAddress) {
+      throw new Error("No external wallet available. Please connect your external wallet.");
+    }
+
+    if (!isExternalWallet) {
+      throw new Error("Please connect an external wallet (like MetaMask) to join matches. Embedded wallets are not supported for transactions.");
+    }
 
     try {
-      const { request } = await contract.simulate.joinMatch([matchId], {
-        account: user.wallet.address,
-        value: amount,
-      });
-      return sendTransaction(request);
+      const ethersContract = getEthersContract();
+      const tx = await ethersContract.joinMatch(matchId.toString(), { value: ethers.BigNumber.from(amount.toString()) });
+      return tx.hash;
     } catch (error) {
       console.error("Error joining match:", error);
       throw error;
@@ -433,17 +387,18 @@ export function useMatch() {
     isTeamA: boolean,
     amount: bigint
   ) => {
-    if (!contract || !user?.wallet) return;
+    if (!contract || !walletAddress) {
+      throw new Error("No external wallet available. Please connect your external wallet.");
+    }
+
+    if (!isExternalWallet) {
+      throw new Error("Please connect an external wallet (like MetaMask) to join matches. Embedded wallets are not supported for transactions.");
+    }
 
     try {
-      const { request } = await contract.simulate.join2v2Team(
-        [matchId, isTeamA],
-        {
-          account: user.wallet.address,
-          value: amount,
-        }
-      );
-      return sendTransaction(request);
+      const ethersContract = getEthersContract();
+      const tx = await ethersContract.join2v2Team(matchId.toString(), isTeamA, { value: ethers.BigNumber.from(amount.toString()) });
+      return tx.hash;
     } catch (error) {
       console.error("Error joining 2v2 team:", error);
       throw error;
@@ -455,17 +410,18 @@ export function useMatch() {
     isTeamA: boolean,
     amount: bigint
   ) => {
-    if (!contract || !user?.wallet) return;
+    if (!contract || !walletAddress) {
+      throw new Error("No external wallet available. Please connect your external wallet.");
+    }
+
+    if (!isExternalWallet) {
+      throw new Error("Please connect an external wallet (like MetaMask) to join matches. Embedded wallets are not supported for transactions.");
+    }
 
     try {
-      const { request } = await contract.simulate.join5v5Team(
-        [matchId, isTeamA],
-        {
-          account: user.wallet.address,
-          value: amount,
-        }
-      );
-      return sendTransaction(request);
+      const ethersContract = getEthersContract();
+      const tx = await ethersContract.join5v5Team(matchId.toString(), isTeamA, { value: ethers.BigNumber.from(amount.toString()) });
+      return tx.hash;
     } catch (error) {
       console.error("Error joining 5v5 team:", error);
       throw error;

@@ -43,6 +43,13 @@ test_*.py
 check_*.js
 run_*.py
 cleanup_*.py
+test-*.js
+check-*.js
+
+# Deployment documentation (not needed in repo)
+DEPLOYMENT.md
+DEPLOYMENT_CHECKLIST.md
+deployment-*.md
 
 # Prisma (if not needed in repo)
 prisma/migrations/

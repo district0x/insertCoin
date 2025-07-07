@@ -126,19 +126,22 @@ def create_enhanced_match_embed(match, creator: discord.User) -> discord.Embed:
         inline=True
     )
     
-    # Room ID Section
+    # Instructions Section
     embed.add_field(
-        name="🔑 Room Information",
+        name="🎮 How to Join",
         value=(
-            f"**Room ID:** `{match.roomId}`\n"
-            f"**Channel:** <#{match.discordChannelId}>\n"
-            f"**Created:** {discord.utils.format_dt(match.createdAt, style='R')}"
+            "**To participate in this match:**\n"
+            "• Click '🎮 Join Match Room' to access the private coordination room\n"
+            "• Use the private room to coordinate with other players\n"
+            "• The '⚡ Setup Match' button will appear once players join\n"
+            "• Share the blockchain match link with opponents\n\n"
+            "**The match room is private and only visible to participants.**"
         ),
         inline=False
     )
     
     # Add footer with Room ID and timestamp
-    embed.set_footer(text=f"Room ID: {match.roomId} • Created {discord.utils.format_dt(match.createdAt, style='R')}")
+    embed.set_footer(text=f"Room ID: {match.roomId}. Created {discord.utils.format_dt(match.createdAt, style='R')}")
     
     return embed
 

@@ -8,11 +8,17 @@ import { baseSepolia } from "@/lib/config/chains";
 import MatchList from "@/components/match/match-list";
 import { fetchMatch } from "@/lib/match/fetch";
 import { WalletLinkBanner } from "@/components/WalletLinkBanner";
+import { DiscordLinkBanner } from "@/components/DiscordLinkBanner";
+import { useDiscordLink } from "@/lib/hooks/useDiscordLink";
+import { useWalletConnection } from "@/lib/hooks/useWalletConnection";
 
 export default function MatchesPage() {
   const contract = useContract();
+  const { isConnected } = useWalletConnection();
+  const { hasLinkedDiscordId, isLoading: isCheckingDiscord } = useDiscordLink();
   const [error, setError] = React.useState<string | null>(null);
-  const [showBanner, setShowBanner] = React.useState(true);
+  const [showWalletBanner, setShowWalletBanner] = React.useState(true);
+  const [showDiscordBanner, setShowDiscordBanner] = React.useState(true);
 
   // Create a public client for reading contract state
   const publicClient = React.useMemo(() => {
@@ -21,6 +27,18 @@ export default function MatchesPage() {
       transport: http(process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL!),
     });
   }, []);
+
+  // Check if user needs to link Discord account
+  const needsDiscordLink = React.useMemo(() => {
+    // If we're still checking, don't show banner yet
+    if (isCheckingDiscord) return false;
+
+    // If user has linked Discord ID, don't show banner
+    if (hasLinkedDiscordId === true) return false;
+
+    // Show banner if user is connected but doesn't have linked Discord ID
+    return isConnected && hasLinkedDiscordId === false;
+  }, [isCheckingDiscord, hasLinkedDiscordId, isConnected]);
 
   // Debug contract address
   React.useEffect(() => {
@@ -72,8 +90,13 @@ export default function MatchesPage() {
         </div>
 
         {/* Wallet Link Banner */}
-        {showBanner && (
-          <WalletLinkBanner onDismiss={() => setShowBanner(false)} />
+        {showWalletBanner && (
+          <WalletLinkBanner onDismiss={() => setShowWalletBanner(false)} />
+        )}
+
+        {/* Discord Link Banner */}
+        {needsDiscordLink && showDiscordBanner && (
+          <DiscordLinkBanner onDismiss={() => setShowDiscordBanner(false)} />
         )}
 
         {/* Fixed height container to prevent layout shifts */}

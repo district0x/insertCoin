@@ -28,16 +28,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
         appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || ""}
         config={{
           loginMethods: [
+            "wallet",
             "email",
             "discord",
-            "google",
-            "wallet"
+            "google"
           ],
           appearance: {
             theme: "dark",
             accentColor: "#6366f1",
             showWalletLoginFirst: true,
           },
+
           defaultChain: {
             id: 84532,
             name: "Base Sepolia",

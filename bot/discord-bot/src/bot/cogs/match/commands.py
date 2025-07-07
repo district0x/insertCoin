@@ -23,9 +23,17 @@ from src.utils.embeds import (
     create_match_history_embed,
     create_opponent_record_embed,
 )
+from src.utils.rate_limiter import (
+    rate_limit,
+    DISCORD_RATE_LIMITER,
+    DiscordRateLimitHandler,
+    rate_limited_discord_operation,
+    rate_limited_db_operation
+)
 
 logger = logging.getLogger(__name__)
 
+@rate_limit(DISCORD_RATE_LIMITER, user_specific=True)
 async def handle_create_match(
     interaction: discord.Interaction,
     bot,
@@ -36,40 +44,64 @@ async def handle_create_match(
     match_amount_usd: int,
     amount: Optional[float] = None
 ):
-    """Handle the create-match command."""
+    """Handle the create-match command with rate limiting."""
     await interaction.response.defer()
     
     try:
         logger.info(f"Creating match with type: {match_type}, platform: {platform}, game: {game}, amount: {amount}")
         
-        # Create match channel and get channel info
-        channel_info = await create_match_channel(interaction)
+        # Prepare match data for channel creation
+        match_data = {
+            "matchType": match_type,
+            "platform": platform,
+            "game": game,
+            "matchAmountUsd": match_amount_usd
+        }
         
-        # Create match in database
-        match = await create_match_in_db(
-            interaction,
-            match_type,
-            platform,
-            category,
-            game,
-            match_amount_usd,
-            amount,
-            channel_info
+        # Create match channel with rate limiting
+        async def create_channel():
+            return await create_match_channel(interaction, match_data)
+        
+        channel_info = await DiscordRateLimitHandler.handle_rate_limit(
+            interaction, create_channel
         )
+
+        # Create match in database with rate limiting
+        async def create_db_match():
+            return await create_match_in_db(
+                interaction,
+                match_type,
+                platform,
+                category,
+                game,
+                match_amount_usd,
+                amount,
+                channel_info
+            )
         
-        # Create and send embeds
-        await create_match_embeds(interaction, match, channel_info)
+        match = await rate_limited_db_operation(create_db_match)
+
+        # Create and send embeds with rate limiting
+        async def send_embeds():
+            await create_match_embeds(interaction, match, channel_info)
         
+        await DiscordRateLimitHandler.handle_rate_limit(
+            interaction, send_embeds
+        )
+
         # Send success message
-        await interaction.followup.send(
+        await rate_limited_discord_operation(
+            interaction.followup.send,
             f"✅ Match created successfully! Head over to {channel_info.channel.mention} to get started.",
             ephemeral=True
         )
+        
         logger.info("Match creation completed successfully")
         
     except Exception as e:
         logger.error(f"Error creating match: {e}", exc_info=True)
-        await interaction.followup.send(
+        await rate_limited_discord_operation(
+            interaction.followup.send,
             "An error occurred while creating the match. Please try again.",
             ephemeral=True
         )

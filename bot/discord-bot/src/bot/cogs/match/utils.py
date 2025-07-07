@@ -1,6 +1,7 @@
 import logging
 import time
 import uuid
+import re
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
@@ -9,7 +10,7 @@ from discord.ext import commands
 
 from src.db.prisma import prisma
 from src.utils.embeds import create_enhanced_match_embed
-from .components import MatchSetupView
+from .components import MatchPostView, MatchRoomView
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +20,38 @@ class ChannelInfo:
     channel: discord.TextChannel
     category: discord.CategoryChannel
 
-async def create_match_channel(interaction: discord.Interaction) -> ChannelInfo:
-    """Create a dedicated channel for the match."""
+def clean_channel_name(name: str) -> str:
+    """Clean and format channel name for Discord."""
+    # Remove special characters that Discord doesn't allow in channel names
+    cleaned = re.sub(r'[^\w\s-]', '', name)
+    # Replace spaces with hyphens
+    cleaned = re.sub(r'\s+', '-', cleaned)
+    # Convert to lowercase
+    cleaned = cleaned.lower()
+    # Limit to 100 characters (Discord limit)
+    if len(cleaned) > 100:
+        cleaned = cleaned[:97] + "..."
+    return cleaned
+
+def generate_match_channel_name(match_type: str, platform: str, game: str, amount: int) -> str:
+    """Generate a descriptive channel name from match details."""
+    # Format: {Type}-{Platform}-{Game}-${Amount}
+    channel_name = f"{match_type}-{platform}-{game}-${amount}"
+    return clean_channel_name(channel_name)
+
+async def get_user_by_discord_id(discord_id: str) -> Optional[discord.User]:
+    """Get Discord user by Discord ID."""
+    try:
+        # This would need to be called from a context where we have access to the bot
+        # For now, we'll return a mock user or handle this differently
+        # In a real implementation, you'd need to pass the bot instance
+        return None
+    except Exception as e:
+        logger.error(f"Error getting user by Discord ID {discord_id}: {e}")
+        return None
+
+async def create_match_channel(interaction: discord.Interaction, match_data: dict) -> ChannelInfo:
+    """Create a dedicated channel for the match with hybrid approach."""
     try:
         # Get the guild and category
         guild = interaction.guild
@@ -35,18 +66,30 @@ async def create_match_channel(interaction: discord.Interaction) -> ChannelInfo:
             category = await guild.create_category(category_name)
             logger.info(f"Created new category: {category_name}")
         
-        # Create a unique channel name
-        timestamp = int(time.time())
-        channel_name = f"match-{timestamp}"
+        # Generate descriptive channel name
+        channel_name = generate_match_channel_name(
+            match_data["matchType"],
+            match_data["platform"],
+            match_data["game"],
+            match_data["matchAmountUsd"]
+        )
         
-        # Create the channel
+        # Set up permissions - hidden from everyone by default
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(read_messages=False),  # Hidden from everyone
+            guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True, manage_messages=True),  # Bot can see and manage
+            interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True),  # Creator can see and send
+        }
+        
+        # Create the channel with restricted permissions
         channel = await guild.create_text_channel(
             name=channel_name,
             category=category,
-            topic=f"Match channel created by {interaction.user.display_name}"
+            topic=f"Match channel created by {interaction.user.display_name} - Join via match post to access!",
+            overwrites=overwrites
         )
         
-        logger.info(f"Created match channel: {channel.name}")
+        logger.info(f"Created restricted match channel: {channel.name}")
         return ChannelInfo(channel=channel, category=category)
         
     except Exception as e:
@@ -116,37 +159,62 @@ async def create_match_embeds(
     match: dict,
     channel_info: ChannelInfo
 ):
-    """Create and send enhanced match embeds with setup button."""
-    # Create and send enhanced match embed with button
-    embed = create_enhanced_match_embed(match, interaction.user)
-    view = MatchSetupView(match.roomId, match.matchAmountUsd or 0)
+    """Create and send match embeds with hybrid approach."""
+    # Create match post for the original room (where command was used)
+    from src.utils.embeds import create_enhanced_match_embed
+    from .components import MatchPostView
     
-    match_message = await channel_info.channel.send(embed=embed, view=view)
+    # Create the match post embed
+    embed = create_enhanced_match_embed(match, interaction.user)
+    
+    # Add information about the private match room
+    embed.add_field(
+        name="🎮 Private Match Room",
+        value=(
+            f"**A private coordination room has been created:** {channel_info.channel.mention}\n\n"
+            f"🔒 **Access:** Click 'Join Match Room' to get access\n"
+            f"💬 **Purpose:** Coordinate with other players\n"
+            f"🎯 **Features:** Share match links, discuss strategies\n\n"
+            f"*The match room is hidden from the server by default and only visible to participants.*"
+        ),
+        inline=False
+    )
+    
+    # Create view with join room and setup buttons
+    view = MatchPostView(match.roomId, str(channel_info.channel.id), match.matchAmountUsd or 0)
+    
+    # Send the match post in the original room
+    match_message = await interaction.channel.send(embed=embed, view=view)
     await match_message.pin()
     
-    # Send welcome message with game details
+    # Send welcome message to the private match room
     welcome_embed = discord.Embed(
-        title="👋 Welcome to the Match Channel!",
+        title="🎮 Welcome to the Match Room!",
         description=(
-            "This channel is dedicated to your match. Here's what to do next:\n\n"
+            "This is your private match coordination space.\n\n"
             "1️⃣ **Match Details**\n"
             f"• Platform: {match.platform}\n"
             f"• Game: {match.game} ({match.gameCategory})\n"
             f"• Match Amount: ${match.matchAmountUsd} USD\n"
             f"• Room ID: `{match.roomId}`\n\n"
-            "2️⃣ **Setup Your Match**\n"
-            f"• Click the '⚡ Setup Match' button above\n"
-            f"• Follow the instructions in the modal\n"
-            f"• Connect your wallet and set stake amount\n\n"
-            "3️⃣ **Share with Opponent**\n"
-            "• Once created, share the match link with your opponent\n"
-            "• Use this channel to coordinate game details\n\n"
-            "4️⃣ **Need Help?**\n"
-            "• Use `/match-info` to see match details\n"
-            "• Ask questions in this channel"
+            "2️⃣ **Waiting for Players**\n"
+            f"• Share the original post with potential opponents\n"
+            f"• They need to click 'Join Match Room' to access this room\n"
+            f"• Once another player joins, the '⚡ Setup Match' button will appear\n\n"
+            "3️⃣ **Coordinate with Players**\n"
+            f"• Use this room to discuss match details\n"
+            f"• Share blockchain match links\n"
+            f"• Coordinate game strategies\n"
+            f"• Find additional players if needed\n\n"
+            "4️⃣ **Privacy**\n"
+            f"• This room is only visible to participants\n"
+            f"• Others can join by clicking 'Join Match Room' in the original post\n\n"
+            "🔒 **Private Room:** Only participants can see this channel."
         ),
         color=discord.Color.blue()
     )
+    
+    # Don't add Setup Match button initially - it will appear when players join
     await channel_info.channel.send(embed=welcome_embed)
 
 async def get_user_stats(user_id: str) -> Optional[Dict]:

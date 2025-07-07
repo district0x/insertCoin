@@ -61,6 +61,54 @@ export async function getUserByDiscordId(discordId: string) {
     }
 }
 
+// Function to check if a wallet address has a linked Discord ID
+export async function hasLinkedDiscordId(walletAddress: string): Promise<boolean> {
+    try {
+        console.log(`[DB] Checking if wallet ${walletAddress} has linked Discord ID`);
+
+        if (!walletAddress || typeof walletAddress !== 'string') {
+            throw new Error(`Invalid wallet address: ${walletAddress}`);
+        }
+
+        // Validate wallet address format
+        if (!walletAddress.startsWith('0x') || walletAddress.length !== 42) {
+            throw new Error(`Invalid wallet address format: ${walletAddress}`);
+        }
+
+        // Create a fresh Prisma client instance to avoid connection issues
+        const { PrismaClient } = require('@prisma/client');
+        const freshPrisma = new PrismaClient({
+            log: ['error', 'warn'],
+        });
+
+        try {
+            // Test database connection
+            await freshPrisma.$connect();
+            console.log("[DB] Database connection successful");
+
+            // Try to find the user
+            const user = await freshPrisma.user.findUnique({
+                where: { address: walletAddress },
+                select: { discordId: true }
+            });
+
+            console.log(`[DB] User query result:`, user);
+
+            const hasDiscordId = user?.discordId !== null && user?.discordId !== undefined;
+            console.log(`[DB] Wallet ${walletAddress} has linked Discord ID: ${hasDiscordId}`);
+
+            return hasDiscordId;
+        } finally {
+            // Always disconnect to prevent connection leaks
+            await freshPrisma.$disconnect();
+        }
+    } catch (error) {
+        console.error("[DB] Error checking Discord ID link:", error);
+        // Return false instead of throwing to prevent the app from crashing
+        return false;
+    }
+}
+
 // Function to get user by wallet address
 export async function getUserByWalletAddress(walletAddress: string) {
     try {

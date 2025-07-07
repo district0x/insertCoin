@@ -7,6 +7,8 @@ from discord.ext import commands
 
 from src.db.prisma import prisma
 from src.web3.contract import contract
+from src.utils.embeds import create_stats_embed, create_match_history_embed, create_opponent_record_embed
+from src.utils.rate_limiter import get_rate_limit_stats, METRICS
 
 logger = logging.getLogger(__name__)
 
@@ -79,19 +81,19 @@ class UtilsCog(commands.Cog):
             
         except Exception as e:
             logger.error(f"Error in link wallet command: {e}", exc_info=True)
-                await interaction.followup.send(
+            await interaction.followup.send(
                 "❌ An error occurred. Please try again or contact support.",
-                    ephemeral=True
-                )
+                ephemeral=True
+            )
 
     @app_commands.command(name="profile")
     async def profile(self, interaction: discord.Interaction):
-        """View your profile and match statistics."""
+        """View your gaming profile and statistics."""
         await interaction.response.defer()
         
         try:
-            # Find user by Discord ID
-            user = prisma.user.find_unique(
+            # Get user stats
+            user = await prisma.user.find_unique(
                 where={"discordId": str(interaction.user.id)}
             )
             
@@ -99,149 +101,159 @@ class UtilsCog(commands.Cog):
                 embed = discord.Embed(
                     title="👤 Profile Not Found",
                     description="You don't have a profile yet. Create a match to get started!",
-                    color=discord.Color.blue()
-                )
-                embed.add_field(
-                    name="Get Started",
-                    value="Use `/create-match` to start a new match and create your profile.",
-                    inline=False
+                    color=discord.Color.orange()
                 )
                 await interaction.followup.send(embed=embed, ephemeral=True)
                 return
-                
+            
             # Calculate win rate
             total_matches = user.totalMatches
-            wins = user.totalWins
-            losses = user.totalLosses
-            win_rate = (wins / total_matches * 100) if total_matches > 0 else 0
+            win_rate = (user.totalWins / total_matches * 100) if total_matches > 0 else 0
             
-            # Create profile embed
             embed = discord.Embed(
                 title=f"👤 {interaction.user.display_name}'s Profile",
+                description="Your gaming statistics and achievements",
                 color=discord.Color.blue()
             )
             
-            if user.address:
-                embed.add_field(
-                    name="🔗 Linked Wallet",
-                    value=f"`{user.address[:6]}...{user.address[-4:]}`",
-                    inline=True
-                )
-            
+            # Stats Section
             embed.add_field(
-                name="📊 Match Statistics",
+                name="📊 Statistics",
                 value=(
                     f"**Total Matches:** {total_matches}\n"
-                    f"**Wins:** {wins}\n"
-                    f"**Losses:** {losses}\n"
+                    f"**Wins:** {user.totalWins}\n"
+                    f"**Losses:** {user.totalLosses}\n"
                     f"**Win Rate:** {win_rate:.1f}%"
                 ),
                 inline=True
             )
             
-            # Add recent activity - query through User table to get matches they participated in
-            recent_matches = prisma.match.find_many(
+            # Wallet Info
+            if user.address:
+                embed.add_field(
+                    name="💳 Wallet",
+                    value=f"`{user.address[:8]}...{user.address[-6:]}`",
+                    inline=True
+                )
+            else:
+                embed.add_field(
+                    name="💳 Wallet",
+                    value="Not linked",
+                    inline=True
+                )
+            
+            # Recent Activity
+            recent_matches = await prisma.match.findMany(
                 where={
                     "OR": [
-                        {"creatorId": user.id},
-                        {"participants": {"some": {"id": user.id}}}
+                        {"creatorDiscordId": str(interaction.user.id)},
+                        {"opponentDiscordId": str(interaction.user.id)}
                     ]
                 },
-                order={"createdAt": "desc"},
+                orderBy={"createdAt": "desc"},
                 take=5
             )
             
             if recent_matches:
-                recent_activity = []
-                for match in recent_matches:
-                    status_emoji = {
-                        "PENDING": "⏳",
-                        "OPEN": "🔓",
-                        "FILLED": "✅",
-                        "COMPLETED": "🏆",
-                        "CANCELLED": "❌"
-                    }.get(match.status, "❓")
-                    
-                    recent_activity.append(
-                        f"{status_emoji} Match #{match.matchId} ({match.matchType.replace('_', ' ').title()})"
-                    )
-                
+                recent_text = "\n".join([
+                    f"• {match.matchType} - {match.status} ({match.createdAt.strftime('%m/%d')})"
+                    for match in recent_matches
+                ])
                 embed.add_field(
-                    name="📈 Recent Activity",
-                    value="\n".join(recent_activity),
+                    name="🕒 Recent Activity",
+                    value=recent_text,
                     inline=False
                 )
             
-            embed.set_footer(text=f"Profile last updated: {discord.utils.utcnow().strftime('%Y-%m-%d %H:%M UTC')}")
+            embed.add_field(
+                name="💡 Getting Started",
+                value=(
+                    "1. Use `/link-wallet` to connect your wallet to Discord\n"
+                    "2. Use `/create-match` to start a new game\n"
+                    "3. Use `/profile` to view your stats\n"
+                    "4. Have fun playing!"
+                ),
+                inline=False
+            )
+            
+            embed.add_field(
+                name="🔗 Wallet Linking",
+                value=(
+                    "**New users:** Use `/link-wallet` to visit our secure website\n"
+                    "**Supports:** Gmail, Discord, Google, and traditional wallets\n"
+                    "**No crypto knowledge needed** - Gmail users get automatic wallets!"
+                ),
+                inline=False
+            )
+            
+            embed.set_footer(text="Need more help? Ask in the support channel!")
             
             await interaction.followup.send(embed=embed, ephemeral=True)
             
         except Exception as e:
-            logger.error(f"Error fetching profile: {e}", exc_info=True)
+            logger.error(f"Error getting profile: {e}", exc_info=True)
             await interaction.followup.send(
-                "❌ An error occurred while fetching your profile. Please try again or contact support.",
+                "An error occurred while getting your profile. Please try again.",
                 ephemeral=True
             )
-            
+
+    @app_commands.command(name="rate-limits")
+    @app_commands.default_permissions(administrator=True)
+    async def rate_limits(self, interaction: discord.Interaction):
+        """View rate limiting statistics (Admin only)."""
+        await get_rate_limit_stats(interaction)
+
     @app_commands.command(name="help")
     async def help_command(self, interaction: discord.Interaction):
-        """Show help information about available commands."""
+        """Get help with bot commands."""
         embed = discord.Embed(
-            title="🎮 OneVOne Bot Commands",
+            title="🤖 OneVOne Bot Help",
             description="Here are all the available commands:",
             color=discord.Color.blue()
         )
         
-        # Wallet commands
+        # Match Commands
         embed.add_field(
-            name="🔗 Wallet Commands",
-            value=(
-                "`/link-wallet` - Link your wallet to Discord (via website)\n"
-                "`/profile` - View your profile and statistics"
-            ),
-            inline=False
-        )
-        
-        # Match commands
-        embed.add_field(
-            name="🎯 Match Commands",
+            name="🎮 Match Commands",
             value=(
                 "`/create-match` - Create a new match\n"
-                "`/match-info <id>` - Get info about a specific match\n"
-                "`/stats` - View your gaming statistics\n"
-                "`/matchhistory` - View your recent matches\n"
-                "`/opponents <user>` - Check your record against someone"
+                "`/match-info <room_id>` - Get match details\n"
+                "`/stats` - View your statistics\n"
+                "`/matchhistory` - View your match history\n"
+                "`/opponents <user>` - Check record against opponent"
             ),
             inline=False
         )
         
-        # Profile commands
+        # Profile Commands
         embed.add_field(
             name="👤 Profile Commands",
             value=(
-                "`/profile` - View your profile and statistics\n"
+                "`/profile` - View your gaming profile\n"
+                "`/link-wallet <address>` - Link your wallet\n"
+                "`/unlink-wallet` - Unlink your wallet\n"
+                "`/wallet-info` - View wallet details"
+            ),
+            inline=False
+        )
+        
+        # Admin Commands
+        embed.add_field(
+            name="⚙️ Admin Commands",
+            value=(
+                "`/rate-limits` - View rate limiting stats\n"
                 "`/help` - Show this help message"
             ),
             inline=False
         )
         
         embed.add_field(
-            name="💡 Getting Started",
+            name="💡 Tips",
             value=(
-                "1. Use `/link-wallet` to connect your wallet to Discord\n"
-                "2. Use `/create-match` to start a new game\n"
-                "3. Use `/profile` to view your stats\n"
-                "4. Have fun playing!"
-            ),
-            inline=False
-        )
-        
-        embed.add_field(
-            name="🔗 Wallet Linking",
-            value=(
-                "**New users:** Use `/link-wallet` to visit our secure website\n"
-                "**Supports:** Gmail, Discord, Google, and traditional wallets\n"
-                "**No crypto knowledge needed** - Gmail users get automatic wallets!"
+                "• Use `/create-match` to start a new game\n"
+                "• Link your wallet to track statistics\n"
+                "• Join match rooms to coordinate with opponents\n"
+                "• Check your profile regularly for updates"
             ),
             inline=False
         )

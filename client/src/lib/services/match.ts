@@ -2,6 +2,12 @@
 
 import { prisma } from "@/lib/prisma";
 import { MatchStatus, MatchType } from "@prisma/client";
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 // Function to create a pending match from Discord bot
 export async function createPendingMatch({
@@ -83,6 +89,27 @@ export async function updateMatchWithWallet({
 
             if (existingUser) {
                 console.log(`[DB] Found existing user with wallet ${walletAddress}`);
+
+                // Check if Discord ID is already linked to a different user
+                const existingDiscordUser = await prisma.user.findUnique({
+                    where: { discordId: match.creatorDiscordId },
+                });
+
+                if (existingDiscordUser && existingDiscordUser.id !== existingUser.id) {
+                    console.error(
+                        `[DB] Discord ID ${match.creatorDiscordId} already linked to different wallet ${existingDiscordUser.address}`
+                    );
+                    // Check if the current user trying to connect is the same person
+                    if (existingUser.discordId === match.creatorDiscordId) {
+                        console.log(`[DB] User with wallet ${walletAddress} already has Discord ID ${match.creatorDiscordId}, proceeding`);
+                        // User is legitimate, continue with existing user
+                    } else {
+                        throw new Error(
+                            'Discord ID is already linked to a different wallet. Please contact support to resolve this conflict.'
+                        );
+                    }
+                }
+
                 // If user exists but doesn't have Discord ID, update it
                 if (!existingUser.discordId) {
                     console.log(
@@ -121,6 +148,7 @@ export async function updateMatchWithWallet({
                 where: { id: match.id },
                 data: {
                     creatorId: user.id,
+                    creatorAddress: walletAddress,
                     status: MatchStatus.OPEN,
                 },
                 include: {
@@ -152,6 +180,7 @@ export async function updateMatchWithWallet({
             where: { id: match.id },
             data: {
                 creatorId: user.id,
+                creatorAddress: walletAddress,
                 status: MatchStatus.OPEN,
             },
             include: {
@@ -687,4 +716,15 @@ export async function syncMatchIdWithContract(contractNextMatchId: number): Prom
         console.error("[DB] Error syncing match IDs:", error);
         throw error;
     }
+}
+
+export async function getDiscordChannelIdByRoomId(roomId: string): Promise<string | null> {
+    const { data, error } = await supabase
+        .from('Match')
+        .select('discordChannelId')
+        .eq('roomId', roomId)
+        .single();
+
+    if (error || !data) throw new Error('Could not find Discord channel ID for this room');
+    return data.discordChannelId;
 } 

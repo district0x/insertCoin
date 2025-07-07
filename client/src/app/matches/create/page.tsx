@@ -33,6 +33,8 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { MTK_TOKEN, TokenOption, TOKEN_OPTIONS } from "@/lib/constants/tokens";
 import { usePrivy } from "@privy-io/react-auth";
+import { WalletConnectionBanner } from "@/components/WalletConnectionBanner";
+
 
 // type MatchEventArgs = {
 //   matchId: bigint;
@@ -47,7 +49,7 @@ function CreateMatchForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const { address, isConnected, ready } = useWalletConnection();
+  const { address, isConnected, ready, isExternalWallet } = useWalletConnection();
   const { user } = usePrivy();
 
   // Debug logging
@@ -55,6 +57,7 @@ function CreateMatchForm() {
   console.log("CreateMatchForm - user.wallet.address:", user?.wallet?.address);
   console.log("CreateMatchForm - isConnected:", isConnected);
   console.log("CreateMatchForm - ready:", ready);
+  console.log("CreateMatchForm - isExternalWallet:", isExternalWallet);
 
   // Get roomId and ethAmount from URL
   const roomId = searchParams.get("roomId");
@@ -70,6 +73,9 @@ function CreateMatchForm() {
 
   // Get the actual wallet address to use (fallback to user.wallet.address if address is null)
   const walletAddress = address || user?.wallet?.address;
+
+  // Stabilize toast function to prevent infinite loops
+  const stableToast = React.useCallback(toast, [toast]);
 
   // On mount, set ethAmount from URL if roomId is present
   React.useEffect(() => {
@@ -93,14 +99,21 @@ function CreateMatchForm() {
   // Check if user is connected when accessing the page
   React.useEffect(() => {
     if (ready && !isConnected) {
-      toast({
-        title: "Wallet Connection Required",
-        description: "Please connect your wallet to create a match.",
+      stableToast({
+        title: "External Wallet Required",
+        description: "Please connect an external wallet (MetaMask, etc.) to create a match. Embedded wallets are not supported for transactions.",
         variant: "destructive",
-        duration: 5000,
+        duration: 8000,
+      });
+    } else if (ready && isConnected && !isExternalWallet) {
+      stableToast({
+        title: "External Wallet Recommended",
+        description: "You're using an embedded wallet. For better transaction experience, please connect an external wallet like MetaMask.",
+        variant: "default",
+        duration: 6000,
       });
     }
-  }, [ready, isConnected, toast]);
+  }, [ready, isConnected, isExternalWallet, stableToast]);
 
   // Watch for transaction confirmation
   React.useEffect(() => {
@@ -111,7 +124,7 @@ function CreateMatchForm() {
         setIsWaitingForTx(true);
 
         // Add a more detailed status message
-        toast({
+        stableToast({
           title: "Transaction Submitted",
           description: `Waiting for transaction to be confirmed on Base Sepolia. This may take a few minutes.`,
           duration: 30000, // Show for longer since blockchain confirmations take time
@@ -132,7 +145,10 @@ function CreateMatchForm() {
         if (receipt.status === "success") {
           setIsLoading(false); // Stop loading state
 
-          // Find the match started event
+          console.log("Transaction successful, looking for match events...");
+          console.log("Receipt logs:", receipt.logs);
+
+          // Find the match started event - for 1v1 matches, always look for MatchStarted
           const eventName = (() => {
             switch (matchType) {
               case "FIVE_V_FIVE":
@@ -140,9 +156,11 @@ function CreateMatchForm() {
               case "TWO_V_TWO":
                 return "Team2v2MatchStarted";
               default:
-                return "MatchStarted";
+                return "MatchStarted"; // This is the correct event for 1v1 matches
             }
           })();
+
+          console.log(`Looking for event: ${eventName}`);
 
           const matchEvent = receipt.logs.find((log) => {
             try {
@@ -151,15 +169,32 @@ function CreateMatchForm() {
                 data: log.data,
                 topics: log.topics,
               });
+              console.log("Found event:", event.eventName);
               return event.eventName === eventName;
-            } catch {
+            } catch (error) {
+              console.log("Failed to decode log:", error);
               return false;
             }
           });
 
           if (!matchEvent) {
+            console.error("Available events in transaction:");
+            receipt.logs.forEach((log, index) => {
+              try {
+                const event = decodeEventLog({
+                  abi: ONEVONE_ABI,
+                  data: log.data,
+                  topics: log.topics,
+                });
+                console.log(`Log ${index}: ${event.eventName}`);
+              } catch (error) {
+                console.log(`Log ${index}: Failed to decode`);
+              }
+            });
             throw new Error(`${eventName} event not found in transaction`);
           }
+
+          console.log("Found match event:", matchEvent);
 
           // Decode the event
           const result = decodeEventLog({
@@ -168,14 +203,28 @@ function CreateMatchForm() {
             topics: matchEvent.topics,
           });
 
-          // Cast to unknown first, then to the expected shape
+          console.log("Decoded event result:", result);
+
+          // The decoded event has named arguments, not an array
           const decoded = result as unknown as {
             eventName: string;
-            args: [bigint, `0x${string}`, bigint, ...unknown[]];
+            args: {
+              matchId: bigint;
+              player1: `0x${string}`;
+              matchAmount: bigint;
+            };
           };
 
-          // The first argument is the match ID
-          const onChainMatchId = decoded.args[0].toString();
+          console.log("Decoded args:", decoded.args);
+
+          // Extract match ID from the named argument
+          const onChainMatchId = decoded.args.matchId?.toString();
+
+          console.log("Extracted match ID:", onChainMatchId);
+
+          if (!onChainMatchId) {
+            throw new Error("Could not extract match ID from transaction");
+          }
 
           // If this was a Discord-created match, update it with the contract match ID
           if (roomId) {
@@ -200,7 +249,21 @@ function CreateMatchForm() {
             });
           }
 
-          toast({
+          // Notify Discord if this was a Discord-created match
+          if (roomId && onChainMatchId) {
+            try {
+              await fetch("/api/matches/discord-notify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ roomId, matchId: onChainMatchId }),
+              });
+              console.log("Discord notification sent!");
+            } catch (err) {
+              console.error("Failed to notify Discord:", err);
+            }
+          }
+
+          stableToast({
             title: "Match Created Successfully!",
             description: `Your ${matchType.toLowerCase()} match with ID #${onChainMatchId} is now live with a stake of ${formatEther(
               ethAmount
@@ -221,14 +284,14 @@ function CreateMatchForm() {
 
         // Check if it's a timeout error
         if (error instanceof Error && error.message.includes("Timed out")) {
-          toast({
+          stableToast({
             title: "Transaction Taking Longer Than Expected",
             description: `The transaction is taking longer than expected to confirm. You can check the status on the Base Sepolia explorer: https://sepolia.basescan.org/tx/${txHash}`,
             variant: "destructive",
             duration: 10000,
           });
         } else {
-          toast({
+          stableToast({
             title: "Transaction Failed",
             description:
               error instanceof Error
@@ -249,16 +312,16 @@ function CreateMatchForm() {
     walletAddress,
     ethAmount,
     router,
-    toast,
     selectedToken,
     roomId,
+    stableToast,
   ]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!isConnected || !walletAddress) {
-      toast({
+      stableToast({
         title: "External Wallet Required",
         description: "Please connect your external wallet (like MetaMask) to create matches. Embedded wallets are not supported.",
         variant: "destructive",
@@ -270,7 +333,7 @@ function CreateMatchForm() {
     if (isLoading) return;
 
     if (ethAmount <= 0n) {
-      toast({
+      stableToast({
         title: "Invalid Amount",
         description: "Please enter a stake amount greater than 0.",
         variant: "destructive",
@@ -280,7 +343,7 @@ function CreateMatchForm() {
     }
 
     if (ethAmount > MAX_STAKE_AMOUNT) {
-      toast({
+      stableToast({
         title: "Amount Too Large",
         description:
           "The stake amount is too large. Please enter a smaller amount.",
@@ -321,7 +384,7 @@ function CreateMatchForm() {
 
         setTxHash(hash);
 
-        toast({
+        stableToast({
           title: "Transaction Submitted",
           description: `Creating your ${matchType.toLowerCase()} match. Please wait for blockchain confirmation...`,
           duration: 10000, // Show for longer since blockchain confirmations take time
@@ -342,7 +405,7 @@ function CreateMatchForm() {
 
         setTxHash(hash);
 
-        toast({
+        stableToast({
           title: "Transaction Submitted",
           description: `Creating your ${matchType.toLowerCase()} match. Please wait for blockchain confirmation...`,
           duration: 10000,
@@ -352,7 +415,7 @@ function CreateMatchForm() {
       setIsLoading(false);
       console.error("Error creating match:", error);
 
-      toast({
+      stableToast({
         title: "Error Creating Match",
         description:
           error instanceof Error
@@ -394,18 +457,7 @@ function CreateMatchForm() {
                 {paramError}
               </div>
             )}
-            {!isConnected && (
-              <div className="mb-4 p-3 bg-yellow-100 text-yellow-700 rounded">
-                Please connect your external wallet to continue.
-              </div>
-            )}
-            {isConnected && !address && (
-              <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
-                <strong>External Wallet Required</strong><br />
-                You need to connect an external wallet (like MetaMask) to create matches.
-                Embedded wallets are not supported for transactions.
-              </div>
-            )}
+            <WalletConnectionBanner />
             <form onSubmit={handleSubmit} className="space-y-8">
               {!roomId && (
                 <>

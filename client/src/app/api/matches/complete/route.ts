@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 export async function POST(request: Request) {
   try {
     const { matchId, winnerAddress } = await request.json();
+    console.log(`[API] /api/matches/complete called with:`, { matchId, winnerAddress });
 
     if (!matchId || !winnerAddress) {
       return NextResponse.json(
@@ -14,15 +15,12 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log(`[API] Processing match completion for ID ${matchId} with winner ${winnerAddress}`);
-
-    // Get match by ID
-    const match = await prisma.match.findUnique({
-      where: { matchId: Number(matchId) },
-      include: {
-        participants: true
-      }
+    // Get match by matchId using findFirst
+    const match = await prisma.match.findFirst({
+      where: { matchId: Number(matchId) }
     });
+
+    console.log(`[API] Fetched match:`, match);
 
     if (!match) {
       return NextResponse.json(
@@ -36,55 +34,45 @@ export async function POST(request: Request) {
       where: { address: winnerAddress }
     });
 
-    // Update the match status and set the winner
+    console.log(`[API] Winner user:`, winnerUser);
+
+    // Update the match status and set the winner using the match's id
     const updatedMatch = await prisma.match.update({
-      where: { matchId: Number(matchId) },
+      where: { id: match.id },
       data: {
         status: MatchStatus.COMPLETED,
         winnerAddress: winnerAddress,
-        // If we found the winner's user record, set the winner ID
         ...(winnerUser && { winnerId: winnerUser.id })
-      },
-      include: {
-        creator: true,
-        participants: true
       }
     });
 
-    // Update players' stats
+    console.log(`[API] Updated match:`, updatedMatch);
+
+    // Update winner's stats if we found the user
     if (winnerUser) {
-      // Update winner's stats
       await prisma.user.update({
         where: { id: winnerUser.id },
-        data: {
-          totalWins: { increment: 1 }
-        }
+        data: { totalWins: { increment: 1 } }
       });
 
-      // Update losers' stats 
-      for (const participant of match.participants) {
-        if (participant.address !== winnerAddress) {
-          await prisma.user.update({
-            where: { id: participant.id },
-            data: {
-              totalLosses: { increment: 1 }
-            }
-          });
-        }
-      }
+      console.log(`[API] Updated winner stats for user:`, winnerUser.id);
     }
 
     console.log(`[API] Match ${matchId} completed successfully`);
+
     return NextResponse.json({
       success: true,
       match: updatedMatch
     });
+
   } catch (error) {
     console.error('[API] Error completing match:', error);
+    console.error('[API] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to complete match',
-        details: error instanceof Error ? error.message : 'Unknown error' 
+        details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
     );
