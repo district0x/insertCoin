@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useContract } from "@/lib/hooks/useContract";
 import { formatEther, createPublicClient, http } from "viem";
-import { Loader2 } from "lucide-react";
+import { Loader2, Users, Trophy, DollarSign, Calendar } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -19,7 +19,7 @@ import { baseSepolia } from "@/lib/config/chains";
 
 export default function Tournaments() {
   const contract = useContract();
-  const [tournaments, setTournaments] = React.useState<OnChainTournament[]>([]);
+  const [latestTournament, setLatestTournament] = React.useState<OnChainTournament | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const hasFetchedRef = React.useRef(false);
@@ -32,7 +32,7 @@ export default function Tournaments() {
     });
   }, []);
 
-  // Fetch tournament data
+  // Fetch latest tournament data
   React.useEffect(() => {
     // Prevent multiple fetch attempts
     if (hasFetchedRef.current) return;
@@ -41,12 +41,12 @@ export default function Tournaments() {
     const timeoutId = setTimeout(() => {
       if (isLoading) {
         setIsLoading(false);
-        setError("Timeout loading tournaments. Please try again later.");
+        setError("Timeout loading tournament. Please try again later.");
         console.log("Tournament loading timed out");
       }
     }, 15000); // 15 second timeout
 
-    async function fetchTournaments() {
+    async function fetchLatestTournament() {
       if (!contract || !publicClient) return;
 
       try {
@@ -60,21 +60,19 @@ export default function Tournaments() {
           functionName: "nextTournamentId",
         });
 
-        // Fetch most recent 3 tournaments
-        const tournamentPromises = [];
-        const startIndex = Math.max(1, Number(nextTournamentId) - 3);
+        // Fetch the latest tournament (nextTournamentId - 1)
+        const latestId = Number(nextTournamentId) - 1;
 
-        for (let i = startIndex; i < Number(nextTournamentId); i++) {
-          tournamentPromises.push(fetchTournament(i));
+        if (latestId < 1) {
+          setLatestTournament(null);
+          return;
         }
 
-        const fetchedTournaments = await Promise.all(tournamentPromises);
-        setTournaments(
-          fetchedTournaments.filter(Boolean) as OnChainTournament[]
-        );
+        const tournament = await fetchTournament(latestId);
+        setLatestTournament(tournament);
       } catch (err) {
-        console.error("Error fetching tournaments:", err);
-        setError("Failed to load tournaments");
+        console.error("Error fetching latest tournament:", err);
+        setError("Failed to load tournament");
       } finally {
         setIsLoading(false);
       }
@@ -157,7 +155,7 @@ export default function Tournaments() {
       }
     }
 
-    fetchTournaments();
+    fetchLatestTournament();
 
     // Cleanup timeout
     return () => clearTimeout(timeoutId);
@@ -181,180 +179,231 @@ export default function Tournaments() {
   function getStatusColor(status: TournamentStatus): string {
     switch (status) {
       case "CREATED":
-        return "bg-blue-100 text-blue-800";
+        return "bg-blue-500 text-white";
       case "FILLING":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-yellow-500 text-white";
       case "FILLED":
-        return "bg-purple-100 text-purple-800";
+        return "bg-purple-500 text-white";
       case "IN_PROGRESS":
-        return "bg-green-100 text-green-800";
+        return "bg-green-500 text-white";
       case "COMPLETED":
-        return "bg-gray-100 text-gray-800";
+        return "bg-gray-500 text-white";
       case "CANCELLED":
-        return "bg-red-100 text-red-800";
+        return "bg-red-500 text-white";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-gray-500 text-white";
     }
   }
 
+  // Calculate total prize pool
+  const calculateTotalPrizePool = (tournament: OnChainTournament) => {
+    const entryFees = tournament.entryFee * BigInt(tournament.currentEntrants);
+    return tournament.totalDonations + entryFees;
+  };
+
+  // Check if tournament is recent (created in last 24 hours)
+  const isRecentTournament = (tournament: OnChainTournament) => {
+    // For now, we'll assume tournaments created in the last 24 hours are "new"
+    // In a real implementation, you'd check the creation timestamp
+    return tournament.currentEntrants < 5; // Simple heuristic
+  };
+
   return (
-    <section className="py-20 bg-gray-100">
+    <section className="py-20 bg-gradient-to-br from-black via-gray-900 to-black">
       <div className="container mx-auto px-4">
-        <h3 className="text-3xl font-bold text-center mb-12">
-          Featured Tournaments
-        </h3>
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold text-white mb-4">
+            Latest Tournament
+          </h2>
+          <p className="text-gray-300 max-w-2xl mx-auto">
+            Join the most recent tournament and compete for amazing prizes
+          </p>
+        </div>
 
         {isLoading ? (
           <div className="flex justify-center items-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin" />
+            <Loader2 className="h-8 w-8 animate-spin text-red-400" />
           </div>
         ) : error ? (
           <div className="text-center py-8">
-            <p className="text-red-500 mb-4">{error}</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8 max-w-3xl mx-auto">
-              {[1, 2, 3].map((i) => (
-                <Card key={i} className="bg-gray-50 border-dashed">
-                  <CardHeader>
-                    <CardTitle>Example Tournament</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <p className="text-sm text-gray-600">
-                        This is a placeholder for tournament data. Please check
-                        back later.
-                      </p>
-                    </div>
-                  </CardContent>
-                  <CardFooter>
-                    <Link href="/tournaments" className="w-full">
-                      <Button variant="outline" className="w-full">
-                        Try Again Later
-                      </Button>
-                    </Link>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
+            <p className="text-red-400 mb-4">{error}</p>
+            <Card className="bg-gray-900/80 border-red-500/20 max-w-2xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-white">No Tournament Available</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-300">
+                  No tournaments are currently available. Check back later or create a new tournament!
+                </p>
+              </CardContent>
+              <CardFooter>
+                <Link href="/tournaments/create" className="w-full">
+                  <Button className="w-full bg-red-600 hover:bg-red-700">
+                    Create Tournament
+                  </Button>
+                </Link>
+              </CardFooter>
+            </Card>
           </div>
-        ) : tournaments.length === 0 ? (
+        ) : !latestTournament ? (
           <div className="text-center py-8">
-            <p className="text-muted-foreground mb-4">
-              No tournaments available at the moment
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8 max-w-3xl mx-auto">
-              {[1, 2, 3].map((i) => (
-                <Card key={i} className="bg-gray-50">
-                  <CardHeader>
-                    <CardTitle>Coming Soon</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <p className="text-sm text-gray-600">
-                        Be the first to create a tournament and compete with
-                        others!
-                      </p>
-                    </div>
-                  </CardContent>
-                  <CardFooter>
-                    <Link href="/tournaments/create" className="w-full">
-                      <Button className="w-full">Create Tournament</Button>
-                    </Link>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
+            <Card className="bg-gray-900/80 border-red-500/20 max-w-2xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-white">No Tournaments Yet</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-300">
+                  Be the first to create a tournament and compete with others!
+                </p>
+              </CardContent>
+              <CardFooter>
+                <Link href="/tournaments/create" className="w-full">
+                  <Button className="w-full bg-red-600 hover:bg-red-700">
+                    Create First Tournament
+                  </Button>
+                </Link>
+              </CardFooter>
+            </Card>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-            {tournaments.map((tournament) => (
-              <Card key={tournament.id.toString()} className="overflow-hidden">
-                <CardHeader className="relative pb-2">
-                  <div className="absolute top-4 right-4">
+          <div className="max-w-4xl mx-auto">
+            <Card className="bg-gradient-to-br from-gray-900/80 to-black/80 backdrop-blur-sm border border-red-500/20 overflow-hidden hover:border-red-500/40 transition-all duration-300 hover:scale-[1.02]">
+              <CardHeader className="relative pb-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-2xl text-white">
+                      Tournament #{latestTournament.id.toString()}
+                    </CardTitle>
+                    <p className="text-gray-300 mt-1">
+                      Latest tournament on the platform
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    {/* Live indicator */}
+                    {latestTournament.status === "IN_PROGRESS" && (
+                      <span className="px-3 py-1 text-sm bg-red-500 text-white rounded-full font-medium animate-pulse">
+                        LIVE
+                      </span>
+                    )}
+                    {/* New badge */}
+                    {isRecentTournament(latestTournament) && (
+                      <span className="px-3 py-1 text-sm bg-green-500 text-white rounded-full font-medium">
+                        NEW
+                      </span>
+                    )}
                     <span
-                      className={`px-2 py-1 text-xs rounded-full ${getStatusColor(
-                        tournament.status
+                      className={`px-3 py-1 text-sm rounded-full font-medium ${getStatusColor(
+                        latestTournament.status
                       )}`}
                     >
-                      {tournament.status}
+                      {latestTournament.status.replace('_', ' ')}
                     </span>
                   </div>
-                  <CardTitle>Tournament #{tournament.id.toString()}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <p className="text-xl font-bold">
-                        Prize Pool:{" "}
-                        {formatEther(
-                          tournament.totalDonations +
-                          tournament.entryFee *
-                          BigInt(tournament.currentEntrants)
-                        )}
-                        {tournament.isERC20 ? " Tokens" : " ETH"}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Entry Fee: {formatEther(tournament.entryFee)}
-                        {tournament.isERC20 ? " Tokens" : " ETH"}
-                      </p>
+                </div>
+              </CardHeader>
+
+              <CardContent className="space-y-6">
+                {/* Prize Pool Section */}
+                <div className="bg-gray-800/50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Trophy className="h-5 w-5 text-red-400" />
+                    <h3 className="text-lg font-semibold text-white">Total Prize Pool</h3>
+                  </div>
+                  <div className="text-3xl font-bold text-white mb-2">
+                    {formatEther(calculateTotalPrizePool(latestTournament))} {latestTournament.isERC20 ? "Tokens" : "ETH"}
+                  </div>
+                  <div className="text-sm text-gray-300">
+                    Entry Fees: {formatEther(latestTournament.entryFee * BigInt(latestTournament.currentEntrants))} {latestTournament.isERC20 ? "Tokens" : "ETH"} •
+                    Donations: {formatEther(latestTournament.totalDonations)} {latestTournament.isERC20 ? "Tokens" : "ETH"}
+                  </div>
+                </div>
+
+                {/* Tournament Details Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Participants */}
+                  <div className="bg-gray-800/50 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Users className="h-5 w-5 text-red-400" />
+                      <h3 className="text-lg font-semibold text-white">Participants</h3>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div className="text-2xl font-bold text-white mb-2">
+                      {latestTournament.currentEntrants} / {latestTournament.numEntrants}
+                    </div>
+                    <div className="w-full bg-gray-700 rounded-full h-2 mb-2">
                       <div
-                        className="bg-primary h-2.5 rounded-full"
+                        className="bg-red-500 h-2 rounded-full transition-all duration-300"
                         style={{
                           width: `${Math.min(
                             100,
-                            (tournament.currentEntrants /
-                              Number(tournament.numEntrants)) *
-                            100
+                            (latestTournament.currentEntrants / Number(latestTournament.numEntrants)) * 100
                           )}%`,
                         }}
                       ></div>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span>
-                        Participants: {tournament.currentEntrants}/
-                        {tournament.numEntrants}
-                      </span>
-                      <span>Winners: {tournament.winnersPercentage}%</span>
+                    <div className="text-sm text-gray-300">
+                      {latestTournament.hasEntryFee && (
+                        <span>Entry Fee: {formatEther(latestTournament.entryFee)} {latestTournament.isERC20 ? "Tokens" : "ETH"}</span>
+                      )}
                     </div>
                   </div>
-                </CardContent>
-                <CardFooter>
-                  <Link
-                    href={`/tournaments/${tournament.id.toString()}`}
-                    className="w-full"
-                  >
-                    <Button variant="outline" className="w-full">
-                      View Details
+
+                  {/* Winners & Payouts */}
+                  <div className="bg-gray-800/50 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <DollarSign className="h-5 w-5 text-red-400" />
+                      <h3 className="text-lg font-semibold text-white">Winners & Payouts</h3>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-gray-300">Winners Percentage:</span>
+                        <span className="text-white font-semibold">{latestTournament.winnersPercentage}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-300">Multisig Percentage:</span>
+                        <span className="text-white font-semibold">{latestTournament.multisigPercentage}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-300">Remaining Balance:</span>
+                        <span className="text-white font-semibold">
+                          {formatEther(latestTournament.remainingBalance)} {latestTournament.isERC20 ? "Tokens" : "ETH"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+
+              <CardFooter className="flex gap-4">
+                <Link href={`/tournaments/${latestTournament.id.toString()}`} className="flex-1">
+                  <Button variant="outline" className="w-full border-red-500/20 text-red-400 hover:bg-red-500/10">
+                    View Details
+                  </Button>
+                </Link>
+                <Link href="/tournaments" className="flex-1">
+                  <Button className="w-full bg-red-600 hover:bg-red-700">
+                    Browse All Tournaments
+                  </Button>
+                </Link>
+              </CardFooter>
+            </Card>
+
+            {/* Create Tournament CTA */}
+            <div className="mt-8 text-center">
+              <Card className="bg-gray-900/80 border-red-500/20 max-w-md mx-auto">
+                <CardContent className="pt-6">
+                  <Link href="/tournaments/create" className="w-full">
+                    <Button className="w-full bg-red-600 hover:bg-red-700">
+                      Create New Tournament
                     </Button>
                   </Link>
-                </CardFooter>
+                </CardContent>
               </Card>
-            ))}
+            </div>
           </div>
         )}
 
-        <div className="max-w-md mx-auto mt-12">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-center">
-                Create or Join Tournaments
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              <Link href="/tournaments" className="w-full">
-                <Button className="w-full">Browse All Tournaments</Button>
-              </Link>
-              <Link href="/tournaments/create" className="w-full">
-                <Button variant="outline" className="w-full">
-                  Create New Tournament
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="mt-8 flex flex-col items-center">
+        {/* StreamTide Section */}
+        <div className="mt-12 flex flex-col items-center">
           <Image
             src="/streamtide.png"
             alt="StreamTide Logo"

@@ -21,7 +21,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body
-        className={`${inter.className} min-h-screen flex flex-col`}
+        className={`${inter.className} min-h-screen flex flex-col noodle-theme`}
         suppressHydrationWarning={true}
       >
         <Providers>

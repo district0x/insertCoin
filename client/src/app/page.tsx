@@ -10,252 +10,36 @@ import useSWR from "swr";
 import { fetchMatches } from "@/lib/match";
 import { OnChainMatch } from "@/types/match";
 import { baseSepolia } from "@/lib/config/chains";
+import { Button } from "@/components/ui/button";
+import { useWalletConnection } from "@/lib/hooks/useWalletConnection";
 
 // Components
-import Welcome from "@/components/home/welcome";
-import Features from "@/components/home/features";
-import TwitchCard from "@/components/home/twitch-card";
-import Tournaments from "@/components/home/tournaments";
-import { MatchStatusBadge } from "@/components/match/match-status-badge";
-
-const INITIAL_MATCHES_COUNT = 7;
-const POLLING_INTERVAL = 30000; // 30 seconds
-let lastFetchTime = 0;
+import HeroSlider from "@/components/home/hero-slider";
+import StatsSection from "@/components/home/stats-section";
+import QuickActions from "@/components/home/quick-actions";
+import TournamentsAndStreaming from "@/components/home/tournaments-and-streaming";
+import ScrollToTop from "@/components/ui/scroll-to-top";
 
 export default function Home() {
-  const { toast } = useToast();
-  const contract = useContract();
-  const [allMatches, setAllMatches] = React.useState<OnChainMatch[]>([]);
-  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
-  const [hasLoadedAll, setHasLoadedAll] = React.useState(false);
-
-  // Create a public client for reading contract state
-  const publicClient = React.useMemo(() => {
-    return createPublicClient({
-      chain: baseSepolia,
-      transport: http(process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL!),
-    });
-  }, []);
-
-  // Fetch initial matches using SWR for caching and revalidation
-  const fetchInitialMatches = React.useCallback(async () => {
-    if (!contract) return [];
-
-    // Rate limiting protection
-    const now = Date.now();
-    if (now - lastFetchTime < 1000) {
-      throw new Error("Rate limit: Please wait before fetching again");
-    }
-    lastFetchTime = now;
-
-    try {
-      const matches = await fetchMatches(contract, publicClient, {
-        limit: INITIAL_MATCHES_COUNT,
-      });
-      setAllMatches(matches);
-      return matches;
-    } catch (error) {
-      console.error("Error fetching matches:", error);
-      if (error instanceof Error && error.message.includes("429")) {
-        toast({
-          variant: "destructive",
-          title: "Rate Limited",
-          description:
-            "Too many requests. Please wait a moment before refreshing.",
-        });
-      }
-      throw error;
-    }
-  }, [contract, publicClient, toast]);
-
-  const {
-    data: initialMatches = [],
-    error,
-    isLoading,
-  } = useSWR("initial-matches", fetchInitialMatches, {
-    refreshInterval: POLLING_INTERVAL,
-    revalidateOnFocus: false,
-    shouldRetryOnError: false,
-  });
-
-  // Load remaining matches in the background
-  React.useEffect(() => {
-    const loadRemainingMatches = async () => {
-      if (!contract || isLoadingMore || hasLoadedAll) return;
-
-      try {
-        setIsLoadingMore(true);
-        const remainingMatches = await fetchMatches(contract, publicClient, {
-          offset: INITIAL_MATCHES_COUNT,
-        });
-
-        // Only update if we got new matches
-        if (remainingMatches.length > 0) {
-          setAllMatches((prev) => {
-            // Create a Set of existing match IDs for quick lookup
-            const existingIds = new Set(prev.map((m) => m.id.toString()));
-
-            // Filter out any matches that we already have
-            const newMatches = remainingMatches.filter(
-              (match) => !existingIds.has(match.id.toString())
-            );
-
-            return [...prev, ...newMatches];
-          });
-        } else {
-          setHasLoadedAll(true);
-        }
-      } catch (error) {
-        console.error("Error loading remaining matches:", error);
-      } finally {
-        setIsLoadingMore(false);
-      }
-    };
-
-    if (initialMatches.length > 0 && !hasLoadedAll) {
-      loadRemainingMatches();
-    }
-  }, [contract, publicClient, initialMatches, isLoadingMore, hasLoadedAll]);
-
-  // Show error toast when fetch fails
-  React.useEffect(() => {
-    if (error) {
-      console.error("Error in SWR:", error);
-      if (!error.message?.includes("Rate limit")) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to fetch matches. Please try again later.",
-        });
-      }
-    }
-  }, [error, toast]);
-
-  const truncateAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  };
-
-  const renderContent = () => {
-    if (error && !error.message?.includes("Rate limit")) {
-      return (
-        <div className="text-center py-4 text-red-500">
-          Failed to load matches. Please try again later.
-        </div>
-      );
-    }
-
-    if (isLoading) {
-      return (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      );
-    }
-
-    const matches = allMatches.length > 0 ? allMatches : initialMatches;
-
-    if (!matches || matches.length === 0) {
-      return (
-        <div className="text-center py-8">
-          <p className="text-muted-foreground">No matches found</p>
-          <p className="mt-2">Be the first to create a match!</p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {matches.map((match) => (
-          <Link
-            key={match.id.toString()}
-            href={`/matches/${match.id.toString()}`}
-            className="block p-6 border rounded-lg hover:border-primary transition-colors"
-          >
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-lg font-semibold">
-                  {match.matchType} Match #{match.id.toString()}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Prize Pool: {formatEther(match.totalAmount)} {match.isERC20 ? "MTK" : "ETH"}
-                </p>
-              </div>
-              <MatchStatusBadge match={match} />
-            </div>
-            <div className="space-y-2">
-              <div className="space-y-1">
-                <p className="text-sm font-medium">Team A:</p>
-                {match.teamA.map((address) => (
-                  <p key={address} className="text-sm pl-2">
-                    {truncateAddress(address)}
-                  </p>
-                ))}
-              </div>
-              {match.teamB.length > 0 && (
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Team B:</p>
-                  {match.teamB.map((address) => (
-                    <p key={address} className="text-sm pl-2">
-                      {truncateAddress(address)}
-                    </p>
-                  ))}
-                </div>
-              )}
-              <p className="text-sm">
-                <span className="font-medium">Stake per player:</span>{" "}
-                {formatEther(match.player1Amount)} ETH
-              </p>
-              {match.donatedAmount > BigInt(0) && (
-                <p className="text-sm">
-                  <span className="font-medium">Donations:</span>{" "}
-                  {formatEther(match.donatedAmount)} ETH
-                </p>
-              )}
-            </div>
-          </Link>
-        ))}
-      </div>
-    );
-  };
+  const { isConnected } = useWalletConnection();
 
   return (
     <div>
-      <Welcome />
-      <Features />
+      <HeroSlider />
 
-      {/* <section className="py-20">
-				<div className="container mx-auto px-4">
-					<h3 className="text-3xl font-bold text-center mb-12">
-						Support the Players
-					</h3>
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-12">
-						<StartMatch />
-						<CloseMatch />
-					</div>
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-12">
-						<DonateToMatch />
-						<JoinMatch />
-					</div>
-					<CurrentMatches />
-				</div>
-			</section> */}
-
-      <div className="space-y-6 max-w-7xl mx-auto px-2 mb-10">
-        <div className="flex justify-between items-center py-10">
-          <h2 className="text-3xl font-bold">Active Matches</h2>
-          <Link
-            href="/matches/create"
-            className="inline-block px-4 py-2 bg-primary text-primary-foreground rounded-md"
-          >
-            Create Match
-          </Link>
+      {/* Wallet Connection Prompt */}
+      {!isConnected && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mx-4 my-8 text-center max-w-4xl mx-auto">
+          <p className="text-red-400 text-sm">
+            Connect your wallet to create matches and join tournaments
+          </p>
         </div>
+      )}
 
-        {renderContent()}
-      </div>
-
-      <Tournaments />
-      <TwitchCard />
+      <StatsSection />
+      <QuickActions />
+      <TournamentsAndStreaming />
+      <ScrollToTop />
     </div>
   );
 }

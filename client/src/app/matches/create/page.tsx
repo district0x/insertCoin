@@ -10,6 +10,7 @@ import { createPublicClient, http } from "viem";
 import { baseSepolia } from "@/lib/config/chains";
 import { updateMatchWithWallet, createMatchInDb, updateMatchWithContractId } from "@/lib/services/match";
 import { formatEther, decodeEventLog } from "viem";
+import { useRefreshStats } from "@/hooks/useRefreshStats";
 import { MatchType } from "@/types/match";
 import { UsdInput } from "@/components/ui/usd-input";
 import { ONEVONE_ABI } from "@/lib/contracts/abis/ABI";
@@ -70,6 +71,7 @@ function CreateMatchForm() {
   const [selectedToken, setSelectedToken] = React.useState<TokenOption>("ETH");
   const [paramError, setParamError] = React.useState<string | null>(null);
   const { createMatch, create2v2Match, create5v5Match } = useMatch();
+  const refreshStats = useRefreshStats();
 
   // Get the actual wallet address to use (fallback to user.wallet.address if address is null)
   const walletAddress = address || user?.wallet?.address;
@@ -263,6 +265,13 @@ function CreateMatchForm() {
             }
           }
 
+          // Refresh stats after successful match creation
+          try {
+            await refreshStats();
+          } catch (error) {
+            console.error("Failed to refresh stats:", error);
+          }
+
           stableToast({
             title: "Match Created Successfully!",
             description: `Your ${matchType.toLowerCase()} match with ID #${onChainMatchId} is now live with a stake of ${formatEther(
@@ -315,6 +324,7 @@ function CreateMatchForm() {
     selectedToken,
     roomId,
     stableToast,
+    refreshStats,
   ]);
 
   const handleSubmit = async (e: React.FormEvent) => {

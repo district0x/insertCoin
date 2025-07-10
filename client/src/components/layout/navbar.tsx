@@ -16,10 +16,8 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: "/matches", label: "Matches" },
   { href: "/tournaments", label: "Tournaments" },
-  { href: "/link-wallet", label: "Link Wallet" },
-  { href: "/how-it-works", label: "How It Works" },
-  { href: "/community", label: "Community" },
-  { href: "/about", label: "About One v One" },
+  { href: "/link-wallet", label: "Verify Wallet" },
+  { href: "/faqs", label: "FAQs" },
 ];
 
 export function Navbar() {
@@ -61,14 +59,14 @@ export function Navbar() {
   };
 
   return (
-    <header className="border-b bg-gray-900 text-white">
+    <header className="border-b border-red-500/20 bg-black text-white noodle-theme">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <div className="flex items-center space-x-8">
           <Link
             href="/"
-            className="text-2xl font-bold hover:text-white/80 transition-colors"
+            className="text-2xl font-bold hover:text-red-400 transition-colors"
           >
-            One v One
+            Insert Coin
           </Link>
           <nav className="hidden md:flex space-x-6">
             {navItems.map((item) => (
@@ -76,8 +74,8 @@ export function Navbar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "text-sm font-medium transition-colors hover:text-white/80",
-                  isActive(item.href) && "text-white"
+                  "text-sm font-medium transition-colors hover:text-red-400",
+                  isActive(item.href) && "text-red-400"
                 )}
               >
                 {item.label}
@@ -101,7 +99,7 @@ export function Navbar() {
                     onClick={handleAuthClick}
                     variant="outline"
                     size="sm"
-                    className="text-white border-white/20 hover:bg-white/10"
+                    className="text-white border-red-500/30 hover:bg-red-500/10"
                   >
                     <LogOut className="h-4 w-4 mr-2" />
                     Disconnect
@@ -110,9 +108,9 @@ export function Navbar() {
               ) : (
                 <Button
                   onClick={handleAuthClick}
-                  className="bg-indigo-600 hover:bg-indigo-700"
+                  className="bg-red-600 hover:bg-red-700"
                 >
-                  Connect Wallet
+                  Sign In
                 </Button>
               )}
             </>
@@ -121,7 +119,7 @@ export function Navbar() {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden inline-flex items-center justify-center rounded-md p-2 hover:bg-gray-800 transition-colors"
+            className="md:hidden inline-flex items-center justify-center rounded-md p-2 hover:bg-red-500/10 transition-colors"
             aria-expanded={isOpen}
             aria-controls="mobile-menu"
           >
@@ -141,7 +139,7 @@ export function Navbar() {
       {isOpen && (
         <div
           id="mobile-menu"
-          className="md:hidden bg-gray-900 border-t border-gray-800 absolute w-full z-50"
+          className="md:hidden bg-black border-t border-red-500/20 absolute w-full z-50"
         >
           <nav className="container mx-auto px-4 py-3 space-y-3">
             {navItems.map((item) => (
@@ -149,9 +147,9 @@ export function Navbar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "block py-2 px-3 text-base font-medium rounded-md transition-colors hover:bg-gray-800",
+                  "block py-2 px-3 text-base font-medium rounded-md transition-colors hover:bg-red-500/10",
                   isActive(item.href)
-                    ? "bg-gray-800 text-primary"
+                    ? "bg-red-500/10 text-red-400"
                     : "text-gray-200"
                 )}
                 onClick={() => setIsOpen(false)}
@@ -160,7 +158,7 @@ export function Navbar() {
               </Link>
             ))}
             {ready && (
-              <div className="pt-3 border-t border-gray-800">
+              <div className="pt-3 border-t border-red-500/20">
                 {authenticated ? (
                   <div className="space-y-2">
                     <div className="px-3 py-2 text-sm text-gray-300">
@@ -173,7 +171,7 @@ export function Navbar() {
                       }}
                       variant="outline"
                       size="sm"
-                      className="w-full text-white border-white/20 hover:bg-white/10"
+                      className="w-full text-white border-red-500/30 hover:bg-red-500/10"
                     >
                       <LogOut className="h-4 w-4 mr-2" />
                       Disconnect
@@ -185,9 +183,9 @@ export function Navbar() {
                       handleAuthClick();
                       setIsOpen(false);
                     }}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700"
+                    className="w-full bg-red-600 hover:bg-red-700"
                   >
-                    Connect Wallet
+                    Sign In
                   </Button>
                 )}
               </div>
