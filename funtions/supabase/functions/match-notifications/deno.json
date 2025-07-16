@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "lib": ["deno.window", "deno.ns", "esnext"],
+    "strict": true,
+    "types": ["./deno.env.d.ts"]
+  },
+  "imports": {
+    "std/": "https://deno.land/std@0.168.0/",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.7.1"
+  },
+  "tasks": {
+    "dev": "deno run --allow-net --allow-env --watch index.ts",
+    "deploy": "supabase functions deploy match-notifications"
+  }
+}

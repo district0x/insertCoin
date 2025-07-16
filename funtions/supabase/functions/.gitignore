@@ -1,0 +1,28 @@
+# Environment variables
+.env
+.env.*
+*.env
+!.env.example
+
+# Deno specific
+/.deno/
+/.cache/
+/.vscode/
+
+# Supabase
+.branches
+.temp
+.supabase
+
+# Dependencies
+/node_modules/
+/npm-debug.log*
+/yarn-debug.log*
+/yarn-error.log*
+
+# IDE specific files
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db 

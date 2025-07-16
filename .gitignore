@@ -1,0 +1,104 @@
+# Environment files - NEVER commit these
+.env
+.env.*
+*.env
+!.env.example
+
+# Discord Bot Tokens and API Keys
+token.txt
+config.json
+secrets.json
+*.key
+*.pem
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Node modules and build artifacts
+node_modules/
+dist/
+build/
+.next/
+out/
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE and OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Test files and temporary scripts
+test_*.py
+check_*.js
+run_*.py
+cleanup_*.py
+test-*.js
+check-*.js
+
+# Deployment documentation (not needed in repo)
+DEPLOYMENT.md
+DEPLOYMENT_CHECKLIST.md
+deployment-*.md
+
+# Prisma (if not needed in repo)
+prisma/migrations/
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.python-version
+
+# Poetry
+poetry.lock
+.poetry/
+
+# Supabase
+.branches
+.temp
+.env.keys
+.env.local
+.env.*.local
+
+# Git rewrite temporary files
+.git-rewrite/
+
+# Package lock files (if not needed)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml 

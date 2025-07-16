@@ -1,0 +1,11 @@
+{
+    "buildCommand": "npx prisma generate && npm run build",
+    "outputDirectory": ".next",
+    "framework": "nextjs",
+    "installCommand": "npm install",
+    "functions": {
+        "src/app/api/**/*.ts": {
+            "maxDuration": 30
+        }
+    }
+}
