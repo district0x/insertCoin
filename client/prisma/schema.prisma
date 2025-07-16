@@ -9,16 +9,17 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  address      String?  @unique
-  discordId    String?  @unique
-  username     String?  @unique
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  totalMatches Int      @default(0)
-  totalWins    Int      @default(0)
-  totalLosses  Int      @default(0)
-  createdMatches Match[] @relation("Creator")
+  id               String   @id @default(uuid())
+  address          String?  @unique
+  discordId        String?  @unique
+  username         String?  @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  totalMatches     Int      @default(0)
+  totalWins        Int      @default(0)
+  totalLosses      Int      @default(0)
+  matchTokensEarned Float   @default(0) // Track MATCH tokens earned
+  createdMatches   Match[]  @relation("Creator")
 }
 
 model Match {

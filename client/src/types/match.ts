@@ -17,4 +17,14 @@ export interface OnChainMatch {
   teamA: `0x${string}`[];
   teamB: `0x${string}`[];
   allPlayers: MatchPlayers;
+  // Metadata from database
+  metadata?: {
+    game: string | null;
+    gameCategory: string | null;
+    platform: string | null;
+    status: string;
+    creatorDiscordId: string | null;
+    opponentDiscordId: string | null;
+    winnerId: string | null;
+  };
 }

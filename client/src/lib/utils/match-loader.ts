@@ -4,8 +4,8 @@ import { ONEVONE_ABI } from "@/lib/contracts/abis/ABI";
 import { fetchMatch } from "@/lib/match/fetch";
 
 // Constants
-export const MATCHES_PER_PAGE = 12;
-export const POLLING_INTERVAL = 60000; // 60 seconds
+export const MATCHES_PER_PAGE = 3;
+export const POLLING_INTERVAL = 600000; // 10 minutes - less frequent updates
 export const MAX_RETRIES = 3;
 export const RETRY_DELAY = 1000; // 1 second
 
