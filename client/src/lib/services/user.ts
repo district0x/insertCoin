@@ -75,19 +75,14 @@ export async function hasLinkedDiscordId(walletAddress: string): Promise<boolean
             throw new Error(`Invalid wallet address format: ${walletAddress}`);
         }
 
-        // Create a fresh Prisma client instance to avoid connection issues
-        const { PrismaClient } = require('@prisma/client');
-        const freshPrisma = new PrismaClient({
-            log: ['error', 'warn'],
-        });
-
+        // Use the singleton Prisma client instance to avoid connection issues
         try {
             // Test database connection
-            await freshPrisma.$connect();
+            await prisma.$connect();
             console.log("[DB] Database connection successful");
 
             // Try to find the user
-            const user = await freshPrisma.user.findUnique({
+            const user = await prisma.user.findUnique({
                 where: { address: walletAddress },
                 select: { discordId: true }
             });
@@ -98,9 +93,10 @@ export async function hasLinkedDiscordId(walletAddress: string): Promise<boolean
             console.log(`[DB] Wallet ${walletAddress} has linked Discord ID: ${hasDiscordId}`);
 
             return hasDiscordId;
-        } finally {
-            // Always disconnect to prevent connection leaks
-            await freshPrisma.$disconnect();
+        } catch (error) {
+            console.error("[DB] Error checking Discord ID link:", error);
+            // Return false instead of throwing to prevent the app from crashing
+            return false;
         }
     } catch (error) {
         console.error("[DB] Error checking Discord ID link:", error);

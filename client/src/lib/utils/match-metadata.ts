@@ -27,9 +27,14 @@ export function mergeMatchMetadata(
     matches: OnChainMatch[],
     metadata: Record<number, any>
 ): OnChainMatch[] {
+    console.log('[METADATA] Merging metadata for matches:', matches.map(m => Number(m.id)));
+    console.log('[METADATA] Available metadata:', Object.keys(metadata));
+
     return matches.map(match => {
         const matchId = Number(match.id);
         const matchMetadata = metadata[matchId];
+
+        console.log(`[METADATA] Match ${matchId}:`, matchMetadata);
 
         if (matchMetadata) {
             return {
@@ -56,15 +61,26 @@ export function mergeMatchMetadata(
 
 // Function to get a display title for a match
 export function getMatchDisplayTitle(match: OnChainMatch): string {
+    console.log(`[TITLE] Generating title for match ${match.id}:`, {
+        hasMetadata: !!match.metadata,
+        game: match.metadata?.game,
+        platform: match.metadata?.platform,
+        matchType: match.matchType
+    });
+
     // If we have game metadata and it's not null, use it
     if (match.metadata?.game && match.metadata.game.trim() !== '') {
         const platform = match.metadata.platform ? ` (${match.metadata.platform})` : '';
-        return `${match.metadata.game}${platform}`;
+        const title = `${match.metadata.game}${platform}`;
+        console.log(`[TITLE] Using game title: ${title}`);
+        return title;
     }
 
     // Fallback to generic title with match type
     const matchTypeLabel = getMatchTypeLabel(match.matchType);
-    return `${matchTypeLabel} Match #${match.id.toString()}`;
+    const fallbackTitle = `${matchTypeLabel} Match #${match.id.toString()}`;
+    console.log(`[TITLE] Using fallback title: ${fallbackTitle}`);
+    return fallbackTitle;
 }
 
 // Helper function to get match type label

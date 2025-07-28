@@ -7,7 +7,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from .constants import GAME_CHOICES, PLATFORM_CHOICES, MATCH_TYPES
+from .constants import GAME_CHOICES, PLATFORM_CHOICES, MATCH_TYPES, TOKEN_CHOICES
 from .commands import (
     handle_create_match,
     handle_match_info,
@@ -33,7 +33,8 @@ class MatchCog(commands.Cog, name="Match"):
         category="Choose the game category",
         game="Choose the game",
         match_amount_usd="Enter the match amount in USD",
-        amount="Stake amount in ETH (optional)"
+        token_type="Choose token type for the match",
+        amount="Stake amount in selected token (optional)"
     )
     @app_commands.choices(
         match_type=[
@@ -47,6 +48,10 @@ class MatchCog(commands.Cog, name="Match"):
         category=[
             app_commands.Choice(name=cat, value=cat)
             for cat in GAME_CHOICES.keys()
+        ],
+        token_type=[
+            app_commands.Choice(name=name, value=value)
+            for name, value in TOKEN_CHOICES
         ]
     )
     async def create_match(
@@ -57,6 +62,7 @@ class MatchCog(commands.Cog, name="Match"):
         category: str,
         game: str,
         match_amount_usd: int,
+        token_type: str,
         amount: Optional[float] = None
     ):
         """Create a new match."""
@@ -68,6 +74,7 @@ class MatchCog(commands.Cog, name="Match"):
             category,
             game,
             match_amount_usd,
+            token_type,
             amount
         )
 

@@ -8,7 +8,7 @@ from web3.types import LogReceipt
 
 from src.db.prisma import prisma
 from src.utils.config import config
-from src.web3.contract import contract
+from src.web3_contracts.contract import contract
 
 logger = logging.getLogger(__name__)
 

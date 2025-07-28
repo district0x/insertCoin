@@ -9,17 +9,18 @@ datasource db {
 }
 
 model User {
-  id               String   @id @default(uuid())
-  address          String?  @unique
-  discordId        String?  @unique
-  username         String?  @unique
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  totalMatches     Int      @default(0)
-  totalWins        Int      @default(0)
-  totalLosses      Int      @default(0)
-  matchTokensEarned Float   @default(0) // Track MATCH tokens earned
-  createdMatches   Match[]  @relation("Creator")
+  id                 String   @id @default(uuid())
+  address            String?  @unique
+  discordId          String?  @unique
+  username           String?  @unique
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  totalMatches       Int      @default(0)
+  totalWins          Int      @default(0)
+  totalLosses        Int      @default(0)
+  matchTokensEarned  Float    @default(0) // Total MATCH tokens earned
+  ethEarned          Float    @default(0) // Total ETH earned
+  createdMatches     Match[]  @relation("Creator")
 }
 
 model Match {
@@ -33,7 +34,7 @@ model Match {
   creatorDiscordId  String?
   creatorAddress    String?
   stake             Float
-  tokenAddress      String?
+  tokenName         String?
   totalPrize        Float
   winnerAddress     String?
   discordChannelId  String?

@@ -103,6 +103,7 @@ async def create_match_in_db(
     category: str,
     game: str,
     match_amount_usd: int,
+    token_type: str,
     amount: Optional[float],
     channel_info: ChannelInfo
 ) -> dict:
@@ -123,13 +124,14 @@ async def create_match_in_db(
                 "matchType": match_type,
                 "status": "PENDING",
                 "creatorDiscordId": str(interaction.user.id),
-                "stake": amount or 0.0,
-                "totalPrize": amount or 0.0,
+                "stake": match_amount_usd if token_type == "MATCH" else (amount or match_amount_usd),
+                "totalPrize": match_amount_usd if token_type == "MATCH" else (amount or match_amount_usd),
                 "discordChannelId": str(channel_info.channel.id),
                 "game": game,
                 "gameCategory": category,
                 "matchAmountUsd": match_amount_usd,
                 "platform": platform,
+                "tokenName": token_type,
             }
             
             # Create the match
@@ -188,6 +190,9 @@ async def create_match_embeds(
     await match_message.pin()
     
     # Send welcome message to the private match room
+    token_type = match.tokenName or "ETH"
+    token_display = f"${match.matchAmountUsd} USD" if token_type == "ETH" else f"{match.matchAmountUsd} MATCH Tokens"
+    
     welcome_embed = discord.Embed(
         title="🎮 Welcome to the Match Room!",
         description=(
@@ -195,7 +200,8 @@ async def create_match_embeds(
             "1️⃣ **Match Details**\n"
             f"• Platform: {match.platform}\n"
             f"• Game: {match.game} ({match.gameCategory})\n"
-            f"• Match Amount: ${match.matchAmountUsd} USD\n"
+            f"• Match Amount: {token_display}\n"
+            f"• Token Type: {token_type}\n"
             f"• Room ID: `{match.roomId}`\n\n"
             "2️⃣ **Waiting for Players**\n"
             f"• Share the original post with potential opponents\n"

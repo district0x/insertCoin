@@ -31,4 +31,10 @@ MATCH_TYPES = [
     ("1v1", "ONE_V_ONE"),
     ("2v2", "TWO_V_TWO"),
     ("5v5", "FIVE_V_FIVE"),
+]
+
+# Token type choices
+TOKEN_CHOICES = [
+    ("ETH", "ETH"),
+    ("MATCH Tokens", "MATCH"),
 ] 

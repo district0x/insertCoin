@@ -1,20 +1,28 @@
 // Token constants for the application
 
-// MTK Token details
+// MATCH Token details (the actual token on-chain)
+export const MATCH_TOKEN = {
+  address: "0x0A8C4a30716Cecd8739fc43A73F2881e1309Af24" as `0x${string}`,
+  symbol: "MATCH",
+  decimals: 18,
+  name: "Match Token",
+} as const;
+
+// MTK Token details (legacy - keeping for backward compatibility)
 export const MTK_TOKEN = {
-  address: "0x29Cf44155892ba0A811daace8a45dba4205df2Fb" as `0x${string}`,
+  address: "0x0A8C4a30716Cecd8739fc43A73F2881e1309Af24" as `0x${string}`,
   symbol: "MTK",
   decimals: 18,
   name: "Match Token",
 } as const;
 
 // Token types for selection
-export type TokenOption = "ETH" | "MTK";
+export type TokenOption = "ETH" | "MATCH";
 
 // Token list for UI display
 export const TOKEN_OPTIONS: { value: TokenOption; label: string }[] = [
   { value: "ETH", label: "ETH" },
-  { value: "MTK", label: "MTK" },
+  { value: "MATCH", label: "MATCH" },
 ];
 
 // ERC20 approval ABI

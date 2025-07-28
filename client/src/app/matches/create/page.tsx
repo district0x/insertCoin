@@ -63,6 +63,8 @@ function CreateMatchForm() {
   // Get roomId and ethAmount from URL
   const roomId = searchParams.get("roomId");
   const ethAmountParam = searchParams.get("ethAmount");
+  const amountParam = searchParams.get("amount");
+  const tokenTypeParam = searchParams.get("tokenType");
   const [matchType, setMatchType] = React.useState<MatchType>("ONE_V_ONE");
   const [ethAmount, setEthAmount] = React.useState<bigint>(BigInt(0));
   const [isLoading, setIsLoading] = React.useState(false);
@@ -76,21 +78,39 @@ function CreateMatchForm() {
   // Get the actual wallet address to use (fallback to user.wallet.address if address is null)
   const walletAddress = address || user?.wallet?.address;
 
-  // Stabilize toast function to prevent infinite loops
-  const stableToast = React.useCallback(toast, [toast]);
-
-  // On mount, set ethAmount from URL if roomId is present
+  // On mount, set ethAmount and token type from URL if roomId is present
   React.useEffect(() => {
     if (roomId) {
-      if (!ethAmountParam || isNaN(Number(ethAmountParam)) || Number(ethAmountParam) <= 0) {
-        setParamError("Invalid or missing match amount. Please use a valid Discord match link.");
-        setEthAmount(BigInt(0));
+      // Set token type from URL parameter
+      if (tokenTypeParam === "MATCH") {
+        setSelectedToken("MTK");
       } else {
-        setEthAmount(BigInt(Math.floor(Number(ethAmountParam) * 1e18)));
-        setParamError(null);
+        setSelectedToken("ETH");
+      }
+
+      // Handle amount based on token type
+      if (tokenTypeParam === "MATCH") {
+        // For MATCH tokens, use the 'amount' parameter (whole numbers)
+        if (!amountParam || isNaN(Number(amountParam)) || Number(amountParam) <= 0) {
+          setParamError("Invalid or missing match amount. Please use a valid Discord match link.");
+          setEthAmount(BigInt(0));
+        } else {
+          // For MATCH tokens, convert to smallest unit (18 decimals)
+          setEthAmount(BigInt(Number(amountParam) * 1e18));
+          setParamError(null);
+        }
+      } else {
+        // For ETH, use the 'ethAmount' parameter (with decimals)
+        if (!ethAmountParam || isNaN(Number(ethAmountParam)) || Number(ethAmountParam) <= 0) {
+          setParamError("Invalid or missing match amount. Please use a valid Discord match link.");
+          setEthAmount(BigInt(0));
+        } else {
+          setEthAmount(BigInt(Math.floor(Number(ethAmountParam) * 1e18)));
+          setParamError(null);
+        }
       }
     }
-  }, [roomId, ethAmountParam]);
+  }, [roomId, ethAmountParam, amountParam, tokenTypeParam]);
 
   // Create public client directly
   const publicClient = createPublicClient({
@@ -101,21 +121,21 @@ function CreateMatchForm() {
   // Check if user is connected when accessing the page
   React.useEffect(() => {
     if (ready && !isConnected) {
-      stableToast({
+      toast({
         title: "External Wallet Required",
         description: "Please connect an external wallet (MetaMask, etc.) to create a match. Embedded wallets are not supported for transactions.",
         variant: "destructive",
         duration: 8000,
       });
     } else if (ready && isConnected && !isExternalWallet) {
-      stableToast({
+      toast({
         title: "External Wallet Recommended",
         description: "You're using an embedded wallet. For better transaction experience, please connect an external wallet like MetaMask.",
         variant: "default",
         duration: 6000,
       });
     }
-  }, [ready, isConnected, isExternalWallet, stableToast]);
+  }, [ready, isConnected, isExternalWallet]);
 
   // Watch for transaction confirmation
   React.useEffect(() => {
@@ -126,7 +146,7 @@ function CreateMatchForm() {
         setIsWaitingForTx(true);
 
         // Add a more detailed status message
-        stableToast({
+        toast({
           title: "Transaction Submitted",
           description: `Waiting for transaction to be confirmed on Base Sepolia. This may take a few minutes.`,
           duration: 30000, // Show for longer since blockchain confirmations take time
@@ -245,9 +265,9 @@ function CreateMatchForm() {
             await createMatchInDb({
               walletAddress: walletAddress as string,
               matchType,
-              stake: formatEther(ethAmount),
+              stake: selectedToken === "MTK" ? (Number(ethAmount) / 1e18).toString() : formatEther(ethAmount),
               matchId: Number(onChainMatchId),
-              tokenAddress: selectedToken === "MTK" ? MTK_TOKEN.address : null,
+              tokenName: selectedToken === "MTK" ? "MATCH" : "ETH",
             });
           }
 
@@ -272,11 +292,12 @@ function CreateMatchForm() {
             console.error("Failed to refresh stats:", error);
           }
 
-          stableToast({
+          toast({
             title: "Match Created Successfully!",
-            description: `Your ${matchType.toLowerCase()} match with ID #${onChainMatchId} is now live with a stake of ${formatEther(
-              ethAmount
-            )} ${selectedToken}.`,
+            description: `Your ${matchType.toLowerCase()} match with ID #${onChainMatchId} is now live with a stake of ${selectedToken === "MTK"
+              ? `${Number(ethAmount) / 1e18} MATCH Tokens`
+              : `${formatEther(ethAmount)} ETH`
+              }.`,
             variant: "success",
             duration: 5000, // Show for 5 seconds to ensure user sees it
           });
@@ -293,14 +314,14 @@ function CreateMatchForm() {
 
         // Check if it's a timeout error
         if (error instanceof Error && error.message.includes("Timed out")) {
-          stableToast({
+          toast({
             title: "Transaction Taking Longer Than Expected",
             description: `The transaction is taking longer than expected to confirm. You can check the status on the Base Sepolia explorer: https://sepolia.basescan.org/tx/${txHash}`,
             variant: "destructive",
             duration: 10000,
           });
         } else {
-          stableToast({
+          toast({
             title: "Transaction Failed",
             description:
               error instanceof Error
@@ -323,15 +344,13 @@ function CreateMatchForm() {
     router,
     selectedToken,
     roomId,
-    stableToast,
-    refreshStats,
   ]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!isConnected || !walletAddress) {
-      stableToast({
+      toast({
         title: "External Wallet Required",
         description: "Please connect your external wallet (like MetaMask) to create matches. Embedded wallets are not supported.",
         variant: "destructive",
@@ -343,7 +362,7 @@ function CreateMatchForm() {
     if (isLoading) return;
 
     if (ethAmount <= 0n) {
-      stableToast({
+      toast({
         title: "Invalid Amount",
         description: "Please enter a stake amount greater than 0.",
         variant: "destructive",
@@ -352,15 +371,31 @@ function CreateMatchForm() {
       return;
     }
 
-    if (ethAmount > MAX_STAKE_AMOUNT) {
-      stableToast({
-        title: "Amount Too Large",
-        description:
-          "The stake amount is too large. Please enter a smaller amount.",
-        variant: "destructive",
-        duration: 5000,
-      });
-      return;
+    // Validate amount based on token type
+    if (selectedToken === "MTK") {
+      // For MATCH tokens, validate as whole numbers
+      const matchAmount = Number(ethAmount) / 1e18;
+      if (matchAmount > 1000000) { // 1M MATCH tokens max
+        toast({
+          title: "Amount Too Large",
+          description: "The stake amount is too large. Please enter a smaller amount (max 1,000,000 MATCH tokens).",
+          variant: "destructive",
+          duration: 5000,
+        });
+        return;
+      }
+    } else {
+      // For ETH, validate as wei amounts (18 decimals)
+      if (ethAmount > MAX_STAKE_AMOUNT) {
+        toast({
+          title: "Amount Too Large",
+          description:
+            "The stake amount is too large. Please enter a smaller amount.",
+          variant: "destructive",
+          duration: 5000,
+        });
+        return;
+      }
     }
 
     setIsLoading(true);
@@ -372,9 +407,20 @@ function CreateMatchForm() {
           throw new Error("Wallet address is required");
         }
 
+        // Calculate the correct stake amount for the database update
+        let stakeAmountForDb: number;
+        if (selectedToken === "MTK") {
+          // For MATCH tokens, use the amount from URL (whole number)
+          stakeAmountForDb = Number(amountParam) || 0;
+        } else {
+          // For ETH, convert from wei to ETH for display
+          stakeAmountForDb = Number(ethAmountParam) || 0;
+        }
+
         console.log("About to call updateMatchWithWallet with:", {
           roomId,
           walletAddress,
+          stakeAmountForDb,
           roomIdType: typeof roomId,
           walletAddressType: typeof walletAddress
         });
@@ -382,19 +428,25 @@ function CreateMatchForm() {
         const updatedMatch = await updateMatchWithWallet({
           roomId,
           walletAddress: walletAddress as string,
+          stakeAmount: stakeAmountForDb,
         });
 
         if (!updatedMatch) {
           throw new Error("Failed to update match");
         }
 
-        // For Discord-created matches, we currently only support ETH
-        const hash = await createMatch(ethAmount);
+        // For Discord-created matches, support both ETH and MATCH tokens
+        const tokenAddress = selectedToken === "MTK" ? MTK_TOKEN.address : undefined;
+
+        // ethAmount is already in the correct format:
+        // - ETH: converted to wei format from URL
+        // - MATCH: whole numbers from URL
+        const hash = await createMatch(ethAmount, tokenAddress);
         if (!hash) throw new Error("Failed to create match");
 
         setTxHash(hash);
 
-        stableToast({
+        toast({
           title: "Transaction Submitted",
           description: `Creating your ${matchType.toLowerCase()} match. Please wait for blockchain confirmation...`,
           duration: 10000, // Show for longer since blockchain confirmations take time
@@ -402,20 +454,22 @@ function CreateMatchForm() {
       } else {
         // Regular match creation (not from Discord)
         let hash: string | null = null;
+        const tokenAddress = selectedToken === "MTK" ? MTK_TOKEN.address : undefined;
 
+        // ethAmount is already in wei format from UsdInput component
         if (matchType === "ONE_V_ONE") {
-          hash = await createMatch(ethAmount);
+          hash = await createMatch(ethAmount, tokenAddress);
         } else if (matchType === "TWO_V_TWO") {
-          hash = await create2v2Match(ethAmount);
+          hash = await create2v2Match(ethAmount, tokenAddress);
         } else if (matchType === "FIVE_V_FIVE") {
-          hash = await create5v5Match(ethAmount);
+          hash = await create5v5Match(ethAmount, tokenAddress);
         }
 
         if (!hash) throw new Error("Failed to create match");
 
         setTxHash(hash);
 
-        stableToast({
+        toast({
           title: "Transaction Submitted",
           description: `Creating your ${matchType.toLowerCase()} match. Please wait for blockchain confirmation...`,
           duration: 10000,
@@ -425,7 +479,7 @@ function CreateMatchForm() {
       setIsLoading(false);
       console.error("Error creating match:", error);
 
-      stableToast({
+      toast({
         title: "Error Creating Match",
         description:
           error instanceof Error
@@ -549,10 +603,16 @@ function CreateMatchForm() {
               )}
               {roomId && (
                 <div className="space-y-3">
-                  <Label className="text-sm font-medium">Stake Amount (ETH)</Label>
+                  <Label className="text-sm font-medium">
+                    Stake Amount ({selectedToken === "MTK" ? "MATCH Tokens" : "ETH"})
+                  </Label>
                   <input
                     type="text"
-                    value={ethAmountParam || ""}
+                    value={
+                      selectedToken === "MTK"
+                        ? `${amountParam || ""} MATCH Tokens`
+                        : `${ethAmountParam || ""} ETH`
+                    }
                     disabled
                     className="w-full px-3 py-2 border rounded bg-gray-100 text-gray-700 cursor-not-allowed"
                   />

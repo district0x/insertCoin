@@ -12,11 +12,11 @@ interface UseMatchDataProps {
   isVisible: boolean;
 }
 
-export function useMatchData({ 
-  matchId, 
-  contract, 
-  publicClient, 
-  isVisible 
+export function useMatchData({
+  matchId,
+  contract,
+  publicClient,
+  isVisible
 }: UseMatchDataProps) {
   // Fetch match data with optimistic updates
   const { data, error, mutate } = useSWR(
@@ -44,9 +44,10 @@ export function useMatchData({
       }
     },
     {
-      refreshInterval: isVisible ? 30000 : 0,
+      refreshInterval: isVisible ? 60000 : 0, // Increased from 30000 to 60000 (1 minute)
       revalidateOnFocus: false,
       keepPreviousData: true, // Keep showing old data while loading new data
+      dedupingInterval: 5000, // Prevent duplicate requests within 5 seconds
     }
   );
 

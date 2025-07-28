@@ -6,7 +6,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from src.db.prisma import prisma
-from src.web3.contract import contract
+from src.web3_contracts.contract import contract
 from src.utils.embeds import create_stats_embed, create_match_history_embed, create_opponent_record_embed
 from src.utils.rate_limiter import get_rate_limit_stats, METRICS
 

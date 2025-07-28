@@ -42,20 +42,22 @@ async def handle_create_match(
     category: str,
     game: str,
     match_amount_usd: int,
+    token_type: str,
     amount: Optional[float] = None
 ):
     """Handle the create-match command with rate limiting."""
     await interaction.response.defer()
     
     try:
-        logger.info(f"Creating match with type: {match_type}, platform: {platform}, game: {game}, amount: {amount}")
+        logger.info(f"Creating match with type: {match_type}, platform: {platform}, game: {game}, token_type: {token_type}, amount: {amount}")
         
         # Prepare match data for channel creation
         match_data = {
             "matchType": match_type,
             "platform": platform,
             "game": game,
-            "matchAmountUsd": match_amount_usd
+            "matchAmountUsd": match_amount_usd,
+            "tokenType": token_type
         }
         
         # Create match channel with rate limiting
@@ -75,6 +77,7 @@ async def handle_create_match(
                 category,
                 game,
                 match_amount_usd,
+                token_type,
                 amount,
                 channel_info
             )

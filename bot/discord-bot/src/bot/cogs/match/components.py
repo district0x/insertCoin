@@ -149,30 +149,57 @@ class CreateMatchButton(ui.Button):
                 )
                 return
             
-            # Get current ETH price and convert USD to ETH
-            eth_price_usd = PriceConverter.get_eth_price_usd()
-            eth_amount = PriceConverter.usd_to_eth(self.match_amount_usd, eth_price_usd)
+            # Get token type from database
+            token_type = match.tokenName or "ETH"  # Default to ETH if not set
             
-            # Create the frontend URL
-            frontend_url = config.get_frontend_url(f"matches/create?roomId={self.room_id}&discord=true&amount={self.match_amount_usd}&ethAmount={eth_amount:.6f}")
-            
-            # Create success embed with link
-            embed = discord.Embed(
-                title="🚀 Ready to Create Match!",
-                description=(
-                    f"**Room {self.room_id[:8]}...** is ready for blockchain creation!\n\n"
-                    f"💰 **Match Amount:** ${self.match_amount_usd} USD\n"
-                    f"⚡ **ETH Equivalent:** {PriceConverter.format_eth_amount(eth_amount)} (Rate: ${eth_price_usd:.2f}/ETH)\n\n"
-                    f"🎮 **Next Steps:**\n"
-                    f"1. Click the link below\n"
-                    f"2. Connect your wallet\n"
-                    f"3. Set stake amount (pre-filled with {PriceConverter.format_eth_amount(eth_amount)})\n"
-                    f"4. Create the match on blockchain\n"
-                    f"5. Share the match link with your opponent!\n\n"
-                    f"🔗 **[Click Here to Create Match]({frontend_url})**"
-                ),
-                color=discord.Color.green()
-            )
+            # Create frontend URL based on token type
+            if token_type == "ETH":
+                # Get current ETH price and convert USD to ETH
+                eth_price_usd = PriceConverter.get_eth_price_usd()
+                eth_amount = PriceConverter.usd_to_eth(self.match_amount_usd, eth_price_usd)
+                
+                # Create the frontend URL with ETH parameters
+                frontend_url = config.get_frontend_url(f"matches/create?roomId={self.room_id}&discord=true&amount={self.match_amount_usd}&ethAmount={eth_amount:.6f}&tokenType=ETH")
+                
+                # Create success embed with ETH info
+                embed = discord.Embed(
+                    title="🚀 Ready to Create Match!",
+                    description=(
+                        f"**Room {self.room_id[:8]}...** is ready for blockchain creation!\n\n"
+                        f"💰 **Match Amount:** ${self.match_amount_usd} USD\n"
+                        f"⚡ **Token Type:** ETH\n"
+                        f"⚡ **ETH Equivalent:** {PriceConverter.format_eth_amount(eth_amount)} (Rate: ${eth_price_usd:.2f}/ETH)\n\n"
+                        f"🎮 **Next Steps:**\n"
+                        f"1. Click the link below\n"
+                        f"2. Connect your wallet\n"
+                        f"3. Set stake amount (pre-filled with {PriceConverter.format_eth_amount(eth_amount)})\n"
+                        f"4. Create the match on blockchain\n"
+                        f"5. Share the match link with your opponent!\n\n"
+                        f"🔗 **[Click Here to Create Match]({frontend_url})**"
+                    ),
+                    color=discord.Color.green()
+                )
+            else:
+                # MATCH tokens - no conversion needed
+                frontend_url = config.get_frontend_url(f"matches/create?roomId={self.room_id}&discord=true&amount={self.match_amount_usd}&tokenType=MATCH")
+                
+                # Create success embed with MATCH token info
+                embed = discord.Embed(
+                    title="🚀 Ready to Create Match!",
+                    description=(
+                        f"**Room {self.room_id[:8]}...** is ready for blockchain creation!\n\n"
+                        f"💰 **Match Amount:** {self.match_amount_usd} MATCH Tokens\n"
+                        f"⚡ **Token Type:** MATCH Tokens\n\n"
+                        f"🎮 **Next Steps:**\n"
+                        f"1. Click the link below\n"
+                        f"2. Connect your wallet\n"
+                        f"3. Set stake amount (pre-filled with {self.match_amount_usd} MATCH tokens)\n"
+                        f"4. Create the match on blockchain\n"
+                        f"5. Share the match link with your opponent!\n\n"
+                        f"🔗 **[Click Here to Create Match]({frontend_url})**"
+                    ),
+                    color=discord.Color.green()
+                )
             
             embed.set_footer(text=f"Room ID: {self.room_id[:8]}... • Ready for blockchain creation")
             
@@ -195,20 +222,24 @@ class MatchSetupModal(ui.Modal, title="🎮 Match Setup"):
         self.room_id = room_id
         self.match_amount_usd = match_amount_usd
         
-        # Get current ETH price and convert USD to ETH
-        eth_price_usd = PriceConverter.get_eth_price_usd()
-        eth_amount = PriceConverter.usd_to_eth(match_amount_usd, eth_price_usd)
+        # Get token type from database
+        from src.db.prisma import prisma
+        match = prisma.match.find_unique(where={"roomId": room_id})
+        token_type = match.tokenName if match else "ETH"
         
-        # Create the frontend URL with room ID and ETH amount
-        frontend_url = config.get_frontend_url(f"matches/create?roomId={room_id}&discord=true&amount={match_amount_usd}&ethAmount={eth_amount:.6f}")
-        
-        # Instructions text
-        self.instructions = ui.TextInput(
-            label="📋 Setup Instructions",
-            placeholder="Follow these steps to complete your match setup...",
-            default=(
+        if token_type == "ETH":
+            # Get current ETH price and convert USD to ETH
+            eth_price_usd = PriceConverter.get_eth_price_usd()
+            eth_amount = PriceConverter.usd_to_eth(match_amount_usd, eth_price_usd)
+            
+            # Create the frontend URL with room ID and ETH amount
+            frontend_url = config.get_frontend_url(f"matches/create?roomId={room_id}&discord=true&amount={match_amount_usd}&ethAmount={eth_amount:.6f}&tokenType=ETH")
+            
+            # Instructions text for ETH
+            instructions_text = (
                 f"🎯 **Room {room_id[:8]}... Setup Instructions**\n\n"
                 f"💰 **Match Amount:** ${match_amount_usd} USD\n"
+                f"⚡ **Token Type:** ETH\n"
                 f"⚡ **ETH Equivalent:** {PriceConverter.format_eth_amount(eth_amount)} (Rate: ${eth_price_usd:.2f}/ETH)\n\n"
                 f"⚡ **Quick Setup Steps:**\n\n"
                 f"1️⃣ **Click the link below** to open the match creation page\n"
@@ -223,7 +254,36 @@ class MatchSetupModal(ui.Modal, title="🎮 Match Setup"):
                 f"• Your opponent will need to join with the same stake amount\n"
                 f"• Use this Discord channel to coordinate with your opponent\n"
                 f"• ETH price may fluctuate - check current rates before confirming"
-            ),
+            )
+        else:
+            # MATCH tokens - no conversion needed
+            frontend_url = config.get_frontend_url(f"matches/create?roomId={room_id}&discord=true&amount={match_amount_usd}&tokenType=MATCH")
+            
+            # Instructions text for MATCH tokens
+            instructions_text = (
+                f"🎯 **Room {room_id[:8]}... Setup Instructions**\n\n"
+                f"💰 **Match Amount:** {match_amount_usd} MATCH Tokens\n"
+                f"⚡ **Token Type:** MATCH Tokens\n\n"
+                f"⚡ **Quick Setup Steps:**\n\n"
+                f"1️⃣ **Click the link below** to open the match creation page\n"
+                f"2️⃣ **Connect your wallet** (MetaMask, WalletConnect, etc.)\n"
+                f"3️⃣ **Set your stake amount** (pre-filled with {match_amount_usd} MATCH tokens)\n"
+                f"4️⃣ **Review and create** the match on the blockchain\n"
+                f"5️⃣ **Share the match link** with your opponent\n\n"
+                f"🔗 **Direct Link:** {frontend_url}\n\n"
+                f"💡 **Pro Tips:**\n"
+                f"• Make sure you have enough MATCH tokens in your wallet\n"
+                f"• The stake amount is in whole MATCH tokens (no decimals)\n"
+                f"• Your opponent will need to join with the same stake amount\n"
+                f"• Use this Discord channel to coordinate with your opponent\n"
+                f"• MATCH tokens are platform-specific tokens for OneVOne matches"
+            )
+        
+        # Instructions text
+        self.instructions = ui.TextInput(
+            label="📋 Setup Instructions",
+            placeholder="Follow these steps to complete your match setup...",
+            default=instructions_text,
             style=discord.TextStyle.paragraph,
             required=False,
             max_length=4000
@@ -233,28 +293,52 @@ class MatchSetupModal(ui.Modal, title="🎮 Match Setup"):
         
     async def on_submit(self, interaction: discord.Interaction):
         """Handle modal submission."""
-        # Get current ETH price and convert USD to ETH
-        eth_price_usd = PriceConverter.get_eth_price_usd()
-        eth_amount = PriceConverter.usd_to_eth(self.match_amount_usd, eth_price_usd)
+        # Get token type from database
+        from src.db.prisma import prisma
+        match = prisma.match.find_unique(where={"roomId": self.room_id})
+        token_type = match.tokenName if match else "ETH"
         
-        # Create a follow-up message with the direct link
-        embed = discord.Embed(
-            title="🎮 Ready to Setup Match!",
-            description=(
-                f"**Room {self.room_id[:8]}...** is ready for setup!\n\n"
-                f"💰 **Match Amount:** ${self.match_amount_usd} USD\n"
-                f"⚡ **ETH Equivalent:** {PriceConverter.format_eth_amount(eth_amount)} (Rate: ${eth_price_usd:.2f}/ETH)\n\n"
-                f"⚡ **Next Steps:**\n"
-                f"1. Click the link below\n"
-                f"2. Connect your wallet\n"
-                f"3. Set stake amount (pre-filled with {PriceConverter.format_eth_amount(eth_amount)})\n"
-                f"4. Create and share with opponent!\n\n"
-                f"🔗 **[Click Here to Setup Match]({config.get_frontend_url(f'matches/create?roomId={self.room_id}&discord=true&amount={self.match_amount_usd}&ethAmount={eth_amount:.6f}')})**"
-            ),
-            color=discord.Color.green()
-        )
+        if token_type == "ETH":
+            # Get current ETH price and convert USD to ETH
+            eth_price_usd = PriceConverter.get_eth_price_usd()
+            eth_amount = PriceConverter.usd_to_eth(self.match_amount_usd, eth_price_usd)
+            
+            # Create a follow-up message with the direct link for ETH
+            embed = discord.Embed(
+                title="🎮 Ready to Setup Match!",
+                description=(
+                    f"**Room {self.room_id[:8]}...** is ready for setup!\n\n"
+                    f"💰 **Match Amount:** ${self.match_amount_usd} USD\n"
+                    f"⚡ **Token Type:** ETH\n"
+                    f"⚡ **ETH Equivalent:** {PriceConverter.format_eth_amount(eth_amount)} (Rate: ${eth_price_usd:.2f}/ETH)\n\n"
+                    f"⚡ **Next Steps:**\n"
+                    f"1. Click the link below\n"
+                    f"2. Connect your wallet\n"
+                    f"3. Set stake amount (pre-filled with {PriceConverter.format_eth_amount(eth_amount)})\n"
+                    f"4. Create and share with opponent!\n\n"
+                    f"🔗 **[Click Here to Setup Match]({config.get_frontend_url(f'matches/create?roomId={self.room_id}&discord=true&amount={self.match_amount_usd}&ethAmount={eth_amount:.6f}&tokenType=ETH')})**"
+                ),
+                color=discord.Color.green()
+            )
+        else:
+            # Create a follow-up message with the direct link for MATCH tokens
+            embed = discord.Embed(
+                title="🎮 Ready to Setup Match!",
+                description=(
+                    f"**Room {self.room_id[:8]}...** is ready for setup!\n\n"
+                    f"💰 **Match Amount:** {self.match_amount_usd} MATCH Tokens\n"
+                    f"⚡ **Token Type:** MATCH Tokens\n\n"
+                    f"⚡ **Next Steps:**\n"
+                    f"1. Click the link below\n"
+                    f"2. Connect your wallet\n"
+                    f"3. Set stake amount (pre-filled with {self.match_amount_usd} MATCH tokens)\n"
+                    f"4. Create and share with opponent!\n\n"
+                    f"🔗 **[Click Here to Setup Match]({config.get_frontend_url(f'matches/create?roomId={self.room_id}&discord=true&amount={self.match_amount_usd}&tokenType=MATCH')})**"
+                ),
+                color=discord.Color.green()
+            )
         
-        embed.set_footer(text=f"Room ID: {self.room_id[:8]}... • Amount: ${self.match_amount_usd} USD • ETH: {PriceConverter.format_eth_amount(eth_amount)}")
+        embed.set_footer(text=f"Room ID: {self.room_id[:8]}... • Amount: {self.match_amount_usd} {'USD' if token_type == 'ETH' else 'MATCH Tokens'}")
         
         await interaction.response.send_message(
             embed=embed,

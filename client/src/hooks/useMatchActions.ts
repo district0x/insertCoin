@@ -290,7 +290,7 @@ export function useMatchActions({
     } finally {
       setIsProcessing(false);
     }
-  }, [contract, address, donationEthAmount, displayMatch, publicClient, toast, onSuccess, sendTransaction]);
+  }, [contract, address, donationEthAmount, displayMatch, publicClient, onSuccess, sendTransaction]);
 
   // Handle closing a match (declaring a winner)
   const handleCloseMatch = useCallback(async () => {
@@ -414,7 +414,6 @@ export function useMatchActions({
     displayMatch,
     selectedWinner,
     address,
-    toast,
     onSuccess,
     sendTransaction,
   ]);

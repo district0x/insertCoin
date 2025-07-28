@@ -74,11 +74,16 @@ const MatchCard = ({ match, onHover }: MatchCardProps) => {
           <span className="text-sm font-medium text-gray-300">Total Prize Pool</span>
         </div>
         <p className="text-xl font-bold text-white">
-          ${(parseFloat(formatEther(match.totalAmount)) * 3000).toFixed(2)}
+          {match.isERC20
+            ? `${formatEther(match.totalAmount)} MATCH`
+            : `$${(parseFloat(formatEther(match.totalAmount)) * 3000).toFixed(2)}`
+          }
         </p>
-        <p className="text-xs text-gray-400 mt-1">
-          {formatEther(match.totalAmount)} {match.isERC20 ? "MATCH" : "ETH"}
-        </p>
+        {!match.isERC20 && (
+          <p className="text-xs text-gray-400 mt-1">
+            {formatEther(match.totalAmount)} ETH
+          </p>
+        )}
       </div>
 
       {/* Key Info Row */}
@@ -87,11 +92,16 @@ const MatchCard = ({ match, onHover }: MatchCardProps) => {
         <div className="text-center">
           <p className="text-xs text-gray-400 mb-1">Entry Fee</p>
           <p className="text-sm font-semibold text-white">
-            ${(parseFloat(formatEther(match.player1Amount)) * 3000).toFixed(2)}
+            {match.isERC20
+              ? `${formatEther(match.player1Amount)} MATCH`
+              : `$${(parseFloat(formatEther(match.player1Amount)) * 3000).toFixed(2)}`
+            }
           </p>
-          <p className="text-xs text-gray-400">
-            {formatEther(match.player1Amount)} {match.isERC20 ? "MATCH" : "ETH"}
-          </p>
+          {!match.isERC20 && (
+            <p className="text-xs text-gray-400">
+              {formatEther(match.player1Amount)} ETH
+            </p>
+          )}
         </div>
 
         {/* Players */}

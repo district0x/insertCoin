@@ -39,7 +39,7 @@ model Match {
   creatorId         String?
   creatorDiscordId  String?
   stake             Float
-  tokenAddress      String?
+  tokenName         String?
   totalPrize        Float
   winnerAddress     String?
   discordChannelId  String?

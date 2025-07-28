@@ -7,7 +7,7 @@ from discord.ext import commands
 from dotenv import load_dotenv
 
 from src.db.prisma import prisma
-from src.web3.contract import contract
+from src.web3_contracts.contract import contract
 from src.utils.config import config
 
 # Load environment variables

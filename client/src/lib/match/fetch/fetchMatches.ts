@@ -2,6 +2,7 @@ import { GetContractReturnType, PublicClient } from "viem";
 import { ONEVONE_ABI } from "../../contracts/abis/ABI";
 import { OnChainMatch } from "@/types/match";
 import { batchFetchMatches } from "./batchFetch";
+import { MATCH_TOKEN } from "@/lib/constants/tokens";
 
 export async function fetchMatches(
   contract: GetContractReturnType<typeof ONEVONE_ABI>,
@@ -22,7 +23,7 @@ export async function fetchMatches(
 
   try {
     let nextMatchId;
-    
+
     try {
       nextMatchId = await publicClient.readContract({
         address: contract.address,
@@ -32,10 +33,10 @@ export async function fetchMatches(
     } catch (error) {
       console.error('Failed to read nextMatchId:', error);
       // If we can't read nextMatchId, try to return some hardcoded test data
-      
+
       // Create some mock matches for testing
       const mockMatches: OnChainMatch[] = [];
-      
+
       // Only create mock data if we're in development
       if (process.env.NODE_ENV === 'development') {
         // Create 5 mock matches
@@ -50,7 +51,7 @@ export async function fetchMatches(
             donatedAmount: BigInt(0),
             isOpen: i % 2 === 0 ? false : true,
             isERC20: i % 3 === 0,
-            token: i % 3 === 0 ? process.env.NEXT_PUBLIC_MTK_TOKEN_ADDRESS as `0x${string}` : `0x${'0'.padStart(40, '0')}` as `0x${string}`,
+            token: i % 3 === 0 ? MATCH_TOKEN.address : `0x${'0'.padStart(40, '0')}` as `0x${string}`,
             matchType: i % 4 === 0 ? "FIVE_V_FIVE" : i % 2 === 0 ? "TWO_V_TWO" : "ONE_V_ONE",
             teamA: [`0x${'1'.padStart(40, '0')}` as `0x${string}`],
             teamB: i % 2 === 0 ? [`0x${'2'.padStart(40, '0')}` as `0x${string}`] : [],
@@ -71,11 +72,11 @@ export async function fetchMatches(
               },
             },
           };
-          
+
           mockMatches.push(mockMatch);
         }
       }
-      
+
       // Apply pagination if options are provided
       const start = options?.offset || 0;
       const end = options?.limit ? start + options?.limit : mockMatches.length;

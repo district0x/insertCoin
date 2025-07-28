@@ -4,7 +4,7 @@ import { useEffect, useCallback, useRef, useMemo } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useToast } from "@/lib/hooks/use-toast";
 import { saveWalletToDb } from "@/lib/actions/wallet";
-import { MTK_TOKEN } from "@/lib/constants/tokens";
+import { MATCH_TOKEN } from "@/lib/constants/tokens";
 
 export function useWalletConnection() {
   const {
@@ -61,17 +61,17 @@ export function useWalletConnection() {
         params: {
           type: "ERC20",
           options: {
-            address: MTK_TOKEN.address,
-            symbol: MTK_TOKEN.symbol,
-            decimals: MTK_TOKEN.decimals,
-            name: MTK_TOKEN.name,
+            address: MATCH_TOKEN.address,
+            symbol: MATCH_TOKEN.symbol,
+            decimals: MATCH_TOKEN.decimals,
+            name: MATCH_TOKEN.name,
           },
         },
       });
 
       toast({
         title: "Token Added",
-        description: "MTK token has been added to your wallet.",
+        description: "MATCH token has been added to your wallet.",
       });
     } catch (error) {
       console.error("Error adding token to wallet:", error);
@@ -83,7 +83,7 @@ export function useWalletConnection() {
         variant: "destructive",
         title: "Error",
         description:
-          "Failed to add MTK token to your wallet. You can add it manually.",
+          "Failed to add MATCH token to your wallet. You can add it manually.",
       });
     }
   }, [user?.wallet, toast]);
@@ -92,12 +92,12 @@ export function useWalletConnection() {
     if (!user?.wallet?.address) return;
 
     try {
-      // Check if the user already has MTK token balance
+      // Check if the user already has MATCH token balance
       const tokenBalance = await (user.wallet as any).request({
         method: "eth_call",
         params: [
           {
-            to: MTK_TOKEN.address,
+            to: MATCH_TOKEN.address,
             data: `0x70a08231000000000000000000000000${user.wallet.address.slice(2)}`,
           },
           "latest",
@@ -154,7 +154,7 @@ export function useWalletConnection() {
         await saveWallet(address);
         savedAddressRef.current = address;
 
-        // Check and add MTK token after successful wallet connection
+        // Check and add MATCH token after successful wallet connection
         await checkAndAddToken();
 
         // Only show toast if we haven't shown it before for this session

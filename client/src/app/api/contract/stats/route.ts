@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createPublicClient, http, parseAbiItem } from 'viem';
 import { baseSepolia } from '@/lib/config/chains';
+import { MATCH_TOKEN } from '@/lib/constants/tokens';
 
 const publicClient = createPublicClient({
     chain: baseSepolia,
@@ -8,7 +9,7 @@ const publicClient = createPublicClient({
 });
 
 // MATCH Token contract address
-const MATCH_TOKEN_ADDRESS = '0x0A8C4a30716Cecd8739fc43A73F2881e1309Af24';
+const MATCH_TOKEN_ADDRESS = MATCH_TOKEN.address;
 
 // ERC-20 ABI for balanceOf function
 const ERC20_ABI = [

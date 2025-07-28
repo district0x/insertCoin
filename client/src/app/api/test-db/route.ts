@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
     try {
@@ -16,9 +16,9 @@ export async function GET(request: NextRequest) {
         console.log(`[TEST-DB] Testing database connection for wallet: ${walletAddress}`);
 
         // Create a fresh Prisma client
-        const prisma = new PrismaClient({
-            log: ['error', 'warn'],
-        });
+        // const prisma = new PrismaClient({
+        //     log: ['error', 'warn'],
+        // });
 
         try {
             // Test connection

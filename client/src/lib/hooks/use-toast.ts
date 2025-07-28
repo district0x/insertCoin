@@ -29,21 +29,21 @@ function genId() {
 
 type Action =
   | {
-      type: typeof ADD_TOAST;
-      toast: ToasterToast;
-    }
+    type: typeof ADD_TOAST;
+    toast: ToasterToast;
+  }
   | {
-      type: typeof UPDATE_TOAST;
-      toast: Partial<ToasterToast>;
-    }
+    type: typeof UPDATE_TOAST;
+    toast: Partial<ToasterToast>;
+  }
   | {
-      type: typeof DISMISS_TOAST;
-      toastId?: ToasterToast["id"];
-    }
+    type: typeof DISMISS_TOAST;
+    toastId?: ToasterToast["id"];
+  }
   | {
-      type: typeof REMOVE_TOAST;
-      toastId?: ToasterToast["id"];
-    };
+    type: typeof REMOVE_TOAST;
+    toastId?: ToasterToast["id"];
+  };
 
 interface State {
   toasts: ToasterToast[];
@@ -101,9 +101,9 @@ const reducer = (state: State, action: Action): State => {
         toasts: state.toasts.map((t) =>
           t.id === toastId || toastId === undefined
             ? {
-                ...t,
-                open: false,
-              }
+              ...t,
+              open: false,
+            }
             : t
         ),
       };
@@ -175,7 +175,7 @@ function useToast() {
         listeners.splice(index, 1);
       }
     };
-  }, [state]);
+  }, []); // Remove state dependency to prevent infinite loop
 
   return {
     ...state,

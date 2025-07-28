@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
     try {
@@ -28,7 +26,10 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json(players);
     } catch (error) {
-        console.error('Error fetching player stats:', error);
+        // Handle error properly
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        console.error('Error fetching player stats:', errorMessage);
+
         return NextResponse.json(
             { error: 'Failed to fetch player statistics' },
             { status: 500 }

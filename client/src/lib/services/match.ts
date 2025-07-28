@@ -1,6 +1,6 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
+import { prisma, resetPrismaConnection } from "@/lib/prisma";
 import { MatchStatus, MatchType } from "@prisma/client";
 import { createClient } from '@supabase/supabase-js';
 
@@ -43,113 +43,87 @@ export async function createPendingMatch({
 export async function updateMatchWithWallet({
     roomId,
     walletAddress,
+    stakeAmount,
 }: {
     roomId: string;
     walletAddress: string;
+    stakeAmount?: number;
 }) {
-    console.log('[DB] updateMatchWithWallet called with:', { roomId, walletAddress });
-    console.log('[DB] Parameters received:', {
-        roomId,
-        walletAddress,
-        roomIdType: typeof roomId,
-        walletAddressType: typeof walletAddress,
-        roomIdIsNull: roomId === null,
-        walletAddressIsNull: walletAddress === null,
-        roomIdIsUndefined: roomId === undefined,
-        walletAddressIsUndefined: walletAddress === undefined
-    });
-
-    if (!roomId || !walletAddress) {
-        console.error('[DB] Missing roomId or walletAddress in payload:', { roomId, walletAddress });
-        throw new Error('Missing roomId or walletAddress in payload');
-    }
-
-    try {
-        console.log(`[DB] Finding match with room ID ${roomId}`);
-        // Find the match by room ID
-        const match = await prisma.match.findUnique({
-            where: { roomId },
-            include: { creator: true },
-        });
-
-        if (!match) {
-            console.log(`[DB] Match with room ID ${roomId} not found`);
-            throw new Error('Match not found');
-        }
-
-        console.log(`[DB] Found match: ${JSON.stringify(match)}`);
-
-        // If match was created through Discord
-        if (match.creatorDiscordId) {
-            console.log(`[DB] Match has Discord ID: ${match.creatorDiscordId}`);
-            // Check if user with this wallet already exists
-            const existingUser = await prisma.user.findFirst({
-                where: { address: walletAddress },
+    const maxRetries = 5; // Increased from 3 to 5
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            console.log(`[DB] updateMatchWithWallet called with:`, {
+                roomId,
+                walletAddress,
+                stakeAmount,
+                roomIdType: typeof roomId,
+                walletAddressType: typeof walletAddress,
+                roomIdIsNull: roomId === null,
+                walletAddressIsNull: walletAddress === null,
+                roomIdIsUndefined: roomId === undefined,
+                walletAddressIsUndefined: walletAddress === undefined,
             });
 
-            if (existingUser) {
-                console.log(`[DB] Found existing user with wallet ${walletAddress}`);
+            console.log(`[DB] Finding match with room ID ${roomId}`);
 
-                // Check if Discord ID is already linked to a different user
-                const existingDiscordUser = await prisma.user.findUnique({
-                    where: { discordId: match.creatorDiscordId },
-                });
+            // Find the match by room ID
+            const match = await prisma.match.findUnique({
+                where: { roomId },
+                include: { creator: true },
+            });
 
-                if (existingDiscordUser && existingDiscordUser.id !== existingUser.id) {
-                    console.error(
-                        `[DB] Discord ID ${match.creatorDiscordId} already linked to different wallet ${existingDiscordUser.address}`
-                    );
-                    // Check if the current user trying to connect is the same person
-                    if (existingUser.discordId === match.creatorDiscordId) {
-                        console.log(`[DB] User with wallet ${walletAddress} already has Discord ID ${match.creatorDiscordId}, proceeding`);
-                        // User is legitimate, continue with existing user
-                    } else {
-                        throw new Error(
-                            'Discord ID is already linked to a different wallet. Please contact support to resolve this conflict.'
-                        );
-                    }
-                }
-
-                // If user exists but doesn't have Discord ID, update it
-                if (!existingUser.discordId) {
-                    console.log(
-                        `[DB] Updating existing user with Discord ID ${match.creatorDiscordId}`
-                    );
-                    await prisma.user.update({
-                        where: { id: existingUser.id },
-                        data: { discordId: match.creatorDiscordId },
-                    });
-                } else if (existingUser.discordId !== match.creatorDiscordId) {
-                    console.error(
-                        `[DB] Wallet ${walletAddress} already linked to different Discord ID ${existingUser.discordId}`
-                    );
-                    throw new Error(
-                        'Wallet already linked to a different Discord account'
-                    );
-                }
+            if (!match) {
+                throw new Error(`Match with room ID ${roomId} not found`);
             }
 
-            // Create or update user with both Discord ID and wallet
-            console.log(
-                `[DB] Upserting user with Discord ID ${match.creatorDiscordId} and wallet ${walletAddress}`
-            );
+            console.log(`[DB] Found match:`, {
+                id: match.id,
+                roomId: match.roomId,
+                creatorDiscordId: match.creatorDiscordId,
+                stake: match.stake,
+                matchAmountUsd: match.matchAmountUsd,
+                tokenName: match.tokenName,
+            });
+
+            // Upsert user with Discord ID and wallet
             const user = await prisma.user.upsert({
-                where: { discordId: match.creatorDiscordId },
-                update: { address: walletAddress },
-                create: {
+                where: { discordId: match.creatorDiscordId! },
+                update: {
                     address: walletAddress,
-                    discordId: match.creatorDiscordId,
+                    updatedAt: new Date(),
+                },
+                create: {
+                    discordId: match.creatorDiscordId!,
+                    address: walletAddress,
                 },
             });
 
+            console.log(`[DB] Discord match - upserting user with Discord ID ${match.creatorDiscordId} and wallet ${walletAddress}`);
+
             // Update match with creator and status
             console.log(`[DB] Updating match ${roomId} with creator ID ${user.id}`);
+
+            // Calculate the correct stake amount based on token type
+            let finalStakeAmount = stakeAmount;
+            if (!finalStakeAmount) {
+                // Fallback to database value if no stakeAmount provided
+                if ((match as any).tokenName === "MATCH") {
+                    // For MATCH tokens, use the matchAmountUsd as the stake
+                    finalStakeAmount = match.matchAmountUsd || 0;
+                } else {
+                    // For ETH, use the database stake value
+                    finalStakeAmount = match.stake;
+                }
+            }
+
             const updatedMatch = await prisma.match.update({
                 where: { id: match.id },
                 data: {
                     creatorId: user.id,
                     creatorAddress: walletAddress,
                     status: MatchStatus.OPEN,
+                    stake: finalStakeAmount,
+                    totalPrize: finalStakeAmount,
                 },
                 include: {
                     creator: true,
@@ -160,43 +134,25 @@ export async function updateMatchWithWallet({
                 `[DB] Match updated successfully: ${JSON.stringify(updatedMatch)}`
             );
             return updatedMatch;
+
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error) || "Unknown error occurred";
+            console.error(`[DB] Error updating match with wallet (attempt ${attempt + 1}):`, errorMessage);
+
+            // Check if it's a prepared statement error
+            if (errorMessage.includes("prepared statement") && attempt < maxRetries - 1) {
+                console.log(`[DB] Prepared statement error detected, resetting connection and retrying...`);
+                await resetPrismaConnection();
+                // Wait longer between retries for prepared statement errors
+                await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
+                continue;
+            }
+
+            // If it's the last attempt or not a prepared statement error, throw
+            throw new Error(errorMessage);
         }
-
-        // If match wasn't created through Discord, just create/update user with wallet
-        console.log(
-            `[DB] Regular match - upserting user with wallet ${walletAddress}`
-        );
-        const user = await prisma.user.upsert({
-            where: { address: walletAddress },
-            update: {},
-            create: {
-                address: walletAddress,
-            },
-        });
-
-        // Update match with creator and status
-        console.log(`[DB] Updating match ${roomId} with creator ID ${user.id}`);
-        const updatedMatch = await prisma.match.update({
-            where: { id: match.id },
-            data: {
-                creatorId: user.id,
-                creatorAddress: walletAddress,
-                status: MatchStatus.OPEN,
-            },
-            include: {
-                creator: true,
-            },
-        });
-
-        console.log(
-            `[DB] Match updated successfully: ${JSON.stringify(updatedMatch)}`
-        );
-        return updatedMatch;
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error) || "Unknown error occurred";
-        console.error("[DB] Error updating match with wallet:", errorMessage);
-        throw new Error(errorMessage);
     }
+    throw new Error("Failed to update match with wallet after multiple retries.");
 }
 
 // Function to update match with contract match ID after creation
@@ -278,13 +234,13 @@ export async function createMatchInDb({
     matchType,
     stake,
     matchId,
-    tokenAddress,
+    tokenName,
 }: {
     walletAddress: string;
     matchType: MatchType;
     stake: string;
     matchId: number;
-    tokenAddress: string | null;
+    tokenName: string | null;
 }) {
     try {
         console.log(`[DB] Processing match for wallet ${walletAddress}`);
@@ -317,7 +273,7 @@ export async function createMatchInDb({
                     creatorId: user.id,
                     stake: parseFloat(stake),
                     totalPrize: parseFloat(stake),
-                    tokenAddress: tokenAddress || null,
+                    tokenName: tokenName || null,
                 },
                 include: {
                     creator: true,
@@ -335,7 +291,7 @@ export async function createMatchInDb({
                     creatorId: user.id,
                     stake: parseFloat(stake),
                     totalPrize: parseFloat(stake),
-                    tokenAddress: tokenAddress || null,
+                    tokenName: tokenName || null,
                 },
                 include: {
                     creator: true,

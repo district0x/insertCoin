@@ -81,7 +81,6 @@ export default function MatchPage() {
     publicClient,
     match,
     address: address as `0x${string}` | undefined,
-    onSuccess: () => mutate()
   });
 
   const [closeMatchResult, setCloseMatchResult] = useState<{

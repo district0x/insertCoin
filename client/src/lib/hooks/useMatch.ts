@@ -73,13 +73,16 @@ export function useMatch() {
 
       // If allowance is sufficient, return true
       if (allowance >= amount) {
+        console.log("Sufficient allowance already exists:", allowance.toString());
         return true;
       }
+
+      console.log("Insufficient allowance. Current:", allowance.toString(), "Required:", amount.toString());
 
       // Otherwise, request approval using ethers
       toast({
         title: "Token Approval Required",
-        description: "Please approve the contract to spend your tokens.",
+        description: "Please approve the contract to spend your MATCH tokens.",
         duration: 10000,
       });
 
@@ -90,16 +93,46 @@ export function useMatch() {
         signer
       );
 
+      console.log("Sending approval transaction...");
       const tx = await tokenContract.approve(contract.address, amount.toString());
-      const receipt = await tx.wait();
+      console.log("Approval transaction sent:", tx.hash);
 
       toast({
-        title: "Token Approval Successful",
-        description: "You can now create the match.",
-        variant: "success",
-        duration: 5000,
+        title: "Approval Transaction Sent",
+        description: "Waiting for confirmation... This may take a few minutes.",
+        duration: 15000,
       });
-      return true;
+
+      // Wait for transaction confirmation
+      console.log("Waiting for approval transaction confirmation...");
+      const receipt = await tx.wait();
+      console.log("Approval transaction confirmed in block:", receipt.blockNumber);
+
+      // Additional wait to ensure blockchain state is updated
+      console.log("Waiting additional time for blockchain state update...");
+      await new Promise(resolve => setTimeout(resolve, 30000)); // Wait 30 seconds
+
+      // Verify the allowance was actually updated
+      const newAllowance = await publicClient.readContract({
+        address: tokenAddress,
+        abi: ERC20_APPROVAL_ABI,
+        functionName: "allowance",
+        args: [walletAddress as `0x${string}`, contract.address]
+      });
+
+      console.log("New allowance after approval:", newAllowance.toString());
+
+      if (newAllowance >= amount) {
+        toast({
+          title: "Token Approval Successful",
+          description: "Approval confirmed! You can now create the match.",
+          variant: "success",
+          duration: 5000,
+        });
+        return true;
+      } else {
+        throw new Error("Approval transaction confirmed but allowance not updated. Please try again.");
+      }
     } catch (error) {
       console.error("Error approving token:", error);
       toast({
@@ -132,15 +165,24 @@ export function useMatch() {
         throw new Error("Stake amount must be greater than 0");
       }
 
-      // Max reasonable stake amount (100,000 ETH)
-      const MAX_STAKE = 100000n * 10n ** 18n;
-      if (amount > MAX_STAKE) {
-        throw new Error(`Stake amount exceeds maximum allowed (${formatEther(MAX_STAKE)} ETH)`);
-      }
-
       // Use the imported ZERO_ADDRESS constant for ETH
       const token = tokenAddress || ZERO_ADDRESS;
       const isERC20 = token !== ZERO_ADDRESS;
+
+      // Validate amount based on token type
+      if (isERC20) {
+        // For MATCH tokens, validate as whole numbers (max 1M tokens)
+        const MAX_MATCH_STAKE = 1000000n * 10n ** 18n; // Convert to smallest units
+        if (amount > MAX_MATCH_STAKE) {
+          throw new Error(`Stake amount exceeds maximum allowed (1,000,000 MATCH tokens)`);
+        }
+      } else {
+        // For ETH, validate as wei amounts (18 decimals)
+        const MAX_ETH_STAKE = 100000n * 10n ** 18n;
+        if (amount > MAX_ETH_STAKE) {
+          throw new Error(`Stake amount exceeds maximum allowed (${formatEther(MAX_ETH_STAKE)} ETH)`);
+        }
+      }
 
       console.log("Transaction parameters:", {
         amount: amount.toString(),
@@ -220,15 +262,24 @@ export function useMatch() {
         throw new Error("Stake amount must be greater than 0");
       }
 
-      // Max reasonable stake amount (100,000 ETH)
-      const MAX_STAKE = 100000n * 10n ** 18n;
-      if (amount > MAX_STAKE) {
-        throw new Error(`Stake amount exceeds maximum allowed (${formatEther(MAX_STAKE)} ETH)`);
-      }
-
       // Use the imported ZERO_ADDRESS constant for ETH
       const token = tokenAddress || ZERO_ADDRESS;
       const isERC20 = token !== ZERO_ADDRESS;
+
+      // Validate amount based on token type
+      if (isERC20) {
+        // For MATCH tokens, validate as whole numbers (max 1M tokens)
+        const MAX_MATCH_STAKE = 1000000n * 10n ** 18n; // Convert to smallest units
+        if (amount > MAX_MATCH_STAKE) {
+          throw new Error(`Stake amount exceeds maximum allowed (1,000,000 MATCH tokens)`);
+        }
+      } else {
+        // For ETH, validate as wei amounts (18 decimals)
+        const MAX_ETH_STAKE = 100000n * 10n ** 18n;
+        if (amount > MAX_ETH_STAKE) {
+          throw new Error(`Stake amount exceeds maximum allowed (${formatEther(MAX_ETH_STAKE)} ETH)`);
+        }
+      }
 
       console.log("Transaction parameters:", {
         amount: amount.toString(),
@@ -247,7 +298,7 @@ export function useMatch() {
       }
 
       // Use ethers contract like in tournament project
-      const ethersContract = getEthersContract();
+      const ethersContract = await getEthersContract();
 
       // Prepare transaction options
       const txOptions: { value?: ethers.BigNumber } = {};
@@ -301,15 +352,24 @@ export function useMatch() {
         throw new Error("Stake amount must be greater than 0");
       }
 
-      // Max reasonable stake amount (100,000 ETH)
-      const MAX_STAKE = 100000n * 10n ** 18n;
-      if (amount > MAX_STAKE) {
-        throw new Error(`Stake amount exceeds maximum allowed (${formatEther(MAX_STAKE)} ETH)`);
-      }
-
       // Use the imported ZERO_ADDRESS constant for ETH
       const token = tokenAddress || ZERO_ADDRESS;
       const isERC20 = token !== ZERO_ADDRESS;
+
+      // Validate amount based on token type
+      if (isERC20) {
+        // For MATCH tokens, validate as whole numbers (max 1M tokens)
+        const MAX_MATCH_STAKE = 1000000n * 10n ** 18n; // Convert to smallest units
+        if (amount > MAX_MATCH_STAKE) {
+          throw new Error(`Stake amount exceeds maximum allowed (1,000,000 MATCH tokens)`);
+        }
+      } else {
+        // For ETH, validate as wei amounts (18 decimals)
+        const MAX_ETH_STAKE = 100000n * 10n ** 18n;
+        if (amount > MAX_ETH_STAKE) {
+          throw new Error(`Stake amount exceeds maximum allowed (${formatEther(MAX_ETH_STAKE)} ETH)`);
+        }
+      }
 
       console.log("Transaction parameters:", {
         amount: amount.toString(),
@@ -328,7 +388,7 @@ export function useMatch() {
       }
 
       // Use ethers contract like in tournament project
-      const ethersContract = getEthersContract();
+      const ethersContract = await getEthersContract();
 
       // Prepare transaction options
       const txOptions: { value?: ethers.BigNumber } = {};
@@ -373,7 +433,7 @@ export function useMatch() {
     }
 
     try {
-      const ethersContract = getEthersContract();
+      const ethersContract = await getEthersContract();
       const tx = await ethersContract.joinMatch(matchId.toString(), { value: ethers.BigNumber.from(amount.toString()) });
       return tx.hash;
     } catch (error) {
@@ -396,7 +456,7 @@ export function useMatch() {
     }
 
     try {
-      const ethersContract = getEthersContract();
+      const ethersContract = await getEthersContract();
       const tx = await ethersContract.join2v2Team(matchId.toString(), isTeamA, { value: ethers.BigNumber.from(amount.toString()) });
       return tx.hash;
     } catch (error) {
@@ -419,7 +479,7 @@ export function useMatch() {
     }
 
     try {
-      const ethersContract = getEthersContract();
+      const ethersContract = await getEthersContract();
       const tx = await ethersContract.join5v5Team(matchId.toString(), isTeamA, { value: ethers.BigNumber.from(amount.toString()) });
       return tx.hash;
     } catch (error) {
