@@ -54,7 +54,12 @@ async function checkAndApproveToken(
 
     if (typeof window !== "undefined" && (window as any).ethereum) {
       const provider = new ethers.providers.Web3Provider((window as any).ethereum);
-      const signer = provider.getSigner();
+
+      // Request accounts to ensure wallet is connected (same as useMatch.ts)
+      await provider.send("eth_requestAccounts", []);
+
+      // Get the signer for account 0 (same as useMatch.ts)
+      const signer = provider.getSigner(0);
 
       // If standard ERC20 allowance is insufficient, approve it
       if (allowance < amount) {
@@ -70,8 +75,13 @@ async function checkAndApproveToken(
         console.log(`[TOKEN-APPROVAL] ERC20 approval transaction hash: ${tx.hash}`);
 
         console.log(`[TOKEN-APPROVAL] Waiting for ERC20 approval transaction confirmation...`);
-        const receipt = await tx.wait();
-        console.log(`[TOKEN-APPROVAL] ERC20 approval confirmed in block: ${receipt.blockNumber}`);
+        try {
+          const receipt = await tx.wait();
+          console.log(`[TOKEN-APPROVAL] ERC20 approval confirmed in block: ${receipt.blockNumber}`);
+        } catch (error) {
+          console.log(`[TOKEN-APPROVAL] Rate limited while waiting for confirmation, but transaction was sent: ${tx.hash}`);
+          console.log(`[TOKEN-APPROVAL] Continuing without waiting for confirmation...`);
+        }
       }
 
       // If token is not approved in contract, approve it (requires admin privileges)
@@ -85,10 +95,9 @@ async function checkAndApproveToken(
           functionName: "owner",
         }) as `0x${string}`;
 
-        const currentSignerAddress = await signer.getAddress();
-        console.log(`[TOKEN-APPROVAL] Contract owner: ${contractOwner}, Current signer: ${currentSignerAddress}`);
+        console.log(`[TOKEN-APPROVAL] Contract owner: ${contractOwner}, Current signer: ${walletAddress}`);
 
-        if (contractOwner.toLowerCase() === currentSignerAddress.toLowerCase()) {
+        if (contractOwner.toLowerCase() === walletAddress.toLowerCase()) {
           console.log(`[TOKEN-APPROVAL] Current user is contract owner. Approving token in contract...`);
           const contractInstance = new ethers.Contract(contractAddress, ONEVONE_ABI, signer);
           const approveTx = await contractInstance.approveToken(tokenAddress, true);
@@ -190,7 +199,8 @@ export async function joinMatch(
   publicClient: PublicClient,
   sendTransaction: SendTransactionFunction,
   matchId: bigint,
-  amount: bigint
+  amount: bigint,
+  walletAddress?: `0x${string}`
 ) {
   console.log(`[JOIN-MATCH-DEBUG] Function called with matchId: ${matchId}, amount: ${amount}`);
 
@@ -209,13 +219,14 @@ export async function joinMatch(
     bigint, // totalAmount
     bigint, // donatedAmount
     boolean, // isOpen
+    boolean, // isClosed
     boolean, // isERC20
     `0x${string}` // token
   ];
   console.log(`[JOIN-MATCH] Raw match data:`, match);
 
-  const isERC20 = match[7];
-  const tokenAddress = match[8];
+  const isERC20 = match[8];
+  const tokenAddress = match[9];
 
   console.log(`[JOIN-MATCH] Match ${matchId} details:`, {
     isERC20,
@@ -235,10 +246,15 @@ export async function joinMatch(
     console.log(`[JOIN-MATCH] This is an ERC20 match. Checking for external wallet...`);
     if (typeof window !== "undefined" && (window as any).ethereum) {
       console.log(`[JOIN-MATCH] External wallet detected. Getting wallet address...`);
-      const provider = new ethers.providers.Web3Provider((window as any).ethereum);
-      const signer = provider.getSigner();
-      const walletAddress = await signer.getAddress() as `0x${string}`;
-      console.log(`[JOIN-MATCH] Wallet address: ${walletAddress}`);
+      let currentWalletAddress = walletAddress;
+
+      if (!currentWalletAddress) {
+        const provider = new ethers.providers.Web3Provider((window as any).ethereum);
+        const signer = provider.getSigner();
+        currentWalletAddress = await signer.getAddress() as `0x${string}`;
+      }
+
+      console.log(`[JOIN-MATCH] Wallet address: ${currentWalletAddress}`);
 
       // Let's check if the smart contract has any ERC20-related state variables
       console.log(`[JOIN-MATCH] Checking smart contract for ERC20 handler...`);
@@ -258,7 +274,7 @@ export async function joinMatch(
       }
 
       console.log(`[JOIN-MATCH] Calling checkAndApproveToken...`);
-      await checkAndApproveToken(tokenAddress, amount, contract.address, walletAddress, publicClient);
+      await checkAndApproveToken(tokenAddress, amount, contract.address, currentWalletAddress, publicClient);
       console.log(`[JOIN-MATCH] Token approval completed successfully.`);
 
       // Add a small delay to ensure blockchain state is updated
@@ -270,98 +286,40 @@ export async function joinMatch(
     }
 
     // Now call the joinMatch function without ETH value
-    console.log(`[JOIN-MATCH] Calling contract joinMatch function...`);
-
-    // Double-check allowance right before the transaction and ensure it's sufficient
-    const provider = new ethers.providers.Web3Provider((window as any).ethereum);
-    const signer = provider.getSigner();
-    const currentWalletAddress = await signer.getAddress() as `0x${string}`;
-
-    const finalAllowanceCheck = await publicClient.readContract({
-      address: tokenAddress,
-      abi: ERC20_APPROVAL_ABI,
-      functionName: "allowance",
-      args: [currentWalletAddress, contract.address]
-    });
-    console.log(`[JOIN-MATCH] Final allowance check before transaction: ${finalAllowanceCheck}`);
-
-    // If allowance is still insufficient, try to approve again with a higher amount
-    if (finalAllowanceCheck < amount) {
-      console.log(`[JOIN-MATCH] Final allowance check shows insufficient allowance. Approving again...`);
-      const tokenContract = new ethers.Contract(
-        tokenAddress,
-        ERC20_APPROVAL_ABI,
-        signer
-      );
-
-      // Approve with a higher amount to ensure sufficient allowance
-      const approvalAmount = amount * 2n; // Double the amount to be safe
-      console.log(`[JOIN-MATCH] Approving ${approvalAmount} tokens...`);
-
-      const tx = await tokenContract.approve(contract.address, approvalAmount.toString());
-      console.log(`[JOIN-MATCH] Approval transaction sent: ${tx.hash}`);
-
-      console.log(`[JOIN-MATCH] Waiting for approval confirmation...`);
-      const receipt = await tx.wait();
-      console.log(`[JOIN-MATCH] Approval confirmed in block: ${receipt.blockNumber}`);
-
-      // Wait additional time for blockchain state update
-      console.log(`[JOIN-MATCH] Waiting for blockchain state update...`);
-      await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds
-
-      // Verify the new allowance
-      const newAllowance = await publicClient.readContract({
-        address: tokenAddress,
-        abi: ERC20_APPROVAL_ABI,
-        functionName: "allowance",
-        args: [currentWalletAddress, contract.address]
-      });
-      console.log(`[JOIN-MATCH] New allowance after final approval: ${newAllowance}`);
-
-      if (newAllowance < amount) {
-        throw new Error(`Failed to set sufficient allowance. Current: ${newAllowance}, Required: ${amount}`);
-      }
-    }
-
     console.log(`[JOIN-MATCH] Proceeding with join match transaction...`);
 
-    // Try to simulate the transaction first to see if it works
-    try {
-      const { request } = await publicClient.simulateContract({
-        address: contract.address,
-        abi: contract.abi,
-        functionName: "joinMatch",
-        args: [matchId],
-      });
-      console.log(`[JOIN-MATCH] Contract simulation successful. Sending transaction...`);
-      return sendTransaction(request);
-    } catch (simulationError) {
-      console.error(`[JOIN-MATCH] Contract simulation failed:`, simulationError);
+    // Use ethers.js approach like in match creation
+    if (typeof window !== "undefined" && (window as any).ethereum) {
+      console.log(`[JOIN-MATCH] Using ethers.js for join match transaction...`);
 
-      // If simulation fails, try to understand why
-      console.log(`[JOIN-MATCH] Attempting to debug the issue...`);
+      const provider = new ethers.providers.Web3Provider((window as any).ethereum);
+      const signer = provider.getSigner();
+      const ethersContract = new ethers.Contract(contract.address, contract.abi, signer);
 
-      // Check if there might be a different spender address or pattern
-      console.log(`[JOIN-MATCH] Contract address: ${contract.address}`);
-      console.log(`[JOIN-MATCH] Token address: ${tokenAddress}`);
-      console.log(`[JOIN-MATCH] Wallet address: ${currentWalletAddress}`);
-      console.log(`[JOIN-MATCH] Match ID: ${matchId}`);
-      console.log(`[JOIN-MATCH] Amount: ${amount}`);
-
-      // Try to get more information about the match
-      try {
-        const matchInfo = await publicClient.readContract({
-          address: contract.address,
-          abi: contract.abi,
-          functionName: "matches",
-          args: [matchId]
-        });
-        console.log(`[JOIN-MATCH] Match info:`, matchInfo);
-      } catch (matchError) {
-        console.error(`[JOIN-MATCH] Could not read match info:`, matchError);
+      // Prepare transaction options
+      const txOptions: { value?: ethers.BigNumber } = {};
+      if (!isERC20) {
+        txOptions.value = ethers.BigNumber.from(amount.toString());
       }
 
-      throw simulationError;
+      console.log(`[JOIN-MATCH] Sending join match transaction with ethers.js...`);
+      console.log(`[JOIN-MATCH] Contract address: ${ethersContract.address}`);
+      console.log(`[JOIN-MATCH] Function parameters:`, {
+        matchId: matchId.toString(),
+        txOptions: txOptions
+      });
+
+      const tx = await ethersContract.joinMatch(matchId.toString(), txOptions);
+      console.log(`[JOIN-MATCH] Transaction sent with hash: ${tx.hash}`);
+
+      // Wait for transaction confirmation
+      console.log(`[JOIN-MATCH] Waiting for transaction confirmation...`);
+      const receipt = await tx.wait();
+      console.log(`[JOIN-MATCH] Transaction confirmed in block: ${receipt.blockNumber}`);
+
+      return tx.hash;
+    } else {
+      throw new Error("No external wallet available for join match transaction");
     }
   } else {
     // For ETH matches, use ethers.js directly for external wallets
@@ -453,7 +411,7 @@ export async function join2v2Team(
   }
 }
 
-export async function join5v5Team(
+export async function join6v6Team(
   contract: GetContractReturnType<typeof ONEVONE_ABI>,
   publicClient: PublicClient,
   sendTransaction: SendTransactionFunction,
@@ -462,37 +420,41 @@ export async function join5v5Team(
   amount: bigint
 ) {
   // Get match details to check if it uses ERC20 tokens
-  const match5v5 = await publicClient.readContract({
+  const match6v6 = await publicClient.readContract({
     address: contract.address,
     abi: contract.abi,
-    functionName: "matches5v5",
+    functionName: "matches6v6",
     args: [matchId],
   }) as readonly [
     `0x${string}`, // player1
-    `0x${string}`, // player2
     `0x${string}`, // teamAPlayer2
     `0x${string}`, // teamAPlayer3
     `0x${string}`, // teamAPlayer4
     `0x${string}`, // teamAPlayer5
+    `0x${string}`, // teamAPlayer6
+    `0x${string}`, // player2
     `0x${string}`, // teamBPlayer2
     `0x${string}`, // teamBPlayer3
     `0x${string}`, // teamBPlayer4
     `0x${string}`, // teamBPlayer5
+    `0x${string}`, // teamBPlayer6
     bigint, // player1Amount
     bigint, // totalAmount
+    bigint, // donatedAmount
     `0x${string}`, // token
     boolean, // isERC20
-    boolean // isOpen
+    boolean, // isOpen
+    boolean // isClosed
   ];
 
-  if (!match5v5) {
+  if (!match6v6) {
     throw new Error("Match not found");
   }
 
-  const isERC20 = match5v5[13];
-  const tokenAddress = match5v5[12];
+  const isERC20 = match6v6[16];
+  const tokenAddress = match6v6[15];
 
-  console.log(`5v5 Match ${matchId} is ${isERC20 ? "an ERC20" : "an ETH"} match with token ${tokenAddress}`);
+  console.log(`6v6 Match ${matchId} is ${isERC20 ? "an ERC20" : "an ETH"} match with token ${tokenAddress}`);
 
   // If it's an ERC20 match, approve tokens first
   if (isERC20 && tokenAddress !== "0x0000000000000000000000000000000000000000") {
@@ -510,7 +472,7 @@ export async function join5v5Team(
     const { request } = await publicClient.simulateContract({
       address: contract.address,
       abi: contract.abi,
-      functionName: "join5v5Team",
+      functionName: "join6v6Team",
       args: [matchId, isTeamA],
     });
 
@@ -520,7 +482,7 @@ export async function join5v5Team(
     const { request } = await publicClient.simulateContract({
       address: contract.address,
       abi: contract.abi,
-      functionName: "join5v5Team",
+      functionName: "join6v6Team",
       args: [matchId, isTeamA],
       value: amount,
     });
@@ -537,7 +499,7 @@ export async function donateToMatch(
   amount: bigint
 ) {
   // Check match state in all match types to determine if it's open
-  const [match1v1, match2v2, match5v5] = await Promise.all([
+  const [match1v1, match2v2, match6v6] = await Promise.all([
     // Check 1v1 match
     publicClient.readContract({
       address: contract.address,
@@ -553,6 +515,7 @@ export async function donateToMatch(
         bigint, // totalAmount
         bigint, // donatedAmount
         boolean, // isOpen
+        boolean, // isClosed
         boolean, // isERC20
         `0x${string}` // token
       ]
@@ -578,46 +541,124 @@ export async function donateToMatch(
         `0x${string}` // token
       ]
     >,
-    // Check 5v5 match
+    // Check 6v6 match
     publicClient.readContract({
       address: contract.address,
       abi: contract.abi,
-      functionName: "matches5v5",
+      functionName: "matches6v6",
       args: [matchId],
     }) as Promise<
       readonly [
         `0x${string}`, // player1
-        `0x${string}`, // player2
         `0x${string}`, // teamAPlayer2
         `0x${string}`, // teamAPlayer3
         `0x${string}`, // teamAPlayer4
         `0x${string}`, // teamAPlayer5
+        `0x${string}`, // teamAPlayer6
+        `0x${string}`, // player2
         `0x${string}`, // teamBPlayer2
         `0x${string}`, // teamBPlayer3
         `0x${string}`, // teamBPlayer4
         `0x${string}`, // teamBPlayer5
+        `0x${string}`, // teamBPlayer6
         bigint, // player1Amount
         bigint, // totalAmount
+        bigint, // donatedAmount
         `0x${string}`, // token
         boolean, // isERC20
-        boolean // isOpen
+        boolean, // isOpen
+        boolean // isClosed
       ]
     >,
   ]);
 
-  // Check if any of the match types are open
-  const isMatchOpen = (match1v1 && (match1v1 as any)[6]) || (match2v2 && (match2v2 as any)[8]) || (match5v5 && (match5v5 as any)[14]);
+  // Check if any of the match types are closed (donations should be allowed until explicitly closed)
+  // For 1v1: isClosed is at index 7, for 2v2: isClosed is at index 9, for 6v6: isClosed is at index 18
+  const isMatchClosed = (match1v1 && (match1v1 as any)[7]) || (match2v2 && (match2v2 as any)[9]) || (match6v6 && (match6v6 as any)[18]);
 
-  if (!isMatchOpen) {
+  console.log(`[DONATE-MATCH] Match closed status check:`, {
+    match1v1: match1v1 ? `exists, isClosed: ${(match1v1 as any)[7]}` : "null",
+    match2v2: match2v2 ? `exists, isClosed: ${(match2v2 as any)[9]}` : "null",
+    match6v6: match6v6 ? `exists, isClosed: ${(match6v6 as any)[18]}` : "null",
+    isMatchClosed
+  });
+
+  if (isMatchClosed) {
     throw new Error("This match is closed and no longer accepting donations");
   }
 
+  // Determine match type and get token info
+  let tokenAddress: `0x${string}` | null = null;
+  let isERC20 = false;
+
+  if (match1v1 && (match1v1 as any)[0] !== '0x0000000000000000000000000000000000000000') {
+    isERC20 = (match1v1 as any)[8]; // isERC20 is at index 8 for 1v1
+    tokenAddress = (match1v1 as any)[9]; // token is at index 9 for 1v1
+  } else if (match2v2 && (match2v2 as any)[0] !== '0x0000000000000000000000000000000000000000') {
+    isERC20 = (match2v2 as any)[9]; // isERC20 is at index 9 for 2v2
+    tokenAddress = (match2v2 as any)[10]; // token is at index 10 for 2v2
+  } else if (match6v6 && (match6v6 as any)[0] !== '0x0000000000000000000000000000000000000000') {
+    isERC20 = (match6v6 as any)[16]; // isERC20 is at index 16 for 6v6
+    tokenAddress = (match6v6 as any)[15]; // token is at index 15 for 6v6
+  }
+
+  console.log(`[DONATE-MATCH] Token info:`, {
+    isERC20,
+    tokenAddress,
+    amount: amount.toString()
+  });
+
+  // If it's an ERC20 token, check and approve token allowance
+  if (isERC20 && tokenAddress) {
+    console.log(`[DONATE-MATCH] ERC20 token detected. Checking approval...`);
+
+    // Get wallet address for approval
+    let walletAddress: `0x${string}`;
+    if (typeof window !== "undefined" && (window as any).ethereum) {
+      const provider = new ethers.providers.Web3Provider((window as any).ethereum);
+      await provider.send("eth_requestAccounts", []);
+      const signer = provider.getSigner(0);
+      walletAddress = await signer.getAddress() as `0x${string}`;
+    } else {
+      throw new Error("No wallet connected");
+    }
+
+    // Check and approve token
+    await checkAndApproveToken(tokenAddress, amount, contract.address, walletAddress, publicClient);
+
+    // Add a longer delay to ensure blockchain state is updated and avoid rate limiting
+    console.log(`[DONATE-MATCH] Waiting for blockchain state update...`);
+    await new Promise(resolve => setTimeout(resolve, 5000));
+  }
+
+  // Use ethers.js approach for ERC20 donations (same as joinMatch)
+  if (isERC20 && tokenAddress) {
+    console.log(`[DONATE-MATCH] Using ethers.js for ERC20 donation transaction...`);
+
+    if (typeof window !== "undefined" && (window as any).ethereum) {
+      const provider = new ethers.providers.Web3Provider((window as any).ethereum);
+      const signer = provider.getSigner();
+
+      const contractInstance = new ethers.Contract(contract.address, contract.abi, signer);
+      const tx = await contractInstance.donateToMatch(matchId, amount, { value: 0 }); // 0 ETH value for ERC20
+
+      console.log(`[DONATE-MATCH] ERC20 donation transaction hash: ${tx.hash}`);
+      const receipt = await tx.wait();
+      console.log(`[DONATE-MATCH] ERC20 donation confirmed in block: ${receipt.blockNumber}`);
+
+      return receipt.transactionHash as `0x${string}`;
+    } else {
+      throw new Error("No wallet connected for ERC20 donation");
+    }
+  }
+
+  // For ETH donations, use the original approach
   const { request } = await publicClient.simulateContract({
     address: contract.address,
     abi: contract.abi,
     functionName: "donateToMatch",
     args: [matchId, amount],
-    value: amount,
+    value: amount, // Full ETH value for ETH donations
   });
 
   return sendTransaction(request);
@@ -645,7 +686,7 @@ export async function closeMatch(
     console.log(`[CLOSE-MATCH] Winner: ${winner}`);
 
     // First, determine the match type by checking all match types
-    const [match1v1, match2v2, match5v5] = await Promise.all([
+    const [match1v1, match2v2, match6v6] = await Promise.all([
       // Check 1v1 match
       publicClient.readContract({
         address: contract.address,
@@ -666,7 +707,7 @@ export async function closeMatch(
       publicClient.readContract({
         address: contract.address,
         abi: contract.abi,
-        functionName: "matches5v5",
+        functionName: "matches6v6",
         args: [matchId],
       }).catch(() => null),
     ]);
@@ -674,7 +715,7 @@ export async function closeMatch(
     console.log(`[CLOSE-MATCH] Match type check:`, {
       match1v1: match1v1 ? "exists" : "null",
       match2v2: match2v2 ? "exists" : "null",
-      match5v5: match5v5 ? "exists" : "null"
+      match6v6: match6v6 ? "exists" : "null"
     });
 
     // Determine match type and call appropriate close function
@@ -689,10 +730,10 @@ export async function closeMatch(
       closeFunction = "close2v2Match";
       args = [matchId, winner];
       console.log(`[CLOSE-MATCH] Using close2v2Match for 2v2`);
-    } else if (match5v5 && (match5v5 as any)[0] !== '0x0000000000000000000000000000000000000000') {
-      closeFunction = "close5v5Match";
+    } else if (match6v6 && (match6v6 as any)[0] !== '0x0000000000000000000000000000000000000000') {
+      closeFunction = "close6v6Match";
       args = [matchId, winner];
-      console.log(`[CLOSE-MATCH] Using close5v5Match for 5v5`);
+      console.log(`[CLOSE-MATCH] Using close6v6Match for 6v6`);
     } else {
       throw new Error(`No match found with ID ${matchId}`);
     }

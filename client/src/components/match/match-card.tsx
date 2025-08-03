@@ -76,9 +76,14 @@ const MatchCard = ({ match, onHover }: MatchCardProps) => {
         <p className="text-xl font-bold text-white">
           {match.isERC20
             ? `${formatEther(match.totalAmount)} MATCH`
-            : `$${(parseFloat(formatEther(match.totalAmount)) * 3000).toFixed(2)}`
+            : `$${(parseFloat(formatEther(match.totalAmount)) * 3925.43).toFixed(2)}`
           }
         </p>
+        {match.isERC20 && (
+          <p className="text-xs text-gray-400 mt-1">
+            MATCH tokens have no USD value
+          </p>
+        )}
         {!match.isERC20 && (
           <p className="text-xs text-gray-400 mt-1">
             {formatEther(match.totalAmount)} ETH
@@ -94,9 +99,14 @@ const MatchCard = ({ match, onHover }: MatchCardProps) => {
           <p className="text-sm font-semibold text-white">
             {match.isERC20
               ? `${formatEther(match.player1Amount)} MATCH`
-              : `$${(parseFloat(formatEther(match.player1Amount)) * 3000).toFixed(2)}`
+              : `$${(parseFloat(formatEther(match.player1Amount)) * 3925.43).toFixed(2)}`
             }
           </p>
+          {match.isERC20 && (
+            <p className="text-xs text-gray-400">
+              No USD value
+            </p>
+          )}
           {!match.isERC20 && (
             <p className="text-xs text-gray-400">
               {formatEther(match.player1Amount)} ETH
@@ -126,36 +136,6 @@ const MatchCard = ({ match, onHover }: MatchCardProps) => {
           </p>
         </div>
       </div>
-
-      {/* Payouts Section - Only show for completed matches */}
-      {isCompleted && hasWinner && (
-        <div className="bg-gradient-to-r from-green-500/20 to-green-500/10 rounded-lg p-4 mb-4 border border-green-500/20">
-          <div className="flex items-center gap-2 mb-2">
-            <DollarSign className="h-4 w-4 text-green-400" />
-            <span className="text-sm font-medium text-gray-300">Payouts</span>
-          </div>
-          <div className="space-y-1">
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-400">Winner:</span>
-              <span className="text-sm font-semibold text-green-400">80%</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-400">Multisig:</span>
-              <span className="text-sm font-semibold text-blue-400">10%</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-400">Platform:</span>
-              <span className="text-sm font-semibold text-red-400">10%</span>
-            </div>
-          </div>
-          <div className="mt-2 pt-2 border-t border-green-500/20">
-            <p className="text-xs text-gray-400">Winner:</p>
-            <p className="text-xs text-green-400 font-mono">
-              View match details for winner info
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Players List - Simplified */}
       <div className="mb-4">

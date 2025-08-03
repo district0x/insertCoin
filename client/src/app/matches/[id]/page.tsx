@@ -35,6 +35,13 @@ export default function MatchPage() {
   const { convertEthToUsd } = useEthPrice();
   const isVisible = useVisibilityChange();
 
+  // State for winner information
+  const [winnerInfo, setWinnerInfo] = useState<{
+    winnerAddress?: string;
+    winnerAmount?: string;
+    poolAmount?: string;
+  }>({});
+
   // Debug logging
   React.useEffect(() => {
     console.log("Match page debug info:", {
@@ -52,6 +59,29 @@ export default function MatchPage() {
     publicClient,
     isVisible
   });
+
+  // Fetch winner information for completed matches
+  React.useEffect(() => {
+    const fetchWinnerInfo = async () => {
+      if (!matchId) return;
+
+      try {
+        const response = await fetch(`/api/matches/${matchId}/winner`);
+        if (response.ok) {
+          const data = await response.json();
+          setWinnerInfo({
+            winnerAddress: data.winnerAddress,
+            winnerAmount: data.winnerAmount,
+            poolAmount: data.poolAmount,
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching winner info:", error);
+      }
+    };
+
+    fetchWinnerInfo();
+  }, [matchId]);
 
   // Initialize match actions
   const {
@@ -114,14 +144,34 @@ export default function MatchPage() {
   });
 
   // Pass a callback to handleCloseMatch to set the result
-  const handleCloseMatchWithResult = async (...args) => {
-    const result = await handleCloseMatch(...args);
+  const handleCloseMatchWithResult = async () => {
+    const result = await handleCloseMatch();
     if (result && result.winnerAmount && result.poolAmount) {
       setCloseMatchResult({
         winnerAmount: result.winnerAmount,
         poolAmount: result.poolAmount,
         isOpen: true,
       });
+
+      // Refresh winner info after closing match
+      setTimeout(() => {
+        const fetchWinnerInfo = async () => {
+          try {
+            const response = await fetch(`/api/matches/${matchId}/winner`);
+            if (response.ok) {
+              const data = await response.json();
+              setWinnerInfo({
+                winnerAddress: data.winnerAddress,
+                winnerAmount: data.winnerAmount,
+                poolAmount: data.poolAmount,
+              });
+            }
+          } catch (error) {
+            console.error("Error fetching winner info:", error);
+          }
+        };
+        fetchWinnerInfo();
+      }, 2000); // Wait 2 seconds for database to update
     }
   };
 
@@ -149,6 +199,9 @@ export default function MatchPage() {
           showCloseConfirmation={showCloseConfirmation}
           setShowCloseConfirmation={setShowCloseConfirmation}
           convertEthToUsd={convertEthToUsd}
+          winnerAddress={winnerInfo.winnerAddress}
+          winnerAmount={winnerInfo.winnerAmount}
+          poolAmount={winnerInfo.poolAmount}
         />
       </Card>
 
@@ -166,12 +219,47 @@ export default function MatchPage() {
           <div className="modal-content">
             <h2>Match Closed!</h2>
             <p>
-              Winner Paid: <b>${convertEthToUsd(BigInt(Math.floor(Number(closeMatchResult.winnerAmount) * 1e18))).toFixed(2)} USD</b> (<b>{closeMatchResult.winnerAmount} ETH</b>)
+              Winner Paid: <b>${convertEthToUsd(BigInt(Math.floor(Number(closeMatchResult.winnerAmount) * 1e18))).toFixed(2)} USD</b> (<b>{closeMatchResult.winnerAmount} {displayMatch.isERC20 ? "MATCH" : "ETH"}</b>)
             </p>
             <p>
-              Pool Paid: <b>${convertEthToUsd(BigInt(Math.floor(Number(closeMatchResult.poolAmount) * 1e18))).toFixed(2)} USD</b> (<b>{closeMatchResult.poolAmount} ETH</b>)
+              Pool Paid: <b>${convertEthToUsd(BigInt(Math.floor(Number(closeMatchResult.poolAmount) * 1e18))).toFixed(2)} USD</b> (<b>{closeMatchResult.poolAmount} {displayMatch.isERC20 ? "MATCH" : "ETH"}</b>)
             </p>
             <button onClick={() => setCloseMatchResult({ ...closeMatchResult, isOpen: false })}>Close</button>
+          </div>
+        </div>
+      )}
+
+      {/* Payout Information Modal - Show for completed matches with winner info */}
+      {winnerInfo.winnerAddress && !closeMatchResult.isOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2>Match Results</h2>
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-semibold mb-2">Winner</h3>
+                <p className="text-sm text-muted-foreground">Address: {winnerInfo.winnerAddress}</p>
+                <p className="font-semibold">
+                  Amount: {winnerInfo.winnerAmount} {displayMatch.isERC20 ? "MATCH" : "ETH"}
+                </p>
+                {!displayMatch.isERC20 && (
+                  <p className="text-sm text-muted-foreground">
+                    ≈ ${convertEthToUsd(BigInt(Math.floor(Number(winnerInfo.winnerAmount || "0") * 1e18))).toFixed(2)} USD
+                  </p>
+                )}
+              </div>
+              <div>
+                <h3 className="font-semibold mb-2">Platform Fees</h3>
+                <p className="text-sm">
+                  Contract Fee: {winnerInfo.poolAmount} {displayMatch.isERC20 ? "MATCH" : "ETH"}
+                </p>
+                {!displayMatch.isERC20 && (
+                  <p className="text-sm text-muted-foreground">
+                    ≈ ${convertEthToUsd(BigInt(Math.floor(Number(winnerInfo.poolAmount || "0") * 1e18))).toFixed(2)} USD
+                  </p>
+                )}
+              </div>
+            </div>
+            <button onClick={() => setWinnerInfo({})}>Close</button>
           </div>
         </div>
       )}

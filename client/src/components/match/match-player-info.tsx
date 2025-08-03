@@ -38,8 +38,13 @@ export function MatchPlayerInfo({
       <h3 className="font-medium mb-2">{label}</h3>
       <div className="space-y-1">{playerSlots}</div>
       <p className="text-sm text-muted-foreground mt-2">
-        Stake per player: {formatEther(stake)} {isERC20 ? "MTK" : "ETH"}
-        <span className="ml-1">(≈${convertToUsd(stake).toFixed(2)})</span>
+        Stake per player: {formatEther(stake)} {isERC20 ? "MATCH" : "ETH"}
+        {!isERC20 && (
+          <span className="ml-1">(≈${convertToUsd(stake).toFixed(2)})</span>
+        )}
+        {isERC20 && (
+          <span className="ml-1">(No USD value)</span>
+        )}
       </p>
     </div>
   );

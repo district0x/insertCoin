@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -5,15 +6,14 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
-import { Loader2 } from "lucide-react";
-import { UsdInput } from "@/components/ui/usd-input";
-import { OnChainMatch } from "@/types/match";
-import { useState } from "react";
-import { DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatEther } from "viem";
+import { Loader2 } from "lucide-react";
+import { OnChainMatch } from "@/types/match";
 import { getMatchStatus } from "@/lib/match/types";
+import { formatEther, parseEther } from "viem";
 
 interface MatchDonationDialogProps {
   match: OnChainMatch;
@@ -33,7 +33,25 @@ export function MatchDonationDialog({
   convertToUsd,
 }: MatchDonationDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
-  
+  const [databaseStatus, setDatabaseStatus] = useState<string | undefined>();
+
+  // Fetch database status for this match
+  useEffect(() => {
+    const fetchDatabaseStatus = async () => {
+      try {
+        const response = await fetch(`/api/matches/${match.id}/status`);
+        if (response.ok) {
+          const data = await response.json();
+          setDatabaseStatus(data.status);
+        }
+      } catch (error) {
+        console.error("Error fetching database status:", error);
+      }
+    };
+
+    fetchDatabaseStatus();
+  }, [match.id]);
+
   // Determine if donations are allowed based on match status
   const hasOpponent = match.player2 !== "0x0000000000000000000000000000000000000000";
   const status = getMatchStatus(
@@ -41,9 +59,10 @@ export function MatchDonationDialog({
     hasOpponent,
     match.matchType,
     match.teamA.length,
-    match.teamB.length
+    match.teamB.length,
+    databaseStatus
   );
-  
+
   const canDonate = status === "Open" || status === "In Progress";
 
   return (
@@ -57,35 +76,42 @@ export function MatchDonationDialog({
         <DialogHeader>
           <DialogTitle>Donate to Match #{match.id.toString()}</DialogTitle>
           <DialogDescription>
-            Current prize pool: {formatEther(match.totalAmount)} {match.isERC20 ? "MTK" : "ETH"}
-            <span className="text-muted-foreground ml-1">
-              (≈${convertToUsd(match.totalAmount).toFixed(2)})
-            </span>
+            Add to the prize pool to make this match more exciting!
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Donation Amount</Label>
-            <UsdInput
-              onEthChange={onDonationEthChange}
-              placeholder="Enter donation amount in USD"
-              disabled={isProcessing}
+            <Label htmlFor="donation-amount">Donation Amount ({match.isERC20 ? "MATCH" : "ETH"})</Label>
+            <Input
+              id="donation-amount"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder={`Enter amount in ${match.isERC20 ? "MATCH" : "ETH"}`}
+              value={formatEther(donationEthAmount)}
+              onChange={(e) => {
+                try {
+                  const value = parseEther(e.target.value || "0");
+                  onDonationEthChange(value);
+                } catch {
+                  // Invalid input, ignore
+                }
+              }}
             />
-            <p className="text-sm text-muted-foreground">
-              {donationEthAmount > BigInt(0) && (
-                <>
-                  ≈ {formatEther(donationEthAmount)} {match.isERC20 ? "MTK" : "ETH"}
-                  <span className="ml-1">
-                    (≈${convertToUsd(donationEthAmount).toFixed(2)})
-                  </span>
-                </>
-              )}
-            </p>
+            {!match.isERC20 && (
+              <p className="text-sm text-muted-foreground">
+                ≈ ${convertToUsd(donationEthAmount).toFixed(2)} USD
+              </p>
+            )}
+            {match.isERC20 && (
+              <p className="text-sm text-muted-foreground">
+                No USD value
+              </p>
+            )}
           </div>
-
           <Button
             className="w-full"
-            disabled={isProcessing || donationEthAmount === BigInt(0)}
+            disabled={isProcessing || donationEthAmount <= 0n}
             onClick={async () => {
               await onDonate();
               setIsOpen(false);
@@ -94,7 +120,7 @@ export function MatchDonationDialog({
             {isProcessing ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              "Donate"
+              "Send Donation"
             )}
           </Button>
         </div>

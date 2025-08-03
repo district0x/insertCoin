@@ -51,7 +51,7 @@ export function MatchCloseDialog({
               Select the winner of this match. This action cannot be undone.
             </p>
             <p className="text-sm text-muted-foreground">
-              Prize Pool: {formatEther(match.totalAmount)} {match.isERC20 ? "MTK" : "ETH"} ($
+              Prize Pool: {formatEther(match.totalAmount)} {match.isERC20 ? "MATCH" : "ETH"} ($
               {convertToUsd(match.totalAmount).toFixed(2)})
             </p>
           </DialogDescription>

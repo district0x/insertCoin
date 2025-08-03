@@ -36,7 +36,7 @@ DATABASE_URL="postgresql://username:password@localhost:5432/onevone?pgbouncer=tr
 DIRECT_URL="postgresql://username:password@localhost:5432/onevone"
 
 # Web3
-NEXT_PUBLIC_CONTRACT_ADDRESS="0x052E7926f7B0C892Ef953EcC709d3c6e3D17268b"
+NEXT_PUBLIC_CONTRACT_ADDRESS="0xC24Cea38b8D6e7303DFfA7d5bc309FE5f8FCaD08"
 NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID="your_wallet_connect_project_id"
 
 # General

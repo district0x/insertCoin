@@ -1,6 +1,6 @@
 "use server";
 
-import { prisma, resetPrismaConnection } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { MatchStatus, MatchType } from "@prisma/client";
 import { createClient } from '@supabase/supabase-js';
 
@@ -8,6 +8,38 @@ const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+
+
+// Enhanced connection reset function
+export async function resetPrismaConnection() {
+    try {
+        console.log('[DB] Resetting Prisma connection...');
+        await prisma.$disconnect();
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+        await prisma.$connect();
+        console.log('[DB] Prisma connection reset successfully');
+    } catch (error) {
+        console.error('[DB] Error resetting Prisma connection:', error);
+        // Force disconnect and reconnect
+        try {
+            await prisma.$disconnect();
+        } catch (disconnectError) {
+            console.error('[DB] Error during disconnect:', disconnectError);
+        }
+
+        // Wait longer before reconnecting
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        try {
+            await prisma.$connect();
+            console.log('[DB] Prisma connection reconnected after force reset');
+        } catch (connectError) {
+            console.error('[DB] Error during reconnect:', connectError);
+            throw connectError;
+        }
+    }
+}
 
 // Function to create a pending match from Discord bot
 export async function createPendingMatch({
@@ -29,7 +61,7 @@ export async function createPendingMatch({
                 status: MatchStatus.PENDING,
                 creatorDiscordId: discordId,
                 stake,
-                totalPrize: stake,
+                totalPrize: stake * 2, // FIXED: Use total prize pool (stake * 2) instead of single player stake
             },
         });
         return match;
@@ -49,7 +81,8 @@ export async function updateMatchWithWallet({
     walletAddress: string;
     stakeAmount?: number;
 }) {
-    const maxRetries = 5; // Increased from 3 to 5
+    const maxRetries = 5;
+
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
             console.log(`[DB] updateMatchWithWallet called with:`, {
@@ -64,91 +97,129 @@ export async function updateMatchWithWallet({
                 walletAddressIsUndefined: walletAddress === undefined,
             });
 
-            console.log(`[DB] Finding match with room ID ${roomId}`);
+            // Use a transaction to ensure atomicity
+            return await prisma.$transaction(async (tx) => {
+                console.log(`[DB] Finding match with room ID ${roomId}`);
 
-            // Find the match by room ID
-            const match = await prisma.match.findUnique({
-                where: { roomId },
-                include: { creator: true },
-            });
+                // Find the match by room ID
+                const match = await tx.match.findUnique({
+                    where: { roomId },
+                    include: { creator: true },
+                });
 
-            if (!match) {
-                throw new Error(`Match with room ID ${roomId} not found`);
-            }
-
-            console.log(`[DB] Found match:`, {
-                id: match.id,
-                roomId: match.roomId,
-                creatorDiscordId: match.creatorDiscordId,
-                stake: match.stake,
-                matchAmountUsd: match.matchAmountUsd,
-                tokenName: match.tokenName,
-            });
-
-            // Upsert user with Discord ID and wallet
-            const user = await prisma.user.upsert({
-                where: { discordId: match.creatorDiscordId! },
-                update: {
-                    address: walletAddress,
-                    updatedAt: new Date(),
-                },
-                create: {
-                    discordId: match.creatorDiscordId!,
-                    address: walletAddress,
-                },
-            });
-
-            console.log(`[DB] Discord match - upserting user with Discord ID ${match.creatorDiscordId} and wallet ${walletAddress}`);
-
-            // Update match with creator and status
-            console.log(`[DB] Updating match ${roomId} with creator ID ${user.id}`);
-
-            // Calculate the correct stake amount based on token type
-            let finalStakeAmount = stakeAmount;
-            if (!finalStakeAmount) {
-                // Fallback to database value if no stakeAmount provided
-                if ((match as any).tokenName === "MATCH") {
-                    // For MATCH tokens, use the matchAmountUsd as the stake
-                    finalStakeAmount = match.matchAmountUsd || 0;
-                } else {
-                    // For ETH, use the database stake value
-                    finalStakeAmount = match.stake;
+                if (!match) {
+                    throw new Error(`Match with room ID ${roomId} not found`);
                 }
-            }
 
-            const updatedMatch = await prisma.match.update({
-                where: { id: match.id },
-                data: {
-                    creatorId: user.id,
-                    creatorAddress: walletAddress,
-                    status: MatchStatus.OPEN,
-                    stake: finalStakeAmount,
-                    totalPrize: finalStakeAmount,
-                },
-                include: {
-                    creator: true,
-                },
+                console.log(`[DB] Found match:`, {
+                    id: match.id,
+                    roomId: match.roomId,
+                    creatorDiscordId: match.creatorDiscordId,
+                    stake: match.stake,
+                    matchAmountUsd: match.matchAmountUsd,
+                    tokenName: (match as any).tokenName,
+                });
+
+                // Upsert user with Discord ID and wallet
+                let user;
+                try {
+                    user = await tx.user.upsert({
+                        where: { discordId: match.creatorDiscordId! },
+                        update: {
+                            address: walletAddress,
+                            updatedAt: new Date(),
+                        },
+                        create: {
+                            discordId: match.creatorDiscordId!,
+                            address: walletAddress,
+                        },
+                    });
+                } catch (upsertError) {
+                    // If upsert fails due to address constraint, try to find existing user and update
+                    if (upsertError instanceof Error && upsertError.message.includes('Unique constraint failed on the fields: (`address`)')) {
+                        console.log(`[DB] Address constraint conflict detected. Finding existing user with address ${walletAddress}`);
+
+                        // Find existing user with this address
+                        const existingUser = await tx.user.findUnique({
+                            where: { address: walletAddress }
+                        });
+
+                        if (existingUser) {
+                            // Update the existing user's discordId if it's different
+                            if (existingUser.discordId !== match.creatorDiscordId) {
+                                user = await tx.user.update({
+                                    where: { address: walletAddress },
+                                    data: {
+                                        discordId: match.creatorDiscordId!,
+                                        updatedAt: new Date(),
+                                    }
+                                });
+                            } else {
+                                user = existingUser;
+                            }
+                        } else {
+                            throw upsertError; // Re-throw if we can't resolve the conflict
+                        }
+                    } else {
+                        throw upsertError; // Re-throw other errors
+                    }
+                }
+
+                console.log(`[DB] Discord match - upserting user with Discord ID ${match.creatorDiscordId} and wallet ${walletAddress}`);
+
+                // Update match with creator and status
+                console.log(`[DB] Updating match ${roomId} with creator ID ${user.id}`);
+
+                // Calculate the correct stake amount based on token type
+                let finalStakeAmount = stakeAmount;
+                if (!finalStakeAmount) {
+                    // Fallback to database value if no stakeAmount provided
+                    if ((match as any).tokenName === "MATCH") {
+                        // For MATCH tokens, use the stake value directly (no USD conversion)
+                        finalStakeAmount = match.stake;
+                    } else {
+                        // For ETH, use the database stake value
+                        finalStakeAmount = match.stake;
+                    }
+                }
+
+                const updatedMatch = await tx.match.update({
+                    where: { id: match.id },
+                    data: {
+                        creatorId: user.id,
+                        creatorAddress: walletAddress,
+                        status: MatchStatus.OPEN,
+                        stake: finalStakeAmount,
+                        totalPrize: finalStakeAmount * 2, // FIXED: Use total prize pool (stake * 2)
+                    },
+                    include: {
+                        creator: true,
+                    },
+                });
+
+                console.log(
+                    `[DB] Match updated successfully: ${JSON.stringify(updatedMatch)}`
+                );
+                return updatedMatch;
+            }, {
+                maxWait: 10000, // 10 seconds max wait for transaction
+                timeout: 30000,  // 30 seconds timeout
             });
-
-            console.log(
-                `[DB] Match updated successfully: ${JSON.stringify(updatedMatch)}`
-            );
-            return updatedMatch;
 
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error) || "Unknown error occurred";
             console.error(`[DB] Error updating match with wallet (attempt ${attempt + 1}):`, errorMessage);
 
-            // Check if it's a prepared statement error
-            if (errorMessage.includes("prepared statement") && attempt < maxRetries - 1) {
-                console.log(`[DB] Prepared statement error detected, resetting connection and retrying...`);
+            // Check if it's a connection pool or prepared statement error
+            if ((errorMessage.includes("prepared statement") || errorMessage.includes("connection pool")) && attempt < maxRetries - 1) {
+                console.log(`[DB] Connection error detected, resetting connection and retrying...`);
                 await resetPrismaConnection();
-                // Wait longer between retries for prepared statement errors
-                await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
+                // Wait longer between retries for connection errors
+                await new Promise(resolve => setTimeout(resolve, 3000 * (attempt + 1)));
                 continue;
             }
 
-            // If it's the last attempt or not a prepared statement error, throw
+            // If it's the last attempt or not a connection error, throw
             throw new Error(errorMessage);
         }
     }
@@ -272,7 +343,7 @@ export async function createMatchInDb({
                     status: MatchStatus.OPEN,
                     creatorId: user.id,
                     stake: parseFloat(stake),
-                    totalPrize: parseFloat(stake),
+                    totalPrize: parseFloat(stake) * 2, // FIXED: Use total prize pool (stake * 2)
                     tokenName: tokenName || null,
                 },
                 include: {
@@ -290,7 +361,7 @@ export async function createMatchInDb({
                     status: MatchStatus.OPEN,
                     creatorId: user.id,
                     stake: parseFloat(stake),
-                    totalPrize: parseFloat(stake),
+                    totalPrize: parseFloat(stake) * 2, // FIXED: Use total prize pool (stake * 2)
                     tokenName: tokenName || null,
                 },
                 include: {
@@ -453,18 +524,10 @@ export async function joinMatchInDb({
         });
         console.log(`[DB] User upserted: ${JSON.stringify(user)}`);
 
-        // Get the match with extensive details
+        // Get the match
         console.log(`[DB] Finding match with ID ${matchId}`);
         const match = await prisma.match.findUnique({
-            where: { matchId },
-            include: {
-                teams: {
-                    include: {
-                        members: true
-                    }
-                },
-                participants: true
-            }
+            where: { matchId }
         });
 
         if (!match) {
@@ -475,159 +538,39 @@ export async function joinMatchInDb({
             id: match.id,
             matchId: match.matchId,
             status: match.status,
-            matchType: match.matchType,
-            teams: match.teams.map(t => ({
-                id: t.id,
-                isTeamA: t.isTeamA,
-                memberCount: t.members.length
-            }))
+            matchType: match.matchType
         })}`);
 
-        // Check if user is already a participant in this match
-        const alreadyParticipating = match.participants.some(p => p.id === user.id);
-        if (alreadyParticipating) {
-            console.log(`[DB] User is already a participant in match ${matchId}`);
+        // For 1v1 matches, update player2DiscordId and player2Address when second player joins
+        if (match.matchType === 'ONE_V_ONE') {
+            console.log(`[DB] Updating player2 information for 1v1 match ${matchId}`);
 
-            // Check if the user is already in a team
-            let alreadyInTeam = false;
-            for (const team of match.teams) {
-                if (team.members.some(m => m.userId === user.id)) {
-                    alreadyInTeam = true;
-                    console.log(`[DB] User is already in team: ${team.id}, isTeamA: ${team.isTeamA}`);
-                    break;
-                }
-            }
-
-            // If user is a participant but not in a team, we'll continue and add them to a team
-            if (alreadyInTeam) {
-                return match; // User is already fully set up in this match
-            }
-        }
-
-        // For 1v1 matches, always join as team B
-        // For team matches, join the specified team
-        const teamToJoin = match.matchType === 'ONE_V_ONE'
-            ? match.teams.find(team => !team.isTeamA)
-            : match.teams.find(team => team.isTeamA === isTeamA);
-
-        if (!teamToJoin) {
-            throw new Error(`Team not found for match ID ${matchId}`);
-        }
-
-        // Check if user is already in this team
-        const alreadyInTeam = teamToJoin.members.some(m => m.userId === user.id);
-        if (alreadyInTeam) {
-            console.log(`[DB] User is already in team: ${teamToJoin.id}, isTeamA: ${teamToJoin.isTeamA}`);
-        } else {
-            console.log(`[DB] Adding user to team: ${teamToJoin.id}, isTeamA: ${teamToJoin.isTeamA}`);
-
-            // Add user to the team
-            await prisma.teamMember.create({
-                data: {
-                    teamId: teamToJoin.id,
-                    userId: user.id
-                }
-            });
-            console.log(`[DB] User added to team successfully`);
-        }
-
-        // Add user as a participant in the match if not already
-        if (!alreadyParticipating) {
-            console.log(`[DB] Adding user as participant to match`);
-            await prisma.user.update({
+            // Get user's Discord ID if available
+            const userWithDiscord = await prisma.user.findUnique({
                 where: { id: user.id },
-                data: {
-                    participatedMatches: {
-                        connect: { id: match.id }
-                    },
-                    // Increment totalMatches
-                    totalMatches: {
-                        increment: 1
-                    }
-                }
+                select: { discordId: true }
             });
-            console.log(`[DB] User added as participant successfully`);
-        }
 
-        // Check if all teams are filled
-        console.log(`[DB] Checking if match is now filled`);
-        const updatedMatch = await prisma.match.findUnique({
-            where: { matchId },
-            include: {
-                teams: {
-                    include: {
-                        members: true
-                    }
-                }
-            }
-        });
-
-        if (!updatedMatch) {
-            throw new Error(`Match with ID ${matchId} not found after update`);
-        }
-
-        // Determine if the match is now filled
-        let isFilled = false;
-        if (updatedMatch.matchType === 'ONE_V_ONE') {
-            // For 1v1, need one player in each team
-            const teamA = updatedMatch.teams.find(t => t.isTeamA);
-            const teamB = updatedMatch.teams.find(t => !t.isTeamA);
-            if (teamA?.members.length === 1 && teamB?.members.length === 1) {
-                isFilled = true;
-            }
-        } else if (updatedMatch.matchType === 'TWO_V_TWO') {
-            // For 2v2, need 2 players in each team
-            const teamA = updatedMatch.teams.find(t => t.isTeamA);
-            const teamB = updatedMatch.teams.find(t => !t.isTeamA);
-            if (teamA?.members.length === 2 && teamB?.members.length === 2) {
-                isFilled = true;
-            }
-        } else if (updatedMatch.matchType === 'FIVE_V_FIVE') {
-            // For 5v5, need 5 players in each team
-            const teamA = updatedMatch.teams.find(t => t.isTeamA);
-            const teamB = updatedMatch.teams.find(t => !t.isTeamA);
-            if (teamA?.members.length === 5 && teamB?.members.length === 5) {
-                isFilled = true;
-            }
-        }
-
-        // Update match status if filled
-        if (isFilled && updatedMatch.status !== 'FILLED') {
-            console.log(`[DB] Match ${matchId} is now filled, updating status from ${updatedMatch.status} to FILLED`);
             await prisma.match.update({
                 where: { matchId },
                 data: {
-                    status: MatchStatus.FILLED
+                    opponentDiscordId: userWithDiscord?.discordId || null,
+                    player2Address: walletAddress,
+                    status: 'OPEN' // Update status to OPEN when second player joins
                 }
             });
-            console.log(`[DB] Match status updated to FILLED`);
-        } else {
-            console.log(`[DB] Match ${matchId} is not filled yet (status: ${updatedMatch.status})`);
+
+            console.log(`[DB] Updated match ${matchId} with player2 info:`, {
+                opponentDiscordId: userWithDiscord?.discordId,
+                player2Address: walletAddress
+            });
         }
 
-        // Get the fully updated match with all relations
-        const finalMatch = await prisma.match.findUnique({
-            where: { matchId },
-            include: {
-                teams: {
-                    include: {
-                        members: {
-                            include: {
-                                user: true
-                            }
-                        }
-                    }
-                },
-                participants: true,
-                creator: true
-            }
-        });
-
-        console.log(`[DB] User successfully joined match ${matchId}`);
-        return finalMatch;
+        return match;
     } catch (error) {
+        // Properly format the error for logging
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        console.error("[DB] Error joining match:", { error: errorMessage });
+        console.error("[DB] Error processing join:", { error: errorMessage });
         throw error;
     }
 }

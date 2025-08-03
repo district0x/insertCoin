@@ -1,11 +1,31 @@
-import { OnChainMatch } from "@/types/match";
 import { getMatchStatus, getMatchStatusColor } from "@/lib/match/types";
+import { OnChainMatch } from "@/types/match";
+import { useState, useEffect } from "react";
 
 interface MatchStatusBadgeProps {
   match: OnChainMatch;
 }
 
 export function MatchStatusBadge({ match }: MatchStatusBadgeProps) {
+  const [databaseStatus, setDatabaseStatus] = useState<string | undefined>();
+
+  // Fetch database status for this match
+  useEffect(() => {
+    const fetchDatabaseStatus = async () => {
+      try {
+        const response = await fetch(`/api/matches/${match.id}/status`);
+        if (response.ok) {
+          const data = await response.json();
+          setDatabaseStatus(data.status);
+        }
+      } catch (error) {
+        console.error("Error fetching database status:", error);
+      }
+    };
+
+    fetchDatabaseStatus();
+  }, [match.id]);
+
   // Use the utility functions with full match information
   const hasOpponent = match.player2 !== "0x0000000000000000000000000000000000000000";
   const status = getMatchStatus(
@@ -13,7 +33,8 @@ export function MatchStatusBadge({ match }: MatchStatusBadgeProps) {
     hasOpponent,
     match.matchType,
     match.teamA.length,
-    match.teamB.length
+    match.teamB.length,
+    databaseStatus
   );
 
   const statusColor = getMatchStatusColor(

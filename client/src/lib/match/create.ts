@@ -59,7 +59,7 @@ export async function create5v5Match(
   const { request } = await publicClient.simulateContract({
     address: contract.address,
     abi: contract.abi,
-    functionName: "start5v5Match",
+    functionName: "start6v6Match",
     args: [amount, "0x0000000000000000000000000000000000000000"],
     value: amount, // This is the amount per player
     account: walletClient.account.address,

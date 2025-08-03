@@ -20,28 +20,10 @@ class PrismaClient:
     def connect(self, connection_string: str):
         """Initialize Prisma client with connection string."""
         try:
-            # Add PostgreSQL parameters to prevent prepared statement conflicts
-            # These parameters help resolve the "prepared statement s0 already exists" error
-            if '?' not in connection_string:
-                connection_string += '?'
-            else:
-                connection_string += '&'
-            
-            # Add parameters to disable prepared statements and force fresh connections
-            connection_string += 'prepared_statements=false&connection_limit=1&pool_timeout=20&connect_timeout=20'
-            
             self._connection_string = connection_string
             
-            # Add connection parameters to prevent prepared statement conflicts
-            # These parameters help resolve the "prepared statement s0 already exists" error
-            connection_params = {
-                'url': connection_string,
-                'connection_limit': 1,  # Limit connections to prevent conflicts
-                'pool_timeout': 20,     # Timeout for connection pool
-                'connect_timeout': 20,  # Timeout for initial connection
-            }
-            
-            self._client = Prisma(datasource=connection_params)
+            # Use simple connection without additional parameters
+            self._client = Prisma()
             self._client.connect()
             logger.info("Prisma client connected")
                 
@@ -66,10 +48,10 @@ class PrismaClient:
         if self._client:
             logger.info("Resetting Prisma connection...")
             self.disconnect()
-            time.sleep(1)  # Brief pause to allow connection cleanup
+            time.sleep(2)  # Longer pause to allow connection cleanup
             if self._connection_string:
                 self.connect(self._connection_string)
-                
+            
     @contextmanager
     def transaction(self):
         """Context manager for database transactions with proper error handling."""
@@ -87,6 +69,7 @@ class PrismaClient:
         """Delegate attribute access to the underlying Prisma client."""
         if not self._client:
             raise RuntimeError(f"Prisma client not connected. Cannot access '{name}'. Make sure database connection is initialized.")
+        
         return getattr(self._client, name)
         
     def __enter__(self):

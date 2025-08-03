@@ -8,7 +8,7 @@ import { getMaxPlayers, getMatchStatus } from "@/lib/match/types";
 import {
   joinMatch,
   join2v2Team,
-  join5v5Team,
+  join6v6Team,
   donateToMatch,
   closeMatch,
 } from "@/lib/match/actions";
@@ -88,7 +88,8 @@ export function useMatchActions({
             publicClient,
             sendTransaction,
             displayMatch.id,
-            displayMatch.player1Amount
+            displayMatch.player1Amount,
+            address
           );
           break;
         case "TWO_V_TWO":
@@ -102,7 +103,7 @@ export function useMatchActions({
           );
           break;
         case "FIVE_V_FIVE":
-          hash = await join5v5Team(
+          hash = await join6v6Team(
             contract,
             publicClient,
             sendTransaction,

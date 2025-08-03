@@ -229,7 +229,7 @@ async def get_user_stats(user_id: str) -> Optional[Dict]:
         where={
             "OR": [
                 {"creatorDiscordId": str(user_id)},
-                {"opponentDiscordId": str(user_id)}
+                {"player2DiscordId": str(user_id)}
             ]
         }
     )
@@ -259,7 +259,7 @@ async def get_match_history(user_id: str, bot) -> Optional[List[Dict]]:
         where={
             "OR": [
                 {"creatorDiscordId": str(user_id)},
-                {"opponentDiscordId": str(user_id)}
+                {"player2DiscordId": str(user_id)}
             ]
         },
         order={
@@ -273,7 +273,7 @@ async def get_match_history(user_id: str, bot) -> Optional[List[Dict]]:
         
     history = []
     for match in matches:
-        opponent_id = match.opponentDiscordId or "No opponent yet"
+        opponent_id = match.player2DiscordId or "No opponent yet"
         try:
             opponent = await bot.fetch_user(int(opponent_id)) if opponent_id != "No opponent yet" else None
             opponent_name = opponent.name if opponent else "No opponent yet"
@@ -307,13 +307,13 @@ async def get_opponent_record(user_id: str, opponent_id: str) -> Optional[Dict]:
                 {
                     "AND": [
                         {"creatorDiscordId": str(user_id)},
-                        {"opponentDiscordId": str(opponent_id)}
+                        {"player2DiscordId": str(opponent_id)}
                     ]
                 },
                 {
                     "AND": [
                         {"creatorDiscordId": str(opponent_id)},
-                        {"opponentDiscordId": str(user_id)}
+                        {"player2DiscordId": str(user_id)}
                     ]
                 }
             ]

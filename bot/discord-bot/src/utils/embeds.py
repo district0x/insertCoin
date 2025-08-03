@@ -327,8 +327,8 @@ def create_match_info_embed(match, creator: discord.User) -> discord.Embed:
     
     # Players Section
     players_info = f"**Creator:** {creator.mention}\n"
-    if match.opponentDiscordId:
-        players_info += f"**Opponent:** <@{match.opponentDiscordId}>"
+    if match.player2DiscordId:
+        players_info += f"**Opponent:** <@{match.player2DiscordId}>"
     else:
         players_info += "**Opponent:** Not joined yet"
     

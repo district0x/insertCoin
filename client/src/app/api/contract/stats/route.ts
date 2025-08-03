@@ -37,7 +37,7 @@ async function getEthPrice(): Promise<number> {
         return data.ethereum.usd;
     } catch (error) {
         console.error('Error fetching ETH price:', error);
-        return 3000; // Fallback price
+        return 3925.43; // More realistic fallback price for ETH
     }
 }
 

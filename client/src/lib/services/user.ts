@@ -38,6 +38,101 @@ export async function updateUserStats({
     }
 }
 
+// Comprehensive function to update user statistics after match completion
+export async function updateUserStatsAfterMatchCompletion({
+    winnerAddress,
+    loserAddress,
+    matchData,
+}: {
+    winnerAddress: string;
+    loserAddress: string;
+    matchData: {
+        totalPrize: number;
+        stake: number;
+        tokenName?: string | null;
+    };
+}) {
+    try {
+        console.log(`[DB] Updating comprehensive user stats after match completion:`, {
+            winnerAddress,
+            loserAddress,
+            matchData
+        });
+
+        // Find both users
+        const [winnerUser, loserUser] = await Promise.all([
+            prisma.user.findFirst({ where: { address: winnerAddress } }),
+            prisma.user.findFirst({ where: { address: loserAddress } })
+        ]);
+
+        if (!winnerUser) {
+            console.warn(`[DB] Winner user not found for address: ${winnerAddress}`);
+        }
+
+        if (!loserUser) {
+            console.warn(`[DB] Loser user not found for address: ${loserAddress}`);
+        }
+
+        // Calculate earnings
+        const isERC20 = matchData.tokenName === 'MATCH';
+        const totalPrize = matchData.totalPrize || matchData.stake;
+        const winnerEarnings = totalPrize * 0.8; // 80% to winner
+
+        // Update winner stats
+        if (winnerUser) {
+            await prisma.user.update({
+                where: { id: winnerUser.id },
+                data: {
+                    totalMatches: { increment: 1 },
+                    totalWins: { increment: 1 },
+                    ...(isERC20
+                        ? { matchTokensEarned: { increment: winnerEarnings } }
+                        : { ethEarned: { increment: winnerEarnings } }
+                    )
+                }
+            });
+
+            console.log(`[DB] Updated winner stats for user:`, winnerUser.id);
+            console.log(`[DB] Winner earnings:`, winnerEarnings, isERC20 ? 'MATCH' : 'ETH');
+        }
+
+        // Update loser stats
+        if (loserUser) {
+            await prisma.user.update({
+                where: { id: loserUser.id },
+                data: {
+                    totalMatches: { increment: 1 },
+                    totalLosses: { increment: 1 }
+                }
+            });
+
+            console.log(`[DB] Updated loser stats for user:`, loserUser.id);
+        }
+
+        console.log(`[DB] Comprehensive user stats updated successfully`);
+
+        return {
+            winner: winnerUser ? {
+                id: winnerUser.id,
+                address: winnerUser.address,
+                totalMatches: winnerUser.totalMatches + 1,
+                totalWins: winnerUser.totalWins + 1,
+                earnings: winnerEarnings,
+                tokenType: isERC20 ? 'MATCH' : 'ETH'
+            } : null,
+            loser: loserUser ? {
+                id: loserUser.id,
+                address: loserUser.address,
+                totalMatches: loserUser.totalMatches + 1,
+                totalLosses: loserUser.totalLosses + 1
+            } : null
+        };
+    } catch (error) {
+        console.error("[DB] Error updating comprehensive user stats:", error);
+        throw error;
+    }
+}
+
 // Function to get user by Discord ID
 export async function getUserByDiscordId(discordId: string) {
     try {

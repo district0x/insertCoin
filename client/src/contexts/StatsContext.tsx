@@ -6,7 +6,7 @@ import { baseSepolia } from "@/lib/config/chains";
 import { ONEVONE_ABI } from "@/lib/contracts/abis/ABI";
 
 // Base Sepolia contract address as fallback
-const FALLBACK_CONTRACT_ADDRESS = "0xE5e646aF90F8F1F1B72AcB1F7d3AcE43D91F5a34";
+const FALLBACK_CONTRACT_ADDRESS = "0xC24Cea38b8D6e7303DFfA7d5bc309FE5f8FCaD08";
 
 interface StatsData {
     matchesCreated: string;

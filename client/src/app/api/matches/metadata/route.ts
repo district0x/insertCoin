@@ -36,13 +36,16 @@ export async function GET(request: Request) {
                 },
                 select: {
                     matchId: true,
-                    game: true,
-                    gameCategory: true,
-                    platform: true,
+                    matchType: true,
                     status: true,
                     creatorDiscordId: true,
-                    opponentDiscordId: true,
-                    winnerId: true
+                    player2DiscordId: true,
+                    player2Address: true,
+                    stake: true,
+                    totalPrize: true,
+                    tokenName: true,
+                    createdAt: true,
+                    updatedAt: true
                 }
             });
 
@@ -50,13 +53,16 @@ export async function GET(request: Request) {
             const metadataMap = matches.reduce((acc, match) => {
                 if (match.matchId) {
                     acc[match.matchId] = {
-                        game: match.game || null,
-                        gameCategory: match.gameCategory || null,
-                        platform: match.platform || null,
+                        matchType: match.matchType,
                         status: match.status,
                         creatorDiscordId: match.creatorDiscordId,
-                        opponentDiscordId: match.opponentDiscordId,
-                        winnerId: match.winnerId
+                        player2DiscordId: match.player2DiscordId,
+                        player2Address: match.player2Address,
+                        stake: match.stake,
+                        totalPrize: match.totalPrize,
+                        tokenName: match.tokenName,
+                        createdAt: match.createdAt,
+                        updatedAt: match.updatedAt
                     };
                 }
                 return acc;

@@ -116,13 +116,6 @@ export default function MatchesPage() {
       {/* Matches Section */}
       <section className="py-16 bg-gradient-to-br from-black via-gray-900 to-black">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-white mb-4">Latest Matches</h2>
-            <p className="text-gray-300 max-w-2xl mx-auto">
-              Recent competitive matches from the platform
-            </p>
-          </div>
-
           {error ? (
             <div className="text-center py-8 space-y-4">
               <p className="text-red-400 font-medium">Connection Error</p>

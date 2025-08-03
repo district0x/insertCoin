@@ -80,26 +80,11 @@ export const ONEVONE_ABI = [
     anonymous: false,
     inputs: [
       {
-        indexed: true,
-        internalType: "address",
-        name: "token",
-        type: "address",
-      },
-      { indexed: true, internalType: "address", name: "to", type: "address" },
-      {
         indexed: false,
-        internalType: "uint256",
-        name: "amount",
-        type: "uint256",
+        internalType: "uint8",
+        name: "version",
+        type: "uint8",
       },
-    ],
-    name: "EmergencyWithdraw",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      { indexed: false, internalType: "uint8", name: "version", type: "uint8" },
     ],
     name: "Initialized",
     type: "event",
@@ -150,7 +135,26 @@ export const ONEVONE_ABI = [
         type: "uint256",
       },
     ],
-    name: "Match5v5Closed",
+    name: "Match6v6Closed",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "uint256",
+        name: "matchId",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "totalPrizePool",
+        type: "uint256",
+      },
+    ],
+    name: "Match6v6Ready",
     type: "event",
   },
   {
@@ -180,9 +184,14 @@ export const ONEVONE_ABI = [
         name: "token",
         type: "address",
       },
-      { indexed: false, internalType: "bool", name: "isERC20", type: "bool" },
+      {
+        indexed: false,
+        internalType: "bool",
+        name: "isERC20",
+        type: "bool",
+      },
     ],
-    name: "Match5v5Started",
+    name: "Match6v6Started",
     type: "event",
   },
   {
@@ -276,25 +285,6 @@ export const ONEVONE_ABI = [
         type: "uint256",
       },
       {
-        indexed: false,
-        internalType: "uint256",
-        name: "totalPrizePool",
-        type: "uint256",
-      },
-    ],
-    name: "MatchReady",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: true,
-        internalType: "uint256",
-        name: "matchId",
-        type: "uint256",
-      },
-      {
         indexed: true,
         internalType: "address",
         name: "player1",
@@ -308,21 +298,6 @@ export const ONEVONE_ABI = [
       },
     ],
     name: "MatchStarted",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: true,
-        internalType: "uint256",
-        name: "matchId",
-        type: "uint256",
-      },
-      { indexed: true, internalType: "uint8", name: "oldState", type: "uint8" },
-      { indexed: true, internalType: "uint8", name: "newState", type: "uint8" },
-    ],
-    name: "MatchStateChanged",
     type: "event",
   },
   {
@@ -394,7 +369,7 @@ export const ONEVONE_ABI = [
       {
         indexed: true,
         internalType: "address",
-        name: "player1",
+        name: "teamAPlayer1",
         type: "address",
       },
       {
@@ -416,7 +391,12 @@ export const ONEVONE_ABI = [
         name: "matchId",
         type: "uint256",
       },
-      { indexed: true, internalType: "bool", name: "isTeamA", type: "bool" },
+      {
+        indexed: true,
+        internalType: "bool",
+        name: "isTeamA",
+        type: "bool",
+      },
       {
         indexed: true,
         internalType: "address",
@@ -430,7 +410,7 @@ export const ONEVONE_ABI = [
         type: "uint8",
       },
     ],
-    name: "TeamJoined",
+    name: "Team6v6Joined",
     type: "event",
   },
   {
@@ -448,7 +428,12 @@ export const ONEVONE_ABI = [
         name: "player",
         type: "address",
       },
-      { indexed: false, internalType: "bool", name: "isTeamA", type: "bool" },
+      {
+        indexed: false,
+        internalType: "bool",
+        name: "isTeamA",
+        type: "bool",
+      },
     ],
     name: "TeamPlayerJoined",
     type: "event",
@@ -462,7 +447,12 @@ export const ONEVONE_ABI = [
         name: "token",
         type: "address",
       },
-      { indexed: false, internalType: "bool", name: "approved", type: "bool" },
+      {
+        indexed: false,
+        internalType: "bool",
+        name: "approved",
+        type: "bool",
+      },
     ],
     name: "TokenApprovalUpdated",
     type: "event",
@@ -627,32 +617,56 @@ export const ONEVONE_ABI = [
         type: "uint8",
       },
     ],
-    name: "WinnerPayout",
+    name: "Winner6v6Payout",
     type: "event",
   },
   {
     inputs: [],
     name: "MAX_DECIMALS",
-    outputs: [{ internalType: "uint8", name: "", type: "uint8" }],
+    outputs: [
+      {
+        internalType: "uint8",
+        name: "",
+        type: "uint8",
+      },
+    ],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [],
     name: "MIN_DECIMALS",
-    outputs: [{ internalType: "uint8", name: "", type: "uint8" }],
+    outputs: [
+      {
+        internalType: "uint8",
+        name: "",
+        type: "uint8",
+      },
+    ],
     stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [{ internalType: "address", name: "_admin", type: "address" }],
+    inputs: [
+      {
+        internalType: "address",
+        name: "_admin",
+        type: "address",
+      },
+    ],
     name: "addAdmin",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
-    inputs: [{ internalType: "address", name: "_address", type: "address" }],
+    inputs: [
+      {
+        internalType: "address",
+        name: "_address",
+        type: "address",
+      },
+    ],
     name: "addBlacklisted",
     outputs: [],
     stateMutability: "nonpayable",
@@ -660,7 +674,11 @@ export const ONEVONE_ABI = [
   },
   {
     inputs: [
-      { internalType: "uint256", name: "_tournamentId", type: "uint256" },
+      {
+        internalType: "uint256",
+        name: "_tournamentId",
+        type: "uint256",
+      },
     ],
     name: "allocateMatchingPoolToTournament",
     outputs: [],
@@ -669,8 +687,16 @@ export const ONEVONE_ABI = [
   },
   {
     inputs: [
-      { internalType: "address", name: "_token", type: "address" },
-      { internalType: "bool", name: "_approved", type: "bool" },
+      {
+        internalType: "address",
+        name: "_token",
+        type: "address",
+      },
+      {
+        internalType: "bool",
+        name: "_approved",
+        type: "bool",
+      },
     ],
     name: "approveToken",
     outputs: [],
@@ -678,16 +704,36 @@ export const ONEVONE_ABI = [
     type: "function",
   },
   {
-    inputs: [{ internalType: "address", name: "", type: "address" }],
+    inputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
     name: "approvedTokens",
-    outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [
-      { internalType: "uint256", name: "_matchId", type: "uint256" },
-      { internalType: "address", name: "_winningTeamPlayer", type: "address" },
+      {
+        internalType: "uint256",
+        name: "_matchId",
+        type: "uint256",
+      },
+      {
+        internalType: "address",
+        name: "_winningTeamPlayer",
+        type: "address",
+      },
     ],
     name: "close2v2Match",
     outputs: [],
@@ -696,18 +742,34 @@ export const ONEVONE_ABI = [
   },
   {
     inputs: [
-      { internalType: "uint256", name: "_matchId", type: "uint256" },
-      { internalType: "address", name: "_winner", type: "address" },
+      {
+        internalType: "uint256",
+        name: "_matchId",
+        type: "uint256",
+      },
+      {
+        internalType: "bool",
+        name: "_winningTeamA",
+        type: "bool",
+      },
     ],
-    name: "close5v5Match",
+    name: "close6v6Match",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
     inputs: [
-      { internalType: "uint256", name: "_matchId", type: "uint256" },
-      { internalType: "address", name: "_winner", type: "address" },
+      {
+        internalType: "uint256",
+        name: "_matchId",
+        type: "uint256",
+      },
+      {
+        internalType: "address",
+        name: "_winner",
+        type: "address",
+      },
     ],
     name: "closeMatch",
     outputs: [],
@@ -716,11 +778,31 @@ export const ONEVONE_ABI = [
   },
   {
     inputs: [
-      { internalType: "uint256", name: "_numEntrants", type: "uint256" },
-      { internalType: "uint8", name: "_winnersPercentage", type: "uint8" },
-      { internalType: "uint8", name: "_multisigPercentage", type: "uint8" },
-      { internalType: "contract IERC20", name: "_token", type: "address" },
-      { internalType: "uint256", name: "_entryFee", type: "uint256" },
+      {
+        internalType: "uint256",
+        name: "_numEntrants",
+        type: "uint256",
+      },
+      {
+        internalType: "uint8",
+        name: "_winnersPercentage",
+        type: "uint8",
+      },
+      {
+        internalType: "uint8",
+        name: "_multisigPercentage",
+        type: "uint8",
+      },
+      {
+        internalType: "contract IERC20",
+        name: "_token",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "_entryFee",
+        type: "uint256",
+      },
     ],
     name: "createTournament",
     outputs: [],
@@ -728,15 +810,31 @@ export const ONEVONE_ABI = [
     type: "function",
   },
   {
-    inputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
     name: "currentTournamentRound",
-    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [
-      { internalType: "uint256", name: "_tournamentId", type: "uint256" },
+      {
+        internalType: "uint256",
+        name: "_tournamentId",
+        type: "uint256",
+      },
     ],
     name: "donate",
     outputs: [],
@@ -745,8 +843,70 @@ export const ONEVONE_ABI = [
   },
   {
     inputs: [
-      { internalType: "uint256", name: "_matchId", type: "uint256" },
-      { internalType: "uint256", name: "_amount", type: "uint256" },
+      {
+        internalType: "contract IERC20",
+        name: "_token",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "_amount",
+        type: "uint256",
+      },
+    ],
+    name: "donateERC20ToMatchingPool",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_matchId",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_amount",
+        type: "uint256",
+      },
+    ],
+    name: "donateTo2v2Match",
+    outputs: [],
+    stateMutability: "payable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_matchId",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_amount",
+        type: "uint256",
+      },
+    ],
+    name: "donateTo6v6Match",
+    outputs: [],
+    stateMutability: "payable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_matchId",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_amount",
+        type: "uint256",
+      },
     ],
     name: "donateToMatch",
     outputs: [],
@@ -755,8 +915,16 @@ export const ONEVONE_ABI = [
   },
   {
     inputs: [
-      { internalType: "uint256", name: "_tournamentId", type: "uint256" },
-      { internalType: "uint256", name: "_amount", type: "uint256" },
+      {
+        internalType: "uint256",
+        name: "_tournamentId",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_amount",
+        type: "uint256",
+      },
     ],
     name: "donateTokens",
     outputs: [],
@@ -765,31 +933,40 @@ export const ONEVONE_ABI = [
   },
   {
     inputs: [
-      { internalType: "address", name: "_token", type: "address" },
-      { internalType: "address", name: "_to", type: "address" },
-      { internalType: "uint256", name: "_amount", type: "uint256" },
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
     ],
-    name: "emergencyWithdraw",
-    outputs: [],
-    stateMutability: "nonpayable",
+    name: "erc20MatchingPools",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
   {
     inputs: [
-      { internalType: "uint256", name: "_tournamentId", type: "uint256" },
-      { internalType: "address[]", name: "winners", type: "address[]" },
-      { internalType: "uint8[]", name: "winnersPercentages", type: "uint8[]" },
-    ],
-    name: "endTournament",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      { internalType: "uint256", name: "_tournamentId", type: "uint256" },
-      { internalType: "uint256", name: "_amount", type: "uint256" },
-      { internalType: "contract IERC20", name: "_token", type: "address" },
+      {
+        internalType: "uint256",
+        name: "_tournamentId",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_amount",
+        type: "uint256",
+      },
+      {
+        internalType: "contract IERC20",
+        name: "_token",
+        type: "address",
+      },
     ],
     name: "fillUpERC20MatchingPool",
     outputs: [],
@@ -804,33 +981,96 @@ export const ONEVONE_ABI = [
     type: "function",
   },
   {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_matchId",
+        type: "uint256",
+      },
+      {
+        internalType: "bool",
+        name: "_isTeamA",
+        type: "bool",
+      },
+    ],
+    name: "get6v6TeamMembers",
+    outputs: [
+      {
+        internalType: "address[]",
+        name: "",
+        type: "address[]",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
     inputs: [],
     name: "getContractBalance",
-    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [{ internalType: "address", name: "_donor", type: "address" }],
-    name: "getMatchDonorContribution",
-    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [{ internalType: "uint256", name: "_matchId", type: "uint256" }],
-    name: "getMatchToken",
-    outputs: [{ internalType: "address", name: "", type: "address" }],
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [
-      { internalType: "uint256", name: "_matchId", type: "uint256" },
-      { internalType: "bool", name: "_isTeamA", type: "bool" },
+      {
+        internalType: "contract IERC20",
+        name: "_token",
+        type: "address",
+      },
     ],
-    name: "getTeamMembers",
-    outputs: [{ internalType: "address[5]", name: "", type: "address[5]" }],
+    name: "getERC20MatchingPoolBalance",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "_donor",
+        type: "address",
+      },
+    ],
+    name: "getMatchDonorContribution",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_matchId",
+        type: "uint256",
+      },
+    ],
+    name: "getMatchToken",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
     stateMutability: "view",
     type: "function",
   },
@@ -842,61 +1082,151 @@ export const ONEVONE_ABI = [
     type: "function",
   },
   {
-    inputs: [{ internalType: "address", name: "", type: "address" }],
-    name: "isAdmin",
-    outputs: [{ internalType: "bool", name: "", type: "bool" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [{ internalType: "address", name: "", type: "address" }],
-    name: "isBlacklisted",
-    outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_matchId",
+        type: "uint256",
+      },
+      {
+        internalType: "bool",
+        name: "_isTeamA",
+        type: "bool",
+      },
+    ],
+    name: "is6v6TeamFull",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [
-      { internalType: "uint256", name: "", type: "uint256" },
-      { internalType: "address", name: "", type: "address" },
+      {
+        internalType: "uint256",
+        name: "_matchId",
+        type: "uint256",
+      },
+      {
+        internalType: "address",
+        name: "_player",
+        type: "address",
+      },
+      {
+        internalType: "bool",
+        name: "_isTeamA",
+        type: "bool",
+      },
+    ],
+    name: "is6v6TeamMember",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    name: "isAdmin",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    name: "isBlacklisted",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
     ],
     name: "isEntrantInTournament",
-    outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
     stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [{ internalType: "address", name: "", type: "address" }],
+    inputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
     name: "isPatron",
-    outputs: [{ internalType: "bool", name: "", type: "bool" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      { internalType: "uint256", name: "_matchId", type: "uint256" },
-      { internalType: "bool", name: "_isTeamA", type: "bool" },
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
     ],
-    name: "isTeamFull",
-    outputs: [{ internalType: "bool", name: "", type: "bool" }],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [
-      { internalType: "uint256", name: "_matchId", type: "uint256" },
-      { internalType: "address", name: "_player", type: "address" },
-      { internalType: "bool", name: "_isTeamA", type: "bool" },
-    ],
-    name: "isTeamMember",
-    outputs: [{ internalType: "bool", name: "", type: "bool" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      { internalType: "uint256", name: "_matchId", type: "uint256" },
-      { internalType: "bool", name: "_isTeamA", type: "bool" },
+      {
+        internalType: "uint256",
+        name: "_matchId",
+        type: "uint256",
+      },
+      {
+        internalType: "bool",
+        name: "_isTeamA",
+        type: "bool",
+      },
     ],
     name: "join2v2Team",
     outputs: [],
@@ -905,16 +1235,30 @@ export const ONEVONE_ABI = [
   },
   {
     inputs: [
-      { internalType: "uint256", name: "_matchId", type: "uint256" },
-      { internalType: "bool", name: "_isTeamA", type: "bool" },
+      {
+        internalType: "uint256",
+        name: "_matchId",
+        type: "uint256",
+      },
+      {
+        internalType: "bool",
+        name: "_isTeamA",
+        type: "bool",
+      },
     ],
-    name: "join5v5Team",
+    name: "join6v6Team",
     outputs: [],
     stateMutability: "payable",
     type: "function",
   },
   {
-    inputs: [{ internalType: "uint256", name: "_matchId", type: "uint256" }],
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_matchId",
+        type: "uint256",
+      },
+    ],
     name: "joinMatch",
     outputs: [],
     stateMutability: "payable",
@@ -922,7 +1266,11 @@ export const ONEVONE_ABI = [
   },
   {
     inputs: [
-      { internalType: "uint256", name: "_tournamentId", type: "uint256" },
+      {
+        internalType: "uint256",
+        name: "_tournamentId",
+        type: "uint256",
+      },
     ],
     name: "joinTournament",
     outputs: [],
@@ -930,67 +1278,262 @@ export const ONEVONE_ABI = [
     type: "function",
   },
   {
-    inputs: [{ internalType: "address", name: "", type: "address" }],
+    inputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
     name: "matchDonorContributions",
-    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
     stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
     name: "matches",
     outputs: [
-      { internalType: "address", name: "player1", type: "address" },
-      { internalType: "address", name: "player2", type: "address" },
-      { internalType: "uint256", name: "player1Amount", type: "uint256" },
-      { internalType: "uint256", name: "player2Amount", type: "uint256" },
-      { internalType: "uint256", name: "totalAmount", type: "uint256" },
-      { internalType: "uint256", name: "donatedAmount", type: "uint256" },
-      { internalType: "bool", name: "isOpen", type: "bool" },
-      { internalType: "bool", name: "isERC20", type: "bool" },
-      { internalType: "contract IERC20", name: "token", type: "address" },
+      {
+        internalType: "address",
+        name: "player1",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "player2",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "player1Amount",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "player2Amount",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "totalAmount",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "donatedAmount",
+        type: "uint256",
+      },
+      {
+        internalType: "bool",
+        name: "isOpen",
+        type: "bool",
+      },
+      {
+        internalType: "bool",
+        name: "isClosed",
+        type: "bool",
+      },
+      {
+        internalType: "bool",
+        name: "isERC20",
+        type: "bool",
+      },
+      {
+        internalType: "contract IERC20",
+        name: "token",
+        type: "address",
+      },
     ],
     stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
     name: "matches2v2",
     outputs: [
-      { internalType: "address", name: "player1", type: "address" },
-      { internalType: "address", name: "player2", type: "address" },
-      { internalType: "address", name: "teamAPlayer2", type: "address" },
-      { internalType: "address", name: "teamBPlayer2", type: "address" },
-      { internalType: "uint256", name: "player1Amount", type: "uint256" },
-      { internalType: "uint256", name: "player2Amount", type: "uint256" },
-      { internalType: "uint256", name: "totalAmount", type: "uint256" },
-      { internalType: "uint256", name: "donatedAmount", type: "uint256" },
-      { internalType: "bool", name: "isOpen", type: "bool" },
-      { internalType: "bool", name: "isERC20", type: "bool" },
-      { internalType: "contract IERC20", name: "token", type: "address" },
+      {
+        internalType: "address",
+        name: "teamAPlayer1",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "teamAPlayer2",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "teamBPlayer1",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "teamBPlayer2",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "player1Amount",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "totalAmount",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "donatedAmount",
+        type: "uint256",
+      },
+      {
+        internalType: "contract IERC20",
+        name: "token",
+        type: "address",
+      },
+      {
+        internalType: "bool",
+        name: "isERC20",
+        type: "bool",
+      },
+      {
+        internalType: "bool",
+        name: "isOpen",
+        type: "bool",
+      },
+      {
+        internalType: "bool",
+        name: "isClosed",
+        type: "bool",
+      },
     ],
     stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-    name: "matches5v5",
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    name: "matches6v6",
     outputs: [
-      { internalType: "address", name: "player1", type: "address" },
-      { internalType: "address", name: "teamAPlayer2", type: "address" },
-      { internalType: "address", name: "teamAPlayer3", type: "address" },
-      { internalType: "address", name: "teamAPlayer4", type: "address" },
-      { internalType: "address", name: "teamAPlayer5", type: "address" },
-      { internalType: "address", name: "player2", type: "address" },
-      { internalType: "address", name: "teamBPlayer2", type: "address" },
-      { internalType: "address", name: "teamBPlayer3", type: "address" },
-      { internalType: "address", name: "teamBPlayer4", type: "address" },
-      { internalType: "address", name: "teamBPlayer5", type: "address" },
-      { internalType: "uint256", name: "player1Amount", type: "uint256" },
-      { internalType: "uint256", name: "totalAmount", type: "uint256" },
-      { internalType: "contract IERC20", name: "token", type: "address" },
-      { internalType: "bool", name: "isERC20", type: "bool" },
-      { internalType: "bool", name: "isOpen", type: "bool" },
+      {
+        internalType: "address",
+        name: "player1",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "teamAPlayer2",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "teamAPlayer3",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "teamAPlayer4",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "teamAPlayer5",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "teamAPlayer6",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "player2",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "teamBPlayer2",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "teamBPlayer3",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "teamBPlayer4",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "teamBPlayer5",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "teamBPlayer6",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "player1Amount",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "totalAmount",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "donatedAmount",
+        type: "uint256",
+      },
+      {
+        internalType: "contract IERC20",
+        name: "token",
+        type: "address",
+      },
+      {
+        internalType: "bool",
+        name: "isERC20",
+        type: "bool",
+      },
+      {
+        internalType: "bool",
+        name: "isOpen",
+        type: "bool",
+      },
+      {
+        internalType: "bool",
+        name: "isClosed",
+        type: "bool",
+      },
     ],
     stateMutability: "view",
     type: "function",
@@ -998,47 +1541,89 @@ export const ONEVONE_ABI = [
   {
     inputs: [],
     name: "matchingPool",
-    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [],
     name: "multisigAddress",
-    outputs: [{ internalType: "address", name: "", type: "address" }],
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [],
     name: "nextMatchId",
-    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [],
     name: "nextTournamentId",
-    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [],
     name: "owner",
-    outputs: [{ internalType: "address", name: "", type: "address" }],
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
     stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [{ internalType: "address", name: "_admin", type: "address" }],
+    inputs: [
+      {
+        internalType: "address",
+        name: "_admin",
+        type: "address",
+      },
+    ],
     name: "removeAdmin",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
-    inputs: [{ internalType: "address", name: "_address", type: "address" }],
+    inputs: [
+      {
+        internalType: "address",
+        name: "_address",
+        type: "address",
+      },
+    ],
     name: "removeBlacklisted",
     outputs: [],
     stateMutability: "nonpayable",
@@ -1053,7 +1638,11 @@ export const ONEVONE_ABI = [
   },
   {
     inputs: [
-      { internalType: "address", name: "_multisigAddress", type: "address" },
+      {
+        internalType: "address",
+        name: "_multisigAddress",
+        type: "address",
+      },
     ],
     name: "setMultisigAddress",
     outputs: [],
@@ -1062,8 +1651,16 @@ export const ONEVONE_ABI = [
   },
   {
     inputs: [
-      { internalType: "uint256", name: "_matchAmount", type: "uint256" },
-      { internalType: "contract IERC20", name: "_token", type: "address" },
+      {
+        internalType: "uint256",
+        name: "_matchAmount",
+        type: "uint256",
+      },
+      {
+        internalType: "contract IERC20",
+        name: "_token",
+        type: "address",
+      },
     ],
     name: "start2v2Match",
     outputs: [],
@@ -1072,18 +1669,34 @@ export const ONEVONE_ABI = [
   },
   {
     inputs: [
-      { internalType: "uint256", name: "_amount", type: "uint256" },
-      { internalType: "address", name: "_token", type: "address" },
+      {
+        internalType: "uint256",
+        name: "_amount",
+        type: "uint256",
+      },
+      {
+        internalType: "address",
+        name: "_token",
+        type: "address",
+      },
     ],
-    name: "start5v5Match",
+    name: "start6v6Match",
     outputs: [],
     stateMutability: "payable",
     type: "function",
   },
   {
     inputs: [
-      { internalType: "uint256", name: "_matchAmount", type: "uint256" },
-      { internalType: "contract IERC20", name: "_token", type: "address" },
+      {
+        internalType: "uint256",
+        name: "_matchAmount",
+        type: "uint256",
+      },
+      {
+        internalType: "contract IERC20",
+        name: "_token",
+        type: "address",
+      },
     ],
     name: "startMatch",
     outputs: [],
@@ -1092,7 +1705,11 @@ export const ONEVONE_ABI = [
   },
   {
     inputs: [
-      { internalType: "uint256", name: "_tournamentId", type: "uint256" },
+      {
+        internalType: "uint256",
+        name: "_tournamentId",
+        type: "uint256",
+      },
     ],
     name: "startTournament",
     outputs: [],
@@ -1101,67 +1718,178 @@ export const ONEVONE_ABI = [
   },
   {
     inputs: [
-      { internalType: "uint256", name: "", type: "uint256" },
-      { internalType: "uint256", name: "", type: "uint256" },
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
     ],
     name: "tournamentEntrants",
-    outputs: [{ internalType: "address", name: "", type: "address" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-    name: "tournamentMatchingPools",
-    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [
-      { internalType: "uint256", name: "", type: "uint256" },
-      { internalType: "address", name: "", type: "address" },
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    name: "tournamentMatchingPools",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
     ],
     name: "tournamentWinners",
     outputs: [
-      { internalType: "uint256", name: "amount", type: "uint256" },
-      { internalType: "bool", name: "hasClaimed", type: "bool" },
+      {
+        internalType: "uint256",
+        name: "amount",
+        type: "uint256",
+      },
+      {
+        internalType: "bool",
+        name: "hasClaimed",
+        type: "bool",
+      },
     ],
     stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
     name: "tournaments",
     outputs: [
-      { internalType: "uint8", name: "winnersPercentage", type: "uint8" },
-      { internalType: "uint8", name: "multisigPercentage", type: "uint8" },
-      { internalType: "bool", name: "isActive", type: "bool" },
-      { internalType: "bool", name: "hasStarted", type: "bool" },
-      { internalType: "bool", name: "isERC20", type: "bool" },
-      { internalType: "bool", name: "hasEntryFee", type: "bool" },
-      { internalType: "uint256", name: "numEntrants", type: "uint256" },
-      { internalType: "uint256", name: "totalDonations", type: "uint256" },
-      { internalType: "uint256", name: "totalTokenDonations", type: "uint256" },
-      { internalType: "uint256", name: "remainingBalance", type: "uint256" },
-      { internalType: "uint256", name: "entryFee", type: "uint256" },
-      { internalType: "contract IERC20", name: "token", type: "address" },
+      {
+        internalType: "uint8",
+        name: "winnersPercentage",
+        type: "uint8",
+      },
+      {
+        internalType: "uint8",
+        name: "multisigPercentage",
+        type: "uint8",
+      },
+      {
+        internalType: "bool",
+        name: "isActive",
+        type: "bool",
+      },
+      {
+        internalType: "bool",
+        name: "hasStarted",
+        type: "bool",
+      },
+      {
+        internalType: "bool",
+        name: "isERC20",
+        type: "bool",
+      },
+      {
+        internalType: "bool",
+        name: "hasEntryFee",
+        type: "bool",
+      },
+      {
+        internalType: "uint256",
+        name: "numEntrants",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "totalDonations",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "totalTokenDonations",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "remainingBalance",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "entryFee",
+        type: "uint256",
+      },
+      {
+        internalType: "contract IERC20",
+        name: "token",
+        type: "address",
+      },
     ],
     stateMutability: "view",
     type: "function",
   },
   {
-    inputs: [{ internalType: "address", name: "newOwner", type: "address" }],
+    inputs: [
+      {
+        internalType: "address",
+        name: "newOwner",
+        type: "address",
+      },
+    ],
     name: "transferOwnership",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
-    inputs: [{ internalType: "uint256", name: "amount", type: "uint256" }],
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "amount",
+        type: "uint256",
+      },
+    ],
     name: "withdrawFunds",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
-  { stateMutability: "payable", type: "receive" },
+  {
+    stateMutability: "payable",
+    type: "receive",
+  },
 ];

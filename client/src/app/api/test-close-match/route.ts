@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
             publicClient.readContract({
                 address: contractAddress,
                 abi: ONEVONE_ABI,
-                functionName: "matches5v5",
+                functionName: "matches6v6",
                 args: [BigInt(matchId)],
             }).then(match => match && match[0] !== '0x0000000000000000000000000000000000000000').catch(() => false),
 
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
             }).then(() => ({ success: true })).catch(e => ({ error: e.message })),
         ]);
 
-        const [isAdmin, owner, isOwner, match1v1Exists, match2v2Exists, match5v5Exists, closeMatchResult] = results;
+        const [isAdmin, owner, isOwner, match1v1Exists, match2v2Exists, match6v6Exists, closeMatchResult] = results;
 
         console.log(`[TEST-CLOSE-MATCH] Results:`, {
             callerAddress,
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
             isOwner,
             match1v1Exists,
             match2v2Exists,
-            match5v5Exists,
+            match6v6Exists,
             closeMatchResult
         });
 
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
             matchExists: {
                 match1v1: match1v1Exists,
                 match2v2: match2v2Exists,
-                match5v5: match5v5Exists
+                match6v6: match6v6Exists
             },
             closeMatchSimulation: closeMatchResult,
             matchId,

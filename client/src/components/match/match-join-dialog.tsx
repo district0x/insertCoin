@@ -41,8 +41,8 @@ export function MatchJoinDialog({
     return match.matchType === "FIVE_V_FIVE"
       ? 5
       : match.matchType === "TWO_V_TWO"
-      ? 2
-      : 1;
+        ? 2
+        : 1;
   };
 
   const getTeamSpots = () => {
@@ -73,7 +73,7 @@ export function MatchJoinDialog({
 
     const ethAmount = formatEther(match.player1Amount);
     const usdAmount = convertToUsd(match.player1Amount).toFixed(2);
-    return `Join Match with ${ethAmount} ${match.isERC20 ? "MTK" : "ETH"} (≈$${usdAmount})`;
+    return `Join Match with ${ethAmount} ${match.isERC20 ? "MATCH" : "ETH"} ${match.isERC20 ? "(No USD value)" : `(≈$${usdAmount})`}`;
   };
 
   const isJoinButtonDisabled = () => {
@@ -158,13 +158,11 @@ export function MatchJoinDialog({
           <DialogDescription>
             {match.matchType === "ONE_V_ONE"
               ? `You are about to join this match with ${formatEther(
-                  match.player1Amount
-                )} ${match.isERC20 ? "MTK" : "ETH"} (≈$${convertToUsd(match.player1Amount).toFixed(2)}).`
+                match.player1Amount
+              )} ${match.isERC20 ? "MATCH" : "ETH"} ${match.isERC20 ? "(No USD value)" : `(≈$${convertToUsd(match.player1Amount).toFixed(2)})`}.`
               : `Select a team to join with ${formatEther(
-                  match.player1Amount
-                )} ${match.isERC20 ? "MTK" : "ETH"} (≈$${convertToUsd(match.player1Amount).toFixed(
-                  2
-                )}) stake.`}
+                match.player1Amount
+              )} ${match.isERC20 ? "MATCH" : "ETH"} ${match.isERC20 ? "(No USD value)" : `(≈$${convertToUsd(match.player1Amount).toFixed(2)})`} stake.`}
             This action cannot be undone.
           </DialogDescription>
         </DialogHeader>
@@ -201,16 +199,30 @@ export function MatchJoinDialog({
                 {getTeamMembers(match.teamB)}
               </div>
               <p className="text-sm">
-                Stake Amount: {formatEther(match.player1Amount)} {match.isERC20 ? "MTK" : "ETH"}
-                <span className="text-muted-foreground ml-1">
-                  (≈${convertToUsd(match.player1Amount).toFixed(2)})
-                </span>
+                Stake Amount: {formatEther(match.player1Amount)} {match.isERC20 ? "MATCH" : "ETH"}
+                {!match.isERC20 && (
+                  <span className="text-muted-foreground ml-1">
+                    (≈${convertToUsd(match.player1Amount).toFixed(2)})
+                  </span>
+                )}
+                {match.isERC20 && (
+                  <span className="text-muted-foreground ml-1">
+                    (No USD value)
+                  </span>
+                )}
               </p>
               <p className="text-sm">
-                Total Prize Pool: {formatEther(match.totalAmount)} {match.isERC20 ? "MTK" : "ETH"}
-                <span className="text-muted-foreground ml-1">
-                  (≈${convertToUsd(match.totalAmount).toFixed(2)})
-                </span>
+                Total Prize Pool: {formatEther(match.totalAmount)} {match.isERC20 ? "MATCH" : "ETH"}
+                {!match.isERC20 && (
+                  <span className="text-muted-foreground ml-1">
+                    (≈${convertToUsd(match.totalAmount).toFixed(2)})
+                  </span>
+                )}
+                {match.isERC20 && (
+                  <span className="text-muted-foreground ml-1">
+                    (No USD value)
+                  </span>
+                )}
               </p>
             </div>
           </div>

@@ -20,6 +20,8 @@ export default function LinkWalletPage() {
     const [isLinked, setIsLinked] = useState(false);
     const [discordId, setDiscordId] = useState<string | null>(null);
     const [manualDiscordId, setManualDiscordId] = useState("");
+    const [username, setUsername] = useState("");
+    const [usernameError, setUsernameError] = useState("");
 
     // Check if user has Discord ID from OAuth
     useEffect(() => {
@@ -37,6 +39,16 @@ export default function LinkWalletPage() {
         }
     }, [authenticated, user, isLinking, isLinked]);
 
+    const validateUsername = (username: string) => {
+        if (username.length < 3 || username.length > 20) {
+            return "Username must be 3-20 characters";
+        }
+        if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+            return "Username can only contain letters, numbers, underscores, and hyphens";
+        }
+        return null;
+    };
+
     const handleAutoLink = async () => {
         const finalDiscordId = discordId || manualDiscordId;
 
@@ -44,6 +56,7 @@ export default function LinkWalletPage() {
             discordId,
             manualDiscordId,
             finalDiscordId,
+            username,
             walletAddress: user?.wallet?.address,
             user: user
         });
@@ -54,6 +67,21 @@ export default function LinkWalletPage() {
                 hasWalletAddress: !!user?.wallet?.address
             });
             return;
+        }
+
+        // Validate username if provided
+        if (username.trim()) {
+            const usernameValidation = validateUsername(username);
+            if (usernameValidation) {
+                setUsernameError(usernameValidation);
+                toast({
+                    title: "❌ Invalid Username",
+                    description: usernameValidation,
+                    variant: "destructive",
+                });
+                return;
+            }
+            setUsernameError("");
         }
 
         // Validate inputs before calling service
@@ -81,12 +109,14 @@ export default function LinkWalletPage() {
         try {
             console.log('[DEBUG] Calling linkDiscordToWallet with:', {
                 discordId: finalDiscordId,
-                walletAddress: user.wallet.address
+                walletAddress: user.wallet.address,
+                username: username.trim() || undefined
             });
 
             await linkDiscordToWallet({
                 discordId: finalDiscordId,
                 walletAddress: user.wallet.address,
+                username: username.trim() || undefined,
             });
 
             setIsLinked(true);
@@ -136,7 +166,8 @@ export default function LinkWalletPage() {
     const canLink = () => {
         const hasDiscordId = discordId || manualDiscordId;
         const hasWallet = user?.wallet?.address;
-        return hasDiscordId && hasWallet;
+        const hasValidUsername = !username.trim() || !usernameError;
+        return hasDiscordId && hasWallet && hasValidUsername;
     };
 
     if (!ready) {
@@ -288,6 +319,32 @@ export default function LinkWalletPage() {
                                                     </div>
                                                 </div>
                                             )}
+
+                                            {/* Username Input */}
+                                            <div className="space-y-2">
+                                                <Label htmlFor="username" className="text-sm font-medium">
+                                                    Player Name (Optional)
+                                                </Label>
+                                                <Input
+                                                    id="username"
+                                                    placeholder="Enter your player name (e.g., GameMaster123)"
+                                                    value={username}
+                                                    onChange={(e) => {
+                                                        setUsername(e.target.value);
+                                                        if (usernameError) setUsernameError("");
+                                                    }}
+                                                    className={`text-sm ${usernameError ? 'border-red-500' : ''}`}
+                                                />
+                                                {usernameError && (
+                                                    <p className="text-xs text-red-500">{usernameError}</p>
+                                                )}
+                                                <div className="flex items-start gap-2 p-2 bg-gray-50 rounded text-xs text-gray-600">
+                                                    <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                                                    <p>
+                                                        Choose a unique player name (3-20 characters). Only letters, numbers, underscores, and hyphens allowed.
+                                                    </p>
+                                                </div>
+                                            </div>
 
                                             {isLinking ? (
                                                 <Button disabled className="w-full">

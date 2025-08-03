@@ -32,7 +32,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { MTK_TOKEN, TokenOption, TOKEN_OPTIONS } from "@/lib/constants/tokens";
+import { MATCH_TOKEN, TokenOption, TOKEN_OPTIONS } from "@/lib/constants/tokens";
 import { usePrivy } from "@privy-io/react-auth";
 import { WalletConnectionBanner } from "@/components/WalletConnectionBanner";
 
@@ -83,7 +83,7 @@ function CreateMatchForm() {
     if (roomId) {
       // Set token type from URL parameter
       if (tokenTypeParam === "MATCH") {
-        setSelectedToken("MTK");
+        setSelectedToken("MATCH");
       } else {
         setSelectedToken("ETH");
       }
@@ -265,9 +265,9 @@ function CreateMatchForm() {
             await createMatchInDb({
               walletAddress: walletAddress as string,
               matchType,
-              stake: selectedToken === "MTK" ? (Number(ethAmount) / 1e18).toString() : formatEther(ethAmount),
+              stake: selectedToken === "MATCH" ? (Number(ethAmount) / 1e18).toString() : formatEther(ethAmount),
               matchId: Number(onChainMatchId),
-              tokenName: selectedToken === "MTK" ? "MATCH" : "ETH",
+              tokenName: selectedToken === "MATCH" ? "MATCH" : "ETH",
             });
           }
 
@@ -294,7 +294,7 @@ function CreateMatchForm() {
 
           toast({
             title: "Match Created Successfully!",
-            description: `Your ${matchType.toLowerCase()} match with ID #${onChainMatchId} is now live with a stake of ${selectedToken === "MTK"
+            description: `Your ${matchType.toLowerCase()} match with ID #${onChainMatchId} is now live with a stake of ${selectedToken === "MATCH"
               ? `${Number(ethAmount) / 1e18} MATCH Tokens`
               : `${formatEther(ethAmount)} ETH`
               }.`,
@@ -372,7 +372,7 @@ function CreateMatchForm() {
     }
 
     // Validate amount based on token type
-    if (selectedToken === "MTK") {
+    if (selectedToken === "MATCH") {
       // For MATCH tokens, validate as whole numbers
       const matchAmount = Number(ethAmount) / 1e18;
       if (matchAmount > 1000000) { // 1M MATCH tokens max
@@ -409,7 +409,7 @@ function CreateMatchForm() {
 
         // Calculate the correct stake amount for the database update
         let stakeAmountForDb: number;
-        if (selectedToken === "MTK") {
+        if (selectedToken === "MATCH") {
           // For MATCH tokens, use the amount from URL (whole number)
           stakeAmountForDb = Number(amountParam) || 0;
         } else {
@@ -436,7 +436,7 @@ function CreateMatchForm() {
         }
 
         // For Discord-created matches, support both ETH and MATCH tokens
-        const tokenAddress = selectedToken === "MTK" ? MTK_TOKEN.address : undefined;
+        const tokenAddress = selectedToken === "MATCH" ? MATCH_TOKEN.address : undefined;
 
         // ethAmount is already in the correct format:
         // - ETH: converted to wei format from URL
@@ -454,7 +454,7 @@ function CreateMatchForm() {
       } else {
         // Regular match creation (not from Discord)
         let hash: string | null = null;
-        const tokenAddress = selectedToken === "MTK" ? MTK_TOKEN.address : undefined;
+        const tokenAddress = selectedToken === "MATCH" ? MATCH_TOKEN.address : undefined;
 
         // ethAmount is already in wei format from UsdInput component
         if (matchType === "ONE_V_ONE") {
@@ -604,12 +604,12 @@ function CreateMatchForm() {
               {roomId && (
                 <div className="space-y-3">
                   <Label className="text-sm font-medium">
-                    Stake Amount ({selectedToken === "MTK" ? "MATCH Tokens" : "ETH"})
+                    Stake Amount ({selectedToken === "MATCH" ? "MATCH Tokens" : "ETH"})
                   </Label>
                   <input
                     type="text"
                     value={
-                      selectedToken === "MTK"
+                      selectedToken === "MATCH"
                         ? `${amountParam || ""} MATCH Tokens`
                         : `${ethAmountParam || ""} ETH`
                     }

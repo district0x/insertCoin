@@ -17,6 +17,7 @@ interface MatchDetailHeaderProps {
 }
 
 const MatchDetailHeader = ({ match, convertEthToUsd }: MatchDetailHeaderProps) => {
+
   return (
     <>
       <Link
@@ -35,10 +36,17 @@ const MatchDetailHeader = ({ match, convertEthToUsd }: MatchDetailHeaderProps) =
                 {match.matchType} Match #{match.id.toString()}
               </CardTitle>
               <CardDescription>
-                Prize Pool: {formatEther(match.totalAmount)} {match.isERC20 ? "MTK" : "ETH"}
-                <span className="text-muted-foreground ml-1">
-                  (≈${convertEthToUsd(match.totalAmount).toFixed(2)})
-                </span>
+                Prize Pool: {formatEther(match.totalAmount)} {match.isERC20 ? "MATCH" : "ETH"}
+                {!match.isERC20 && (
+                  <span className="text-muted-foreground ml-1">
+                    (≈${convertEthToUsd(match.totalAmount).toFixed(2)})
+                  </span>
+                )}
+                {match.isERC20 && (
+                  <span className="text-muted-foreground ml-1">
+                    (No USD value)
+                  </span>
+                )}
               </CardDescription>
             </div>
             <MatchStatusBadge match={match} />

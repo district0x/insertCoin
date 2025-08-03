@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from typing import Callable, Dict, List, Optional
+from datetime import datetime
 
 from web3 import Web3
 from web3.contract import Contract
@@ -147,17 +148,20 @@ async def handle_match_completed(event_args):
         winner = event_args['winner']
         
         # Update match in database
-        await prisma.match.update_many(
-            where={
-                "matchId": match_id
-            },
+        await prisma.match.update(
+            where={"matchId": match_id},
             data={
                 "status": "COMPLETED",
-                "winnerAddress": winner
+                "winnerAddress": winner,
+                "updatedAt": datetime.utcnow()
             }
         )
         
-        logger.info(f"Match {match_id} completed, winner: {winner}")
+        # Log the match completion
+        logger.info(f"Match {match_id} completed. Winner: {winner}")
+        
+        # Note: PlayerMatchup tracking removed since model not available in Prisma client
+        # TODO: Re-implement when PlayerMatchup model is properly generated
         
     except Exception as e:
         logger.error(f"Error handling MatchCompleted event: {e}", exc_info=True)

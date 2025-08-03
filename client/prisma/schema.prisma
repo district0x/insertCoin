@@ -41,7 +41,7 @@ model Match {
   game              String?
   gameCategory      String?
   matchAmountUsd    Int?
-  opponentDiscordId String?
+  player2DiscordId  String?
   player2Address    String?
   platform          String?
   winnerId          String?
@@ -52,7 +52,7 @@ model Match {
   @@index([roomId])
   @@index([creatorDiscordId])
   @@index([discordChannelId])
-  @@index([opponentDiscordId])
+  @@index([player2DiscordId])
   @@index([winnerId])
   @@index([creatorAddress])
   @@index([player2Address])
@@ -148,4 +148,50 @@ enum VerificationStatus {
   PENDING
   VERIFIED
   FAILED
+}
+
+model PlayerMatchup {
+  id            String   @id @default(uuid())
+  player1Id     String   // Discord ID
+  player2Id     String   // Discord ID
+  player1Wins   Int      @default(0)
+  player2Wins   Int      @default(0)
+  totalMatches  Int      @default(0)
+  lastMatchDate DateTime @updatedAt
+  createdAt     DateTime @default(now())
+  
+  @@unique([player1Id, player2Id])
+  @@index([player1Id])
+  @@index([player2Id])
+}
+
+model PlayerTeamStats {
+  id            String   @id @default(uuid())
+  playerId      String   // Discord ID
+  matchType     String   // "1v1", "2v2", "5v5"
+  totalMatches  Int      @default(0)
+  totalWins     Int      @default(0)
+  totalLosses   Int      @default(0)
+  teamWins      Int      @default(0)  // Wins in team matches
+  teamLosses    Int      @default(0)  // Losses in team matches
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([playerId, matchType])
+  @@index([playerId])
+  @@index([matchType])
+}
+
+model TeamMatchup {
+  id            String   @id @default(uuid())
+  matchId       String   // Reference to the match
+  team1Players  String[] // Array of Discord IDs
+  team2Players  String[] // Array of Discord IDs
+  winnerTeam    Int      // 1 or 2
+  matchType     String   // "2v2" or "5v5"
+  createdAt     DateTime @default(now())
+  
+  @@index([matchId])
+  @@index([team1Players])
+  @@index([team2Players])
 }

@@ -1,7 +1,7 @@
 import { OnChainMatch } from "@/types/match";
 
-// Simple in-memory cache
-const matchCache = new Map<string, { data: OnChainMatch; timestamp: number }>();
+// Cache for match data
+const matchCache = new Map<string, OnChainMatch>();
 
 // Cache durations based on match state
 export const CACHE_DURATIONS = {
@@ -18,18 +18,22 @@ export function getCacheExpiry(match: OnChainMatch): number {
 }
 
 export function getCachedMatch(matchId: string): OnChainMatch | null {
-  const cached = matchCache.get(matchId);
-  if (cached) {
-    const cacheExpiry = getCacheExpiry(cached.data);
-    if (Date.now() - cached.timestamp < cacheExpiry) {
-      return cached.data;
-    }
-  }
-  return null;
+  return matchCache.get(matchId) || null;
 }
 
-export function cacheMatch(matchId: string, data: OnChainMatch) {
-  matchCache.set(matchId, { data, timestamp: Date.now() });
+export function cacheMatch(matchId: string, match: OnChainMatch) {
+  matchCache.set(matchId, match);
+}
+
+// Add function to clear cache
+export function clearMatchCache(matchId?: string) {
+  if (matchId) {
+    matchCache.delete(matchId);
+    console.log(`[CACHE] Cleared cache for match ${matchId}`);
+  } else {
+    matchCache.clear();
+    console.log(`[CACHE] Cleared all match cache`);
+  }
 }
 
 // Prefetch cache for quick access

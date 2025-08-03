@@ -94,7 +94,39 @@ export function useMatch() {
       );
 
       console.log("Sending approval transaction...");
-      const tx = await tokenContract.approve(contract.address, amount.toString());
+
+      // Add retry logic for rate limiting
+      let tx;
+      let retries = 0;
+      const maxRetries = 3; // Reduced from 5 to 3 to avoid too many attempts
+
+      while (retries < maxRetries) {
+        try {
+          tx = await tokenContract.approve(contract.address, amount.toString());
+          break; // Success, exit retry loop
+        } catch (error) {
+          retries++;
+          console.log(`Approval attempt ${retries} failed:`, error);
+
+          if (error instanceof Error && (error.message?.includes('rate limited') || error.message?.includes('rate limit'))) {
+            if (retries < maxRetries) {
+              const delaySeconds = retries * 10; // Increased delay: 10s, 20s, 30s
+              console.log(`Rate limited, waiting ${delaySeconds} seconds before retry...`);
+              await new Promise(resolve => setTimeout(resolve, delaySeconds * 1000));
+              continue;
+            } else {
+              throw new Error("Rate limited by MetaMask. Please wait a few minutes and try again.");
+            }
+          } else {
+            throw error; // Non-rate-limit error, don't retry
+          }
+        }
+      }
+
+      if (!tx) {
+        throw new Error("Failed to send approval transaction after retries");
+      }
+
       console.log("Approval transaction sent:", tx.hash);
 
       toast({
@@ -396,13 +428,13 @@ export function useMatch() {
         txOptions.value = ethers.BigNumber.from(amount.toString());
       }
 
-      console.log("Sending transaction to start 5v5 match...");
-      const tx = await ethersContract.start5v5Match(amount.toString(), token, txOptions);
+      console.log("Sending transaction to start 6v6 match...");
+      const tx = await ethersContract.start6v6Match(amount.toString(), token, txOptions);
       console.log("Transaction sent with hash:", tx.hash);
 
       return tx.hash;
     } catch (error) {
-      console.error("Error creating 5v5 match:", error);
+      console.error("Error creating 6v6 match:", error);
       if (error instanceof BaseError) {
         // Log detailed error info
         console.error("BaseError details:", {
@@ -465,7 +497,7 @@ export function useMatch() {
     }
   };
 
-  const join5v5Team = async (
+  const join6v6Team = async (
     matchId: bigint,
     isTeamA: boolean,
     amount: bigint
@@ -480,10 +512,10 @@ export function useMatch() {
 
     try {
       const ethersContract = await getEthersContract();
-      const tx = await ethersContract.join5v5Team(matchId.toString(), isTeamA, { value: ethers.BigNumber.from(amount.toString()) });
+      const tx = await ethersContract.join6v6Team(matchId.toString(), isTeamA, { value: ethers.BigNumber.from(amount.toString()) });
       return tx.hash;
     } catch (error) {
-      console.error("Error joining 5v5 team:", error);
+      console.error("Error joining 6v6 team:", error);
       throw error;
     }
   };
@@ -494,6 +526,6 @@ export function useMatch() {
     create5v5Match,
     joinMatch,
     join2v2Team,
-    join5v5Team,
+    join6v6Team,
   };
 }
