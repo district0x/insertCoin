@@ -9,6 +9,7 @@ import discord
 from discord.ext import commands
 
 from src.db.prisma import prisma
+from src.services.ban_service import BanService
 from src.utils.embeds import create_enhanced_match_embed
 from .components import MatchPostView, MatchRoomView
 
@@ -49,6 +50,25 @@ async def get_user_by_discord_id(discord_id: str) -> Optional[discord.User]:
     except Exception as e:
         logger.error(f"Error getting user by Discord ID {discord_id}: {e}")
         return None
+
+async def check_player_banned(discord_id: str) -> tuple[bool, str]:
+    """Check if a player is banned and return ban status and reason."""
+    try:
+        ban_service = BanService(prisma)
+        is_banned, reason, expiry = await ban_service.is_player_banned(discord_id)
+        
+        if is_banned:
+            if expiry:
+                expiry_str = expiry.strftime('%Y-%m-%d %H:%M UTC')
+                return True, f"Banned until {expiry_str}: {reason}"
+            else:
+                return True, f"Permanently banned: {reason}"
+        
+        return False, ""
+        
+    except Exception as e:
+        logger.error(f"Error checking ban status for {discord_id}: {e}")
+        return False, ""
 
 async def create_match_channel(interaction: discord.Interaction, match_data: dict) -> ChannelInfo:
     """Create a dedicated channel for the match with hybrid approach."""
@@ -108,6 +128,13 @@ async def create_match_in_db(
     channel_info: ChannelInfo
 ) -> dict:
     """Create a match in the database with retry logic."""
+    
+    # Check if player is banned before creating match
+    discord_id = str(interaction.user.id)
+    is_banned, ban_reason = await check_player_banned(discord_id)
+    if is_banned:
+        raise Exception(f"Player is banned: {ban_reason}")
+    
     max_retries = 3
     
     for attempt in range(max_retries):

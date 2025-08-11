@@ -1,7 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { updateTournamentWinners } from '@/lib/services/tournament';
+import { applyRateLimit } from '@/lib/middleware/rate-limit';
 
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
+    // Apply rate limiting
+    const rateLimitResponse = applyRateLimit(request);
+    if (rateLimitResponse) {
+        return rateLimitResponse;
+    }
+
     try {
         const data = await request.json();
         const { tournamentId, winners } = data;

@@ -17,6 +17,36 @@ const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey)
 // Discord configuration
 const DISCORD_BOT_TOKEN = Deno.env.get('DISCORD_BOT_TOKEN')!
 
+// Optional webhook signature secret
+const WEBHOOK_SECRET = Deno.env.get('MATCH_WEBHOOK_SECRET')
+
+async function verifySignature(req: Request, rawBody: string): Promise<boolean> {
+  if (!WEBHOOK_SECRET) return true; // no-op when not configured
+  try {
+    const signature = req.headers.get('x-signature') || ''
+    const encoder = new TextEncoder()
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(WEBHOOK_SECRET),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign', 'verify']
+    )
+    const mac = await crypto.subtle.sign('HMAC', key, encoder.encode(rawBody))
+    const macHex = Array.from(new Uint8Array(mac)).map(b => b.toString(16).padStart(2, '0')).join('')
+
+    // timing-safe compare
+    if (signature.length !== macHex.length) return false
+    let result = 0
+    for (let i = 0; i < signature.length; i++) {
+      result |= signature.charCodeAt(i) ^ macHex.charCodeAt(i)
+    }
+    return result === 0
+  } catch (_) {
+    return false
+  }
+}
+
 interface MatchEvent {
   type: 'MATCH_CREATED' | 'PLAYER_JOINED' | 'MATCH_STARTED' | 'MATCH_COMPLETED' | 'MATCH_CANCELLED'
   matchId: number
@@ -74,7 +104,7 @@ async function sendDiscordNotification(content: string, channelId: string) {
         'Content-Type': 'application/json',
         'Authorization': `Bot ${DISCORD_BOT_TOKEN}`
       },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         content,
         embeds: [{
           color: 0x0099ff,
@@ -172,12 +202,12 @@ async function getMatchIdFromReference(matchRefId: string) {
 
 function convertWebhookToMatchEvent(payload: DatabaseWebhookPayload | ParticipantWebhookPayload): MatchEvent | null {
   console.log('Converting webhook payload to match event:', payload);
-  
+
   // Handle participant join events (from the _Participant join table)
   if (payload.table === '_Participant' && payload.type === 'INSERT') {
     console.log('Processing participant join event');
     const participantPayload = payload as ParticipantWebhookPayload;
-    
+
     return {
       type: 'PLAYER_JOINED',
       matchId: 0, // Will be populated later with the actual match ID
@@ -186,7 +216,7 @@ function convertWebhookToMatchEvent(payload: DatabaseWebhookPayload | Participan
       }
     };
   }
-  
+
   // Only process Match table events for status changes
   if (payload.table !== 'Match') {
     console.log('Ignoring non-Match table event');
@@ -194,13 +224,13 @@ function convertWebhookToMatchEvent(payload: DatabaseWebhookPayload | Participan
   }
 
   const matchPayload = payload as DatabaseWebhookPayload;
-  
+
   // Handle different status transitions
   if (matchPayload.type === 'UPDATE' && matchPayload.old_record) {
     const oldStatus = matchPayload.old_record.status;
     const newStatus = matchPayload.record.status;
     const channelId = matchPayload.record.discordChannelId || undefined;
-    
+
     console.log(`Status transition: ${oldStatus} -> ${newStatus}`);
 
     if (oldStatus === 'PENDING' && newStatus === 'OPEN') {
@@ -214,7 +244,7 @@ function convertWebhookToMatchEvent(payload: DatabaseWebhookPayload | Participan
         }
       };
     }
-    
+
     if (oldStatus === 'OPEN' && newStatus === 'FILLED') {
       return {
         type: 'MATCH_STARTED',
@@ -224,7 +254,7 @@ function convertWebhookToMatchEvent(payload: DatabaseWebhookPayload | Participan
         }
       };
     }
-    
+
     // Only trigger COMPLETED notification if the status actually changed from a different status
     if (newStatus === 'COMPLETED' && oldStatus !== 'COMPLETED') {
       return {
@@ -236,7 +266,7 @@ function convertWebhookToMatchEvent(payload: DatabaseWebhookPayload | Participan
         }
       };
     }
-    
+
     // Only trigger CANCELLED notification if the status actually changed from a different status
     if (newStatus === 'CANCELLED' && oldStatus !== 'CANCELLED') {
       return {
@@ -255,21 +285,21 @@ function convertWebhookToMatchEvent(payload: DatabaseWebhookPayload | Participan
 async function handleMatchEvent(event: MatchEvent) {
   try {
     console.log('Processing match event:', event);
-    
+
     // Special handling for PLAYER_JOINED events from the _Participant table
     if (event.type === 'PLAYER_JOINED' && event.matchId === 0 && event.data.playerAddress) {
       // Get user details first
       const userId = event.data.playerAddress;
       const user = await getUserDetails(userId);
-      
+
       // Get match ID from reference if needed (for _Participant table events)
       const matchId = await getMatchIdFromReference(event.data.discordChannelId || '');
       event.matchId = matchId;
       event.data.playerAddress = user.address;
     }
-    
+
     const match = await getMatchDetails(event.matchId)
-    
+
     // Update discordChannelId if provided in the event
     if (event.data.discordChannelId && !match.discordChannelId) {
       console.log(`Updating match ${event.matchId} with Discord channel ID: ${event.data.discordChannelId}`);
@@ -335,7 +365,7 @@ async function handleMatchEvent(event: MatchEvent) {
 
         await supabase
           .from('Match')
-          .update({ 
+          .update({
             status: 'COMPLETED',
             winnerAddress: winner
           })
@@ -368,33 +398,41 @@ async function handleMatchEvent(event: MatchEvent) {
 
 serve(async (req) => {
   try {
+    const rawBody = await req.text()
+
+    // Verify HMAC signature if secret is configured
+    const ok = await verifySignature(req, rawBody)
+    if (!ok) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid signature' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Re-parse after reading text
+    const body = JSON.parse(rawBody)
+
     console.log('Received request:', {
       method: req.method,
       url: req.url,
-      headers: Object.fromEntries(req.headers.entries())
-    });
+      // Do not log all headers in production to avoid leaking signature
+    })
 
-    const body = await req.json().catch((e) => {
-      console.error('Error parsing request body:', e);
-      throw new Error('Invalid JSON payload');
-    });
-    console.log('Request body:', body);
-    
     let event: MatchEvent;
-    
+
     // Check if this is a database webhook event
     if (body.type === 'INSERT' || body.type === 'UPDATE' || body.type === 'DELETE') {
       console.log('Processing database webhook event');
       const webhookEvent = convertWebhookToMatchEvent(body);
-      
+
       if (!webhookEvent) {
         console.log('Event ignored - no action needed');
-  return new Response(
+        return new Response(
           JSON.stringify({ message: 'Event ignored - no action needed' }),
           { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
       }
-      
+
       event = webhookEvent;
     } else {
       // Direct API call
@@ -418,7 +456,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error processing request:', error);
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: 'Internal server error',
         details: error instanceof Error ? error.message : 'Unknown error'
       }),

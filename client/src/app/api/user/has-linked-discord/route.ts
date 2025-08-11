@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { hasLinkedDiscordId } from "@/lib/services/user";
+import { applyRateLimit } from '@/lib/middleware/rate-limit';
 
 export async function POST(request: NextRequest) {
+    // Apply rate limiting
+    const rateLimitResponse = applyRateLimit(request);
+    if (rateLimitResponse) {
+        return rateLimitResponse;
+    }
+
     try {
         const { walletAddress } = await request.json();
 

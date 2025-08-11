@@ -51,8 +51,13 @@ export function MatchPayoutInfo({
         totalCalculated: (winnerShare + contractFee + multisigShare).toString(),
         isERC20: match.isERC20,
         winnerAddress,
-        winnerAmount,
-        expectedWinnerAmount: formatEther(winnerShare)
+        apiWinnerAmount: winnerAmount,
+        calculatedWinnerAmount: formatEther(winnerShare),
+        validation: {
+            totalShouldEqualPrizePool: (winnerShare + contractFee + multisigShare) === totalPrizePool,
+            winnerShouldBe80Percent: (winnerShare * 100n) / totalPrizePool === 80n,
+            feesShouldBe20Percent: ((contractFee + multisigShare) * 100n) / totalPrizePool === 20n
+        }
     });
 
     return (
@@ -136,11 +141,11 @@ export function MatchPayoutInfo({
                                 <span className="text-xs text-muted-foreground">Amount:</span>
                                 <div className="text-right">
                                     <div className="text-sm font-semibold">
-                                        {winnerAmount} {match.isERC20 ? "MATCH" : "ETH"}
+                                        {formatEther(winnerShare)} {match.isERC20 ? "MATCH" : "ETH"}
                                     </div>
-                                    {!match.isERC20 && winnerAmount && (
+                                    {!match.isERC20 && (
                                         <div className="text-xs text-muted-foreground">
-                                            ≈ ${convertEthToUsd(BigInt(Math.floor(Number(winnerAmount) * 1e18))).toFixed(2)} USD
+                                            ≈ ${convertEthToUsd(winnerShare).toFixed(2)} USD
                                         </div>
                                     )}
                                 </div>

@@ -51,7 +51,11 @@ export function mergeMatchMetadata(
                     platform: null,
                     status: match.isOpen ? 'OPEN' : 'COMPLETED',
                     creatorDiscordId: null,
+                    creatorAddress: null,
+                    creatorUsername: null,
                     opponentDiscordId: null,
+                    player2Address: null,
+                    player2Username: null,
                     winnerId: null
                 }
             };

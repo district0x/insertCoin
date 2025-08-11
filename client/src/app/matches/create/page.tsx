@@ -10,7 +10,7 @@ import { createPublicClient, http } from "viem";
 import { baseSepolia } from "@/lib/config/chains";
 import { updateMatchWithWallet, createMatchInDb, updateMatchWithContractId } from "@/lib/services/match";
 import { formatEther, decodeEventLog } from "viem";
-import { useRefreshStats } from "@/hooks/useRefreshStats";
+
 import { MatchType } from "@/types/match";
 import { UsdInput } from "@/components/ui/usd-input";
 import { ONEVONE_ABI } from "@/lib/contracts/abis/ABI";
@@ -73,7 +73,6 @@ function CreateMatchForm() {
   const [selectedToken, setSelectedToken] = React.useState<TokenOption>("ETH");
   const [paramError, setParamError] = React.useState<string | null>(null);
   const { createMatch, create2v2Match, create5v5Match } = useMatch();
-  const refreshStats = useRefreshStats();
 
   // Get the actual wallet address to use (fallback to user.wallet.address if address is null)
   const walletAddress = address || user?.wallet?.address;
@@ -285,12 +284,7 @@ function CreateMatchForm() {
             }
           }
 
-          // Refresh stats after successful match creation
-          try {
-            await refreshStats();
-          } catch (error) {
-            console.error("Failed to refresh stats:", error);
-          }
+
 
           toast({
             title: "Match Created Successfully!",
@@ -521,6 +515,32 @@ function CreateMatchForm() {
                 {paramError}
               </div>
             )}
+
+            {/* Instructions panel (visual-only) */}
+            <div className="mb-4 p-4 rounded-lg border border-red-500/20 bg-gradient-to-br from-gray-900/70 to-black/70">
+              <h4 className="text-sm font-semibold text-white mb-2">What happens when you create a match</h4>
+              <ol className="list-decimal pl-5 space-y-1 text-sm text-gray-300">
+                <li>
+                  {roomId
+                    ? `Amount: We’ll use ${(() => {
+                      if (tokenTypeParam === "MATCH") {
+                        return `${amountParam ?? ""} MATCH`;
+                      }
+                      return `${ethAmountParam ?? ""} ETH`;
+                    })()
+                    } from your Discord match.`
+                    : "Amount: You’ll choose a stake amount below."}
+                </li>
+                <li>Transaction: You’ll sign one transaction to create the on-chain lobby.</li>
+                <li>
+                  {tokenTypeParam === "MATCH" || selectedToken === "MATCH"
+                    ? "If you selected MATCH, your wallet will first ask to approve MATCH token usage, then create the lobby. Please be patient."
+                    : "If you selected ETH, you’ll proceed directly to lobby creation."}
+                </li>
+                <li>Redirect: Once created, you’ll be redirected to the match page for the match ID.</li>
+              </ol>
+            </div>
+
             <WalletConnectionBanner />
             <form onSubmit={handleSubmit} className="space-y-8">
               {!roomId && (

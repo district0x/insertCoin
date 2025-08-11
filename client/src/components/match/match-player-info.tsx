@@ -7,6 +7,7 @@ interface MatchPlayerInfoProps {
   maxPlayers: number;
   convertToUsd: (ethAmount: bigint) => number;
   isERC20?: boolean;
+  usernames?: (string | null)[];
 }
 
 export function MatchPlayerInfo({
@@ -16,6 +17,7 @@ export function MatchPlayerInfo({
   maxPlayers,
   convertToUsd,
   isERC20 = false,
+  usernames = [],
 }: MatchPlayerInfoProps) {
   const truncateAddress = (address: string | null | undefined) => {
     if (!address) return "N/A";
@@ -26,9 +28,18 @@ export function MatchPlayerInfo({
   // Create an array of player slots based on maxPlayers
   const playerSlots = Array.from({ length: maxPlayers }, (_, index) => {
     const address = addresses[index];
+    const username = usernames[index];
+
     return (
       <p key={index} className="text-sm">
-        Player {index + 1}: {truncateAddress(address)}
+        Player {index + 1}: {username ? (
+          <>
+            <span className="font-medium text-white">{username}</span>
+            <span className="text-gray-400 ml-1">({truncateAddress(address)})</span>
+          </>
+        ) : (
+          truncateAddress(address)
+        )}
       </p>
     );
   });

@@ -20,7 +20,23 @@ model User {
   totalLosses        Int      @default(0)
   matchTokensEarned  Float    @default(0) // Total MATCH tokens earned
   ethEarned          Float    @default(0) // Total ETH earned
+  isBanned           Boolean  @default(false)
+  banReason          String?
+  banExpiry          DateTime?
   createdMatches     Match[]  @relation("Creator")
+}
+
+model BanRecord {
+  id          String    @id @default(uuid())
+  userId      String    // Discord ID
+  reason      String
+  bannedBy    String    // Admin Discord ID
+  bannedAt    DateTime  @default(now())
+  expiresAt   DateTime?
+  isActive    Boolean   @default(true)
+  
+  @@index([userId])
+  @@index([isActive])
 }
 
 model Match {
@@ -33,6 +49,7 @@ model Match {
   creatorId         String?
   creatorDiscordId  String?
   creatorAddress    String?
+  creatorName       String?     // Username of match creator
   stake             Float
   tokenName         String?
   totalPrize        Float
@@ -43,6 +60,7 @@ model Match {
   matchAmountUsd    Int?
   player2DiscordId  String?
   player2Address    String?
+  player2Name       String?     // Username of player2
   platform          String?
   winnerId          String?
   roomId            String?     @unique

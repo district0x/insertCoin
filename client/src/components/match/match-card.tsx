@@ -58,10 +58,10 @@ const MatchCard = ({ match, onHover }: MatchCardProps) => {
       <div className="flex justify-between items-start mb-4">
         <div>
           <h3 className="text-lg font-bold text-white mb-1">
-            {displayTitle}
+            {match.metadata?.game ? match.metadata.game : `${getMatchTypeLabel(match.matchType)} Match #${match.id.toString()}`}
           </h3>
           <p className="text-sm text-gray-300">
-            Latest competitive match
+            {match.metadata?.game ? `${match.metadata.game} Match` : `${getMatchTypeLabel(match.matchType)} Match #${match.id.toString()}`}
           </p>
         </div>
         <MatchStatusBadge match={match} />
@@ -130,7 +130,9 @@ const MatchCard = ({ match, onHover }: MatchCardProps) => {
           <p className="text-xs text-gray-400 mb-1">Donations</p>
           <p className="text-sm font-semibold text-green-400">
             {match.donatedAmount > BigInt(0)
-              ? `+${formatEther(match.donatedAmount)} ${match.isERC20 ? "MATCH" : "ETH"}`
+              ? match.isERC20
+                ? `+${formatEther(match.donatedAmount)} MATCH`
+                : `+$${(parseFloat(formatEther(match.donatedAmount)) * 3925.43).toFixed(2)} (${formatEther(match.donatedAmount)} ETH)`
               : "None"
             }
           </p>

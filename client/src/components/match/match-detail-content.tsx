@@ -7,6 +7,9 @@ import { MatchDonationDialog } from "./match-donation-dialog";
 import { MatchCloseDialog } from "./match-close-dialog";
 import { MatchPlayerInfo } from "./match-player-info";
 import { MatchPayoutInfo } from "./match-payout-info";
+import { MatchDonationInfo } from "./match-donation-info";
+import PayoutSplitCard from "./payout-split";
+
 
 interface MatchDetailContentProps {
   match: OnChainMatch;
@@ -24,6 +27,7 @@ interface MatchDetailContentProps {
   showCloseConfirmation: boolean;
   setShowCloseConfirmation: (show: boolean) => void;
   convertEthToUsd: (ethAmount: bigint) => number;
+  convertUsdToEth: (usdAmount: number) => bigint;
   winnerAddress?: string;
   winnerAmount?: string;
   poolAmount?: string;
@@ -45,6 +49,7 @@ const MatchDetailContent = ({
   showCloseConfirmation,
   setShowCloseConfirmation,
   convertEthToUsd,
+  convertUsdToEth,
   winnerAddress,
   winnerAmount,
   poolAmount,
@@ -129,6 +134,7 @@ const MatchDetailContent = ({
             maxPlayers={getMaxPlayers(match.matchType)}
             convertToUsd={convertEthToUsd}
             isERC20={match.isERC20}
+            usernames={[match.metadata?.creatorUsername || null]}
           />
         </div>
 
@@ -141,9 +147,18 @@ const MatchDetailContent = ({
             maxPlayers={getMaxPlayers(match.matchType)}
             convertToUsd={convertEthToUsd}
             isERC20={match.isERC20}
+            usernames={[match.metadata?.player2Username || null]}
           />
         </div>
       </div>
+
+      {/* Payouts Section */}
+      <div className="mt-6">
+        <PayoutSplitCard totalPool={match.totalAmount + match.donatedAmount} isERC20={match.isERC20} />
+      </div>
+
+      {/* Donations Section */}
+      <MatchDonationInfo match={match} convertToUsd={convertEthToUsd} />
 
       {/* Actions Section */}
       <div className="space-y-4">
@@ -175,6 +190,7 @@ const MatchDetailContent = ({
                 onDonationEthChange={onDonationEthChange}
                 onDonate={onDonate}
                 convertToUsd={convertEthToUsd}
+                convertUsdToEth={convertUsdToEth}
               />
 
               {status === "In Progress" && (

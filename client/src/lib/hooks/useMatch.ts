@@ -10,6 +10,23 @@ import { ONEVONE_ABI } from "@/lib/contracts/abis/ABI";
 
 // Remove the MTK_TOKEN and ERC20_APPROVAL_ABI constants as they're now imported
 
+// Environment variable validation
+const validateEnvironmentVariables = () => {
+  const missingVars = [];
+
+  if (!process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL) {
+    missingVars.push('NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL');
+  }
+
+  if (!process.env.NEXT_PUBLIC_CONTRACT_ADDRESS) {
+    missingVars.push('NEXT_PUBLIC_CONTRACT_ADDRESS');
+  }
+
+  if (missingVars.length > 0) {
+    throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+  }
+};
+
 export function useMatch() {
   const contract = useContract();
   const { user, sendTransaction } = usePrivy();
@@ -48,14 +65,22 @@ export function useMatch() {
       throw new Error('Wallet not connected. Please connect your wallet first.');
     }
 
-    const signer = await getEthersSigner();
-    const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
+    try {
+      // Validate environment variables
+      validateEnvironmentVariables();
 
-    if (!contractAddress) {
-      throw new Error('Contract address not configured');
+      const signer = await getEthersSigner();
+      const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
+
+      if (!contractAddress) {
+        throw new Error('Contract address not configured');
+      }
+
+      return new ethers.Contract(contractAddress, ONEVONE_ABI, signer);
+    } catch (error) {
+      console.error('Error creating ethers contract:', error);
+      throw error;
     }
-
-    return new ethers.Contract(contractAddress, ONEVONE_ABI, signer);
   };
 
   // Function to check and approve token allowance

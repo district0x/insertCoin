@@ -24,7 +24,11 @@ export interface OnChainMatch {
     platform: string | null;
     status: string;
     creatorDiscordId: string | null;
+    creatorAddress: string | null;
+    creatorUsername: string | null;
     opponentDiscordId: string | null;
+    player2Address: string | null;
+    player2Username: string | null;
     winnerId: string | null;
   };
 }

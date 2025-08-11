@@ -1,11 +1,30 @@
 import { NextResponse } from 'next/server';
 import { MatchStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { applyRateLimit } from '@/lib/middleware/rate-limit';
+import { z } from 'zod';
+
+const completeSchema = z.object({
+  matchId: z.union([z.string(), z.number()]),
+  winnerAddress: z.string()
+});
 
 // POST /api/matches/complete
 export async function POST(request: Request) {
+  const rateLimitResponse = applyRateLimit(request);
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
   try {
-    const { matchId, winnerAddress } = await request.json();
+    const body = await request.json();
+    const valid = completeSchema.safeParse(body);
+    if (!valid.success) {
+      return NextResponse.json(
+        { error: 'Match ID and winner address are required' },
+        { status: 400 }
+      );
+    }
+    const { matchId, winnerAddress } = valid.data as any;
     console.log(`[API] /api/matches/complete called with:`, { matchId, winnerAddress });
 
     if (!matchId || !winnerAddress) {
@@ -52,18 +71,64 @@ export async function POST(request: Request) {
     // Calculate earnings based on match type and token
     const isERC20 = (match as any).tokenName === 'MATCH';
 
-    // FIXED: Always use total prize pool (stake * 2) regardless of database value
-    const singlePlayerStake = match.stake || 0;
-    const totalPrize = singlePlayerStake * 2; // Always calculate correctly: stake * 2
+    // Get the actual total prize pool from smart contract (includes donations)
+    // We need to fetch this from the blockchain since donations are tracked on-chain
+    const { createPublicClient, http } = await import('viem');
+    const { baseSepolia } = await import('@/lib/config/chains');
+    const { ONEVONE_ABI } = await import('@/lib/contracts/abis/ABI');
+    const { formatEther } = await import('viem');
 
-    console.log(`[API] Payout calculation details:`, {
-      matchId: match.matchId,
-      singlePlayerStake,
-      matchTotalPrize: match.totalPrize,
-      calculatedTotalPrize: totalPrize,
-      isERC20,
-      tokenName: (match as any).tokenName
-    });
+    let totalPrize = 0;
+
+    try {
+      // Create public client
+      const publicClient = createPublicClient({
+        chain: baseSepolia,
+        transport: http(process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL!),
+      });
+
+      // Get contract address
+      const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0xC24Cea38b8D6e7303DFfA7d5bc309FE5f8FCaD08";
+
+      // Fetch match data from smart contract
+      const matchData = await publicClient.readContract({
+        address: contractAddress as `0x${string}`,
+        abi: ONEVONE_ABI,
+        functionName: 'matches',
+        args: [BigInt(matchId)]
+      }) as readonly [
+        `0x${string}`, // player1
+        `0x${string}`, // player2
+        bigint, // player1Amount
+        bigint, // player2Amount
+        bigint, // totalAmount
+        bigint, // donatedAmount
+        boolean, // isOpen
+        boolean, // isClosed
+        boolean, // isERC20
+        `0x${string}` // token
+      ];
+
+      // Calculate total prize pool: totalAmount + donatedAmount
+      const totalAmount = matchData[4]; // totalAmount from contract
+      const donatedAmount = matchData[5]; // donatedAmount from contract
+      totalPrize = Number(formatEther(totalAmount + donatedAmount));
+
+      console.log(`[API] Smart contract match data:`, {
+        matchId,
+        totalAmount: formatEther(totalAmount),
+        donatedAmount: formatEther(donatedAmount),
+        totalPrize,
+        isERC20
+      });
+
+    } catch (error) {
+      console.error('[API] Error fetching smart contract data:', error);
+      // Fallback to database calculation if smart contract call fails
+      const singlePlayerStake = match.stake || 0;
+      totalPrize = singlePlayerStake * 2;
+      console.log(`[API] Using fallback calculation:`, { totalPrize });
+    }
 
     const winnerEarnings = totalPrize * 0.8; // 80% to winner
     const platformFee = totalPrize * 0.1; // 10% to platform

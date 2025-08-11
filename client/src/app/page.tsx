@@ -16,6 +16,10 @@ import { useWalletConnection } from "@/lib/hooks/useWalletConnection";
 // Components
 import HeroSlider from "@/components/home/hero-slider";
 import StatsSection from "@/components/home/stats-section";
+import ExtendedStats from "@/components/home/extended-stats";
+import TrendingGames from "@/components/home/trending-games";
+import RecentWinners from "@/components/home/recent-winners";
+import HowItWorks from "@/components/home/how-it-works";
 import QuickActions from "@/components/home/quick-actions";
 import TournamentsAndStreaming from "@/components/home/tournaments-and-streaming";
 import ScrollToTop from "@/components/ui/scroll-to-top";
@@ -37,7 +41,13 @@ export default function Home() {
       )}
 
       <StatsSection />
+      <ExtendedStats />
+      <div className="container mx-auto px-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <TrendingGames />
+        <RecentWinners />
+      </div>
       <QuickActions />
+      <HowItWorks />
       <TournamentsAndStreaming />
       <ScrollToTop />
     </div>

@@ -47,8 +47,27 @@ class OneVOneBot(commands.Bot):
         # Load cogs AFTER database is connected
         await self.load_extension('src.bot.cogs.match')
         await self.load_extension('src.bot.cogs.utils')
+        await self.load_extension('src.bot.cogs.admin')
         # Removed wallet_verification cog - wallet linking system removed
         logger.info('Bot cogs loaded successfully')
+        
+        # Set up event listeners for new channels (Banned role permissions)
+        @self.event
+        async def on_guild_channel_create(channel):
+            """Automatically apply Banned role permissions to new channels."""
+            try:
+                if isinstance(channel, (discord.TextChannel, discord.VoiceChannel)):
+                    banned_role = discord.utils.get(channel.guild.roles, name="Banned")
+                    if banned_role:
+                        await channel.set_permissions(banned_role, 
+                            read_messages=False,
+                            send_messages=False,
+                            connect=False,
+                            speak=False
+                        )
+                        logger.info(f"Applied Banned role permissions to new channel: {channel.name}")
+            except Exception as e:
+                logger.warning(f"Could not apply Banned role to new channel {channel.name}: {e}")
         
         # Sync commands with Discord
         guild_id = os.getenv('DISCORD_GUILD_ID')

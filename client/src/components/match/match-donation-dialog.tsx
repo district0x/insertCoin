@@ -22,6 +22,7 @@ interface MatchDonationDialogProps {
   onDonationEthChange: (amount: bigint) => void;
   onDonate: () => Promise<void>;
   convertToUsd: (ethAmount: bigint) => number;
+  convertUsdToEth: (usdAmount: number) => bigint;
 }
 
 export function MatchDonationDialog({
@@ -31,9 +32,11 @@ export function MatchDonationDialog({
   onDonationEthChange,
   onDonate,
   convertToUsd,
+  convertUsdToEth,
 }: MatchDonationDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [databaseStatus, setDatabaseStatus] = useState<string | undefined>();
+  const [inputValue, setInputValue] = useState<string>("");
 
   // Fetch database status for this match
   useEffect(() => {
@@ -65,6 +68,13 @@ export function MatchDonationDialog({
 
   const canDonate = status === "Open" || status === "In Progress";
 
+  // Reset input value when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      setInputValue("");
+    }
+  }, [isOpen]);
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
@@ -81,18 +91,29 @@ export function MatchDonationDialog({
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="donation-amount">Donation Amount ({match.isERC20 ? "MATCH" : "ETH"})</Label>
+            <Label htmlFor="donation-amount">Donation Amount ({match.isERC20 ? "MATCH" : "USD"})</Label>
             <Input
               id="donation-amount"
               type="number"
               step="0.01"
               min="0"
-              placeholder={`Enter amount in ${match.isERC20 ? "MATCH" : "ETH"}`}
-              value={formatEther(donationEthAmount)}
+              placeholder={`Enter amount in ${match.isERC20 ? "MATCH" : "USD"}`}
+              value={inputValue}
               onChange={(e) => {
+                const newValue = e.target.value;
+                setInputValue(newValue);
+
                 try {
-                  const value = parseEther(e.target.value || "0");
-                  onDonationEthChange(value);
+                  if (match.isERC20) {
+                    // For MATCH tokens, parse the input value
+                    const value = parseEther(newValue || "0");
+                    onDonationEthChange(value);
+                  } else {
+                    // For ETH matches, convert USD to ETH
+                    const usdAmount = parseFloat(newValue || "0");
+                    const ethAmount = convertUsdToEth(usdAmount);
+                    onDonationEthChange(ethAmount);
+                  }
                 } catch {
                   // Invalid input, ignore
                 }
@@ -100,7 +121,7 @@ export function MatchDonationDialog({
             />
             {!match.isERC20 && (
               <p className="text-sm text-muted-foreground">
-                ≈ ${convertToUsd(donationEthAmount).toFixed(2)} USD
+                ≈ {formatEther(donationEthAmount)} ETH
               </p>
             )}
             {match.isERC20 && (
@@ -114,6 +135,7 @@ export function MatchDonationDialog({
             disabled={isProcessing || donationEthAmount <= 0n}
             onClick={async () => {
               await onDonate();
+              setInputValue(""); // Reset input after donation
               setIsOpen(false);
             }}
           >

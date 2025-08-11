@@ -23,11 +23,27 @@ model User {
   totalLosses           Int                     @default(0)
   ethEarned             Float                   @default(0) // Total ETH earned
   matchTokensEarned     Float                   @default(0) // Total MATCH tokens earned
+  isBanned              Boolean                 @default(false)
+  banReason             String?
+  banExpiry             DateTime?
   matchesCreated        Match[]                 @relation("Creator")
   participatedMatches   Match[]                 @relation("Participant")
   TeamMember            TeamMember[]
   TournamentParticipant TournamentParticipant[]
   verificationTransactions VerificationTransaction[]
+}
+
+model BanRecord {
+  id          String    @id @default(uuid())
+  userId      String    // Discord ID
+  reason      String
+  bannedBy    String    // Admin Discord ID
+  bannedAt    DateTime  @default(now())
+  expiresAt   DateTime?
+  isActive    Boolean   @default(true)
+  
+  @@index([userId])
+  @@index([isActive])
 }
 
 model Match {

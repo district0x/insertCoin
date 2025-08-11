@@ -15,11 +15,11 @@ export default function QuickActions() {
                         Quick Actions
                     </h2>
                     <div className="flex justify-center gap-4 flex-wrap">
-                        <Link href="/matches/create">
+                        <a href="https://discord.gg/8RYncgpCYc" target="_blank" rel="noopener noreferrer">
                             <Button className="bg-red-600 hover:bg-red-700 px-8 py-3 text-lg transition-all duration-300 hover:scale-105 hover:shadow-lg">
                                 Create Match
                             </Button>
-                        </Link>
+                        </a>
                         <Link href="/matches">
                             <Button variant="outline" className="border-red-500/20 text-red-400 hover:bg-red-500/10 px-8 py-3 text-lg transition-all duration-300 hover:scale-105 hover:shadow-lg">
                                 Browse Matches

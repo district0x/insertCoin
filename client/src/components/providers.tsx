@@ -3,7 +3,6 @@
 import { PrivyProvider } from "@privy-io/react-auth";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { StatsProvider } from "@/contexts/StatsContext";
 
 const queryClient = new QueryClient();
 
@@ -85,9 +84,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         }}
       >
         <QueryClientProvider client={queryClient}>
-          <StatsProvider>
-            {children}
-          </StatsProvider>
+          {children}
         </QueryClientProvider>
       </PrivyProvider>
     </ClientOnly>

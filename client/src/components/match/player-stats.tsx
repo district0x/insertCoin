@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { Trophy, Users } from "lucide-react";
+import { Trophy, Users, Coins } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface PlayerStats {
     address: string;
+    username: string | null;
     totalWins: number;
     totalMatches: number;
+    matchTokensEarned: number;
 }
 
 const PlayerStats = () => {
@@ -120,15 +122,29 @@ const PlayerStats = () => {
                             <div className="flex items-center justify-center w-6 h-6 bg-red-500/20 rounded-full text-xs font-bold text-red-400">
                                 {index + 1}
                             </div>
-                            <span className="font-mono text-sm text-gray-300">
-                                {truncateAddress(player.address)}
-                            </span>
+                            <div className="flex flex-col">
+                                {player.username ? (
+                                    <span className="font-semibold text-white text-sm">
+                                        {player.username}
+                                    </span>
+                                ) : null}
+                                <span className="font-mono text-xs text-gray-400">
+                                    {truncateAddress(player.address)}
+                                </span>
+                            </div>
                         </div>
                         <div className="text-right">
-                            <span className="font-semibold text-red-400 text-sm">
-                                {player.totalWins}
-                            </span>
-                            <span className="text-xs text-gray-400 ml-1">wins</span>
+                            <div className="flex items-center gap-2">
+                                <span className="font-semibold text-red-400 text-sm">
+                                    {player.totalWins} wins
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-1 mt-1">
+                                <Coins className="h-3 w-3 text-yellow-400" />
+                                <span className="text-xs text-yellow-400 font-medium">
+                                    {player.matchTokensEarned} MATCH
+                                </span>
+                            </div>
                         </div>
                     </div>
                 ))}

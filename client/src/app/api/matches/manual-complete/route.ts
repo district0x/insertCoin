@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import { MatchStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { applyRateLimit } from '@/lib/middleware/rate-limit';
 
 // POST /api/matches/manual-complete
 export async function POST(request: Request) {
+    const rateLimitResponse = applyRateLimit(request);
+    if (rateLimitResponse) {
+        return rateLimitResponse;
+    }
     try {
         const { matchId, winnerAddress, reason } = await request.json();
         console.log(`[API] Manual match completion called with:`, { matchId, winnerAddress, reason });
@@ -51,12 +56,18 @@ export async function POST(request: Request) {
 
         // Calculate earnings based on match type and token
         const isERC20 = (match as any).tokenName === 'MATCH';
-        const singlePlayerStake = match.stake || 0;
-        const totalPrize = singlePlayerStake * 2; // FIXED: Always use total prize pool (stake * 2)
+
+        // Use database totalPrize if available, otherwise calculate from stake
+        let totalPrize = match.totalPrize || 0;
+        if (totalPrize === 0) {
+            const singlePlayerStake = match.stake || 0;
+            totalPrize = singlePlayerStake * 2;
+        }
+
         const winnerEarnings = totalPrize * 0.8; // 80% to winner
 
         console.log(`[API] Manual completion payout calculation:`, {
-            singlePlayerStake,
+            singlePlayerStake: match.stake,
             matchTotalPrize: match.totalPrize,
             calculatedTotalPrize: totalPrize,
             winnerEarnings,

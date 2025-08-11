@@ -4,9 +4,14 @@ import { baseSepolia } from '@/lib/config/chains';
 import { ONEVONE_ABI } from '@/lib/contracts/abis/ABI';
 import { prisma } from '@/lib/prisma';
 import { MatchStatus, MatchType } from '@prisma/client';
+import { applyRateLimit } from '@/lib/middleware/rate-limit';
 
 // POST /api/sync-match
 export async function POST(request: Request) {
+    const rateLimitResponse = applyRateLimit(request);
+    if (rateLimitResponse) {
+        return rateLimitResponse;
+    }
     try {
         const { matchId, walletAddress } = await request.json();
         console.log(`[API] Syncing match ${matchId} for wallet ${walletAddress}`);
@@ -62,10 +67,9 @@ export async function POST(request: Request) {
         console.log(`[API] User upserted:`, user.id);
 
         // Determine match type and token info
-        const isERC20 = blockchainMatch[8]; // isERC20 field
-        const tokenAddress = blockchainMatch[9]; // token address
+        const isERC20 = (blockchainMatch as any)[8]; // isERC20 field
         const tokenName = isERC20 ? 'MATCH' : 'ETH';
-        const stake = Number(blockchainMatch[2]); // player1Amount
+        const stake = Number((blockchainMatch as any)[2]); // player1Amount
 
         // Create match in database
         const match = await prisma.match.create({
@@ -97,16 +101,16 @@ export async function POST(request: Request) {
                 creatorAddress: match.creatorAddress
             },
             blockchain: {
-                player1: blockchainMatch[0],
-                player2: blockchainMatch[1],
-                player1Amount: blockchainMatch[2].toString(),
-                player2Amount: blockchainMatch[3].toString(),
-                totalAmount: blockchainMatch[4].toString(),
-                donatedAmount: blockchainMatch[5].toString(),
-                isOpen: blockchainMatch[6],
-                isClosed: blockchainMatch[7],
-                isERC20: blockchainMatch[8],
-                token: blockchainMatch[9]
+                player1: (blockchainMatch as any)[0],
+                player2: (blockchainMatch as any)[1],
+                player1Amount: (blockchainMatch as any)[2].toString(),
+                player2Amount: (blockchainMatch as any)[3].toString(),
+                totalAmount: (blockchainMatch as any)[4].toString(),
+                donatedAmount: (blockchainMatch as any)[5].toString(),
+                isOpen: (blockchainMatch as any)[6],
+                isClosed: (blockchainMatch as any)[7],
+                isERC20: (blockchainMatch as any)[8],
+                token: (blockchainMatch as any)[9]
             }
         });
 

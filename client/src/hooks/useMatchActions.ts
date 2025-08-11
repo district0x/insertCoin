@@ -253,7 +253,24 @@ export function useMatchActions({
             `0x${string}` // token
           ];
 
-        const newDonationAmount = updatedMatch[5] - displayMatch.donatedAmount;
+        // Use the actual donation amount that was sent
+        const newDonationAmount = donationEthAmount;
+        const newTotalAmount = updatedMatch[4]; // totalAmount is at index 4
+
+        console.log('[DONATION-SUCCESS] Debug info:', {
+          donationEthAmount: donationEthAmount.toString(),
+          newDonationAmount: newDonationAmount.toString(),
+          displayMatchDonatedAmount: displayMatch.donatedAmount.toString(),
+          updatedMatchDonatedAmount: updatedMatch[5].toString(),
+          newTotalAmount: newTotalAmount.toString()
+        });
+
+        // Update optimistic match data with new totals
+        setOptimisticMatch({
+          ...displayMatch,
+          totalAmount: newTotalAmount,
+          donatedAmount: updatedMatch[5]
+        });
 
         setLastDonationAmount(newDonationAmount);
         setShowSuccessDialog(true);

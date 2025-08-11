@@ -1,19 +1,31 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { updateTournamentStatus } from '@/lib/services/tournament';
 import { TournamentStatus as PrismaTournamentStatus } from '@prisma/client';
+import { applyRateLimit } from '@/lib/middleware/rate-limit';
+import { z } from 'zod';
 
-export async function PUT(request: Request) {
+const statusSchema = z.object({
+    tournamentId: z.union([z.string(), z.number()]),
+    status: z.string()
+});
+
+export async function PUT(request: NextRequest) {
+    // Apply rate limiting
+    const rateLimitResponse = applyRateLimit(request);
+    if (rateLimitResponse) {
+        return rateLimitResponse;
+    }
+
     try {
         const data = await request.json();
-        const { tournamentId, status } = data;
-
-        // Validate the required fields
-        if (!tournamentId || !status) {
+        const parsed = statusSchema.safeParse(data);
+        if (!parsed.success) {
             return NextResponse.json(
                 { error: 'Missing required fields' },
                 { status: 400 }
             );
         }
+        const { tournamentId, status } = parsed.data as any;
 
         // Convert string status to Prisma enum value
         let prismaStatus: PrismaTournamentStatus;

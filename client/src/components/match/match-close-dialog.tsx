@@ -10,6 +10,7 @@ import {
 import { Loader2 } from "lucide-react";
 import { OnChainMatch } from "@/types/match";
 import { formatEther } from "viem";
+import PayoutSplitCard from "./payout-split";
 
 interface MatchCloseDialogProps {
   match: OnChainMatch;
@@ -35,6 +36,8 @@ export function MatchCloseDialog({
   const truncateAddress = (address: string) => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
+
+  const totalPool = match.totalAmount + match.donatedAmount;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -79,6 +82,9 @@ export function MatchCloseDialog({
               </span>
             </Button>
           </div>
+
+          <PayoutSplitCard totalPool={totalPool} isERC20={match.isERC20} />
+
           <Button
             className="w-full"
             disabled={isProcessing || !selectedWinner}

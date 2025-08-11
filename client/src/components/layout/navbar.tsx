@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { Menu, X, LogOut, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useMatchTokenBalance } from "@/hooks/useMatchTokenBalance";
 
 interface NavItem {
   href: string;
@@ -24,6 +25,9 @@ export function Navbar() {
   const [isOpen, setIsOpen] = React.useState<boolean>(false);
   const pathname = usePathname();
   const { login, logout, authenticated, user, ready } = usePrivy();
+  const addr = (user?.wallet?.address as `0x${string}` | undefined) || undefined;
+  const { balance: matchBalance } = useMatchTokenBalance(addr || null);
+  const walletLabel = user?.email?.address || (addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : "User");
 
   const isActive = (path: string): boolean => pathname === path;
 
@@ -91,8 +95,11 @@ export function Navbar() {
                 <div className="flex items-center gap-3">
                   <div className="hidden sm:flex items-center gap-2 text-sm">
                     <User className="h-4 w-4" />
-                    <span>
-                      {user?.email?.address || user?.wallet?.address?.slice(0, 6) + "..." + user?.wallet?.address?.slice(-4) || "User"}
+                    <span className="flex items-center gap-2">
+                      {walletLabel}
+                      {addr && matchBalance !== null ? (
+                        <span className="text-xs text-gray-400">· {matchBalance} MATCH</span>
+                      ) : null}
                     </span>
                   </div>
                   <Button
@@ -162,7 +169,12 @@ export function Navbar() {
                 {authenticated ? (
                   <div className="space-y-2">
                     <div className="px-3 py-2 text-sm text-gray-300">
-                      {user?.email?.address || user?.wallet?.address?.slice(0, 6) + "..." + user?.wallet?.address?.slice(-4) || "User"}
+                      <span className="flex items-center gap-2">
+                        {walletLabel}
+                        {addr && matchBalance !== null ? (
+                          <span className="text-xs text-gray-400">· {matchBalance} MATCH</span>
+                        ) : null}
+                      </span>
                     </div>
                     <Button
                       onClick={() => {

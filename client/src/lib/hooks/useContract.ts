@@ -8,6 +8,19 @@ import { useMemo } from "react";
 // Base Sepolia contract address as fallback
 const FALLBACK_CONTRACT_ADDRESS = "0xC24Cea38b8D6e7303DFfA7d5bc309FE5f8FCaD08";
 
+// Environment variable validation
+const validateEnvironmentVariables = () => {
+  const missingVars = [];
+
+  if (!process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL) {
+    missingVars.push('NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL');
+  }
+
+  if (missingVars.length > 0) {
+    throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+  }
+};
+
 export function useContract() {
   const { user, authenticated } = usePrivy();
 
@@ -17,12 +30,17 @@ export function useContract() {
       return null;
     }
 
-    const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || FALLBACK_CONTRACT_ADDRESS;
-
-    console.log("useContract: Creating contract with address", contractAddress);
-    console.log("useContract: Chain", baseSepolia.name, baseSepolia.id);
+    let contractAddress: string | undefined;
 
     try {
+      // Validate environment variables
+      validateEnvironmentVariables();
+
+      contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || FALLBACK_CONTRACT_ADDRESS;
+
+      console.log("useContract: Creating contract with address", contractAddress);
+      console.log("useContract: Chain", baseSepolia.name, baseSepolia.id);
+
       if (!contractAddress) {
         throw new Error("Contract address is not defined");
       }

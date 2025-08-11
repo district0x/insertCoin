@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useParams } from "next/navigation";
 import { useContract } from "@/lib/hooks/useContract";
-import { createPublicClient, http } from "viem";
+import { createPublicClient, http, formatEther } from "viem";
 import { useWalletConnection } from "@/lib/hooks/useWalletConnection";
 import { useVisibilityChange } from "@/lib/hooks/useVisibilityChange";
 import { useEthPrice } from "@/lib/hooks/useEthPrice";
@@ -32,7 +32,7 @@ export default function MatchPage() {
   }, []);
 
   const { address } = useWalletConnection();
-  const { convertEthToUsd } = useEthPrice();
+  const { convertEthToUsd, convertUsdToEth } = useEthPrice();
   const isVisible = useVisibilityChange();
 
   // State for winner information
@@ -40,6 +40,15 @@ export default function MatchPage() {
     winnerAddress?: string;
     winnerAmount?: string;
     poolAmount?: string;
+  }>({});
+
+  // State for match metadata (original USD amount and game info)
+  const [matchMetadata, setMatchMetadata] = useState<{
+    matchAmountUsd?: number;
+    game?: string;
+    gameCategory?: string;
+    creatorUsername?: string;
+    player2Username?: string;
   }>({});
 
   // Debug logging
@@ -81,6 +90,33 @@ export default function MatchPage() {
     };
 
     fetchWinnerInfo();
+  }, [matchId]);
+
+  // Fetch match metadata for original USD amount
+  React.useEffect(() => {
+    const fetchMatchMetadata = async () => {
+      if (!matchId) return;
+
+      try {
+        const response = await fetch(`/api/matches/metadata?matchIds=${matchId}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.metadata && data.metadata[matchId]) {
+            setMatchMetadata({
+              matchAmountUsd: data.metadata[matchId].matchAmountUsd,
+              game: data.metadata[matchId].game,
+              gameCategory: data.metadata[matchId].gameCategory,
+              creatorUsername: data.metadata[matchId].creatorUsername,
+              player2Username: data.metadata[matchId].player2Username
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching match metadata:", error);
+      }
+    };
+
+    fetchMatchMetadata();
   }, [matchId]);
 
   // Initialize match actions
@@ -135,12 +171,31 @@ export default function MatchPage() {
     return <MatchDetailSkeleton />;
   }
 
+  // Create a merged match object with metadata
+  const matchWithMetadata = {
+    ...displayMatch,
+    metadata: {
+      game: matchMetadata.game || null,
+      gameCategory: matchMetadata.gameCategory || null,
+      platform: null,
+      status: displayMatch.isOpen ? 'OPEN' : 'COMPLETED',
+      creatorDiscordId: null,
+      creatorAddress: null,
+      creatorUsername: matchMetadata.creatorUsername || null,
+      opponentDiscordId: null,
+      player2Address: null,
+      player2Username: matchMetadata.player2Username || null,
+      winnerId: null
+    }
+  };
+
   console.log("[MatchPage] Rendering match data:", {
     id: displayMatch.id.toString(),
     type: displayMatch.matchType,
     totalAmount: displayMatch.totalAmount.toString(),
     teamA: displayMatch.teamA,
     teamB: displayMatch.teamB,
+    metadata: matchWithMetadata.metadata
   });
 
   // Pass a callback to handleCloseMatch to set the result
@@ -178,13 +233,16 @@ export default function MatchPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <MatchDetailHeader
-        match={displayMatch}
+        match={matchWithMetadata}
         convertEthToUsd={convertEthToUsd}
+        originalUsdAmount={matchMetadata.matchAmountUsd}
+        game={matchMetadata.game}
+        gameCategory={matchMetadata.gameCategory}
       />
 
       <Card>
         <MatchDetailContent
-          match={displayMatch}
+          match={matchWithMetadata}
           isProcessing={isProcessing}
           userAddress={address?.startsWith('0x') ? address as `0x${string}` : undefined}
           donationEthAmount={donationEthAmount}
@@ -199,6 +257,7 @@ export default function MatchPage() {
           showCloseConfirmation={showCloseConfirmation}
           setShowCloseConfirmation={setShowCloseConfirmation}
           convertEthToUsd={convertEthToUsd}
+          convertUsdToEth={convertUsdToEth}
           winnerAddress={winnerInfo.winnerAddress}
           winnerAmount={winnerInfo.winnerAmount}
           poolAmount={winnerInfo.poolAmount}
@@ -235,29 +294,50 @@ export default function MatchPage() {
           <div className="modal-content">
             <h2>Match Results</h2>
             <div className="space-y-4">
-              <div>
-                <h3 className="font-semibold mb-2">Winner</h3>
-                <p className="text-sm text-muted-foreground">Address: {winnerInfo.winnerAddress}</p>
-                <p className="font-semibold">
-                  Amount: {winnerInfo.winnerAmount} {displayMatch.isERC20 ? "MATCH" : "ETH"}
-                </p>
-                {!displayMatch.isERC20 && (
-                  <p className="text-sm text-muted-foreground">
-                    ≈ ${convertEthToUsd(BigInt(Math.floor(Number(winnerInfo.winnerAmount || "0") * 1e18))).toFixed(2)} USD
-                  </p>
-                )}
-              </div>
-              <div>
-                <h3 className="font-semibold mb-2">Platform Fees</h3>
-                <p className="text-sm">
-                  Contract Fee: {winnerInfo.poolAmount} {displayMatch.isERC20 ? "MATCH" : "ETH"}
-                </p>
-                {!displayMatch.isERC20 && (
-                  <p className="text-sm text-muted-foreground">
-                    ≈ ${convertEthToUsd(BigInt(Math.floor(Number(winnerInfo.poolAmount || "0") * 1e18))).toFixed(2)} USD
-                  </p>
-                )}
-              </div>
+              {(() => {
+                // Calculate correct amounts
+                const totalStake = displayMatch.player1Amount + displayMatch.player2Amount;
+                const totalPrizePool = totalStake + displayMatch.donatedAmount;
+                const winnerShare = (totalPrizePool * 80n) / 100n;
+                const contractFee = (totalPrizePool * 10n) / 100n;
+                const multisigShare = (totalPrizePool * 10n) / 100n;
+
+                return (
+                  <>
+                    <div>
+                      <h3 className="font-semibold mb-2">Winner</h3>
+                      <p className="text-sm text-muted-foreground">Address: {winnerInfo.winnerAddress}</p>
+                      <p className="font-semibold">
+                        Amount: {formatEther(winnerShare)} {displayMatch.isERC20 ? "MATCH" : "ETH"}
+                      </p>
+                      {!displayMatch.isERC20 && (
+                        <p className="text-sm text-muted-foreground">
+                          ≈ ${convertEthToUsd(winnerShare).toFixed(2)} USD
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold mb-2">Platform Fees</h3>
+                      <p className="text-sm">
+                        Contract Fee: {formatEther(contractFee)} {displayMatch.isERC20 ? "MATCH" : "ETH"}
+                      </p>
+                      {!displayMatch.isERC20 && (
+                        <p className="text-sm text-muted-foreground">
+                          ≈ ${convertEthToUsd(contractFee).toFixed(2)} USD
+                        </p>
+                      )}
+                      <p className="text-sm">
+                        Multisig: {formatEther(multisigShare)} {displayMatch.isERC20 ? "MATCH" : "ETH"}
+                      </p>
+                      {!displayMatch.isERC20 && (
+                        <p className="text-sm text-muted-foreground">
+                          ≈ ${convertEthToUsd(multisigShare).toFixed(2)} USD
+                        </p>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
             <button onClick={() => setWinnerInfo({})}>Close</button>
           </div>

@@ -167,6 +167,27 @@ export async function updateMatchWithWallet({
 
                 console.log(`[DB] Discord match - upserting user with Discord ID ${match.creatorDiscordId} and wallet ${walletAddress}`);
 
+                // Fetch user's username for storage
+                const userWithUsername = await tx.user.findUnique({
+                    where: { address: walletAddress },
+                    select: { username: true, discordId: true }
+                });
+
+                let creatorName = null;
+                if (userWithUsername?.username) {
+                    creatorName = userWithUsername.username;
+                } else if (userWithUsername?.discordId) {
+                    console.log(`[DB] User has Discord ID but no username: ${userWithUsername.discordId}`);
+                }
+
+                console.log(`[DB] Creator username lookup:`, {
+                    walletAddress,
+                    userWithUsername,
+                    creatorName,
+                    hasUsername: !!creatorName,
+                    hasDiscordId: !!userWithUsername?.discordId
+                });
+
                 // Update match with creator and status
                 console.log(`[DB] Updating match ${roomId} with creator ID ${user.id}`);
 
@@ -188,6 +209,7 @@ export async function updateMatchWithWallet({
                     data: {
                         creatorId: user.id,
                         creatorAddress: walletAddress,
+                        creatorName: creatorName, // ADD: Store creator username
                         status: MatchStatus.OPEN,
                         stake: finalStakeAmount,
                         totalPrize: finalStakeAmount * 2, // FIXED: Use total prize pool (stake * 2)
@@ -327,6 +349,31 @@ export async function createMatchInDb({
         });
         console.log(`[DB] User upserted: ${JSON.stringify(user)}`);
 
+        // Fetch user's username for storage - try multiple approaches
+        let creatorName = null;
+
+        // First, try to get username by address
+        const userWithUsername = await prisma.user.findUnique({
+            where: { address: walletAddress },
+            select: { username: true, discordId: true }
+        });
+
+        if (userWithUsername?.username) {
+            creatorName = userWithUsername.username;
+        } else if (userWithUsername?.discordId) {
+            // If no username but has Discord ID, try to get username from Discord
+            // This is a fallback - in a real system, you'd query Discord API
+            console.log(`[DB] User has Discord ID but no username: ${userWithUsername.discordId}`);
+        }
+
+        console.log(`[DB] Creator username lookup:`, {
+            walletAddress,
+            userWithUsername,
+            creatorName,
+            hasUsername: !!creatorName,
+            hasDiscordId: !!userWithUsername?.discordId
+        });
+
         // Check if match already exists (created by Discord bot)
         const existingMatch = await prisma.match.findUnique({
             where: { matchId },
@@ -342,6 +389,9 @@ export async function createMatchInDb({
                     matchType,
                     status: MatchStatus.OPEN,
                     creatorId: user.id,
+                    creatorAddress: walletAddress,
+                    creatorDiscordId: user.discordId,
+                    creatorName: creatorName, // ADD: Store creator username
                     stake: parseFloat(stake),
                     totalPrize: parseFloat(stake) * 2, // FIXED: Use total prize pool (stake * 2)
                     tokenName: tokenName || null,
@@ -360,6 +410,9 @@ export async function createMatchInDb({
                     matchType,
                     status: MatchStatus.OPEN,
                     creatorId: user.id,
+                    creatorAddress: walletAddress,
+                    creatorDiscordId: user.discordId,
+                    creatorName: creatorName, // ADD: Store creator username
                     stake: parseFloat(stake),
                     totalPrize: parseFloat(stake) * 2, // FIXED: Use total prize pool (stake * 2)
                     tokenName: tokenName || null,
@@ -383,85 +436,72 @@ export async function createMatchInDb({
         });
 
         // Create team records based on match type
-        if (matchType === 'ONE_V_ONE') {
-            // For 1v1 matches, create two teams (team A and team B)
-            console.log(`[DB] Creating Team A for 1v1 match`);
-            await prisma.team.create({
-                data: {
+        if (match.matchType === 'ONE_V_ONE') {
+            // For 1v1, create a single team for the creator
+            await prisma.team.upsert({
+                where: {
                     matchId: match.id,
-                    isTeamA: true,
-                    members: {
-                        create: {
-                            userId: user.id
-                        }
-                    }
+                    isTeamA: true
+                },
+                update: {},
+                create: {
+                    matchId: match.id,
+                    isTeamA: true
                 }
             });
-
-            console.log(`[DB] Creating Team B for 1v1 match`);
-            await prisma.team.create({
-                data: {
+        } else if (match.matchType === 'TWO_V_TWO') {
+            // For 2v2, create both teams
+            await prisma.team.upsert({
+                where: {
+                    matchId: match.id,
+                    isTeamA: true
+                },
+                update: {},
+                create: {
+                    matchId: match.id,
+                    isTeamA: true
+                }
+            });
+            await prisma.team.upsert({
+                where: {
+                    matchId: match.id,
+                    isTeamA: false
+                },
+                update: {},
+                create: {
                     matchId: match.id,
                     isTeamA: false
                 }
             });
-
-            console.log(`[DB] Teams created for 1v1 match`);
-        } else if (matchType === 'TWO_V_TWO') {
-            // For 2v2 matches, create two teams with initially one member in team A
-            console.log(`[DB] Creating Team A for 2v2 match`);
-            await prisma.team.create({
-                data: {
+        } else if (match.matchType === 'FIVE_V_FIVE') {
+            // For 5v5, create both teams
+            await prisma.team.upsert({
+                where: {
                     matchId: match.id,
-                    isTeamA: true,
-                    members: {
-                        create: {
-                            userId: user.id
-                        }
-                    }
+                    isTeamA: true
+                },
+                update: {},
+                create: {
+                    matchId: match.id,
+                    isTeamA: true
                 }
             });
-
-            console.log(`[DB] Creating Team B for 2v2 match`);
-            await prisma.team.create({
-                data: {
+            await prisma.team.upsert({
+                where: {
+                    matchId: match.id,
+                    isTeamA: false
+                },
+                update: {},
+                create: {
                     matchId: match.id,
                     isTeamA: false
                 }
             });
-
-            console.log(`[DB] Teams created for 2v2 match`);
-        } else if (matchType === 'FIVE_V_FIVE') {
-            // For 5v5 matches, create two teams with initially one member in team A
-            console.log(`[DB] Creating Team A for 5v5 match`);
-            await prisma.team.create({
-                data: {
-                    matchId: match.id,
-                    isTeamA: true,
-                    members: {
-                        create: {
-                            userId: user.id
-                        }
-                    }
-                }
-            });
-
-            console.log(`[DB] Creating Team B for 5v5 match`);
-            await prisma.team.create({
-                data: {
-                    matchId: match.id,
-                    isTeamA: false
-                }
-            });
-
-            console.log(`[DB] Teams created for 5v5 match`);
         }
 
         return match;
     } catch (error) {
-        // Properly format the error for logging
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        console.error("[DB] Error processing match:", { error: errorMessage });
+        console.error("[DB] Error creating match:", error);
         throw error;
     }
 }
@@ -545,24 +585,26 @@ export async function joinMatchInDb({
         if (match.matchType === 'ONE_V_ONE') {
             console.log(`[DB] Updating player2 information for 1v1 match ${matchId}`);
 
-            // Get user's Discord ID if available
-            const userWithDiscord = await prisma.user.findUnique({
+            // Get user's Discord ID and username if available
+            const userWithDetails = await prisma.user.findUnique({
                 where: { id: user.id },
-                select: { discordId: true }
+                select: { discordId: true, username: true }
             });
 
             await prisma.match.update({
                 where: { matchId },
                 data: {
-                    opponentDiscordId: userWithDiscord?.discordId || null,
+                    player2DiscordId: userWithDetails?.discordId || null,
                     player2Address: walletAddress,
+                    player2Name: userWithDetails?.username || null, // ADD: Store player2 username
                     status: 'OPEN' // Update status to OPEN when second player joins
                 }
             });
 
             console.log(`[DB] Updated match ${matchId} with player2 info:`, {
-                opponentDiscordId: userWithDiscord?.discordId,
-                player2Address: walletAddress
+                player2DiscordId: userWithDetails?.discordId,
+                player2Address: walletAddress,
+                player2Username: userWithDetails?.username
             });
         }
 

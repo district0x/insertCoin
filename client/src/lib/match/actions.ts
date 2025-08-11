@@ -652,16 +652,24 @@ export async function donateToMatch(
     }
   }
 
-  // For ETH donations, use the original approach
-  const { request } = await publicClient.simulateContract({
-    address: contract.address,
-    abi: contract.abi,
-    functionName: "donateToMatch",
-    args: [matchId, amount],
-    value: amount, // Full ETH value for ETH donations
-  });
+  // For ETH donations, use ethers.js approach (same as ERC20)
+  console.log(`[DONATE-MATCH] Using ethers.js for ETH donation transaction...`);
 
-  return sendTransaction(request);
+  if (typeof window !== "undefined" && (window as any).ethereum) {
+    const provider = new ethers.providers.Web3Provider((window as any).ethereum);
+    const signer = provider.getSigner();
+
+    const contractInstance = new ethers.Contract(contract.address, contract.abi, signer);
+    const tx = await contractInstance.donateToMatch(matchId, amount, { value: amount }); // Full ETH value for ETH donations
+
+    console.log(`[DONATE-MATCH] ETH donation transaction hash: ${tx.hash}`);
+    const receipt = await tx.wait();
+    console.log(`[DONATE-MATCH] ETH donation confirmed in block: ${receipt.blockNumber}`);
+
+    return receipt.transactionHash as `0x${string}`;
+  } else {
+    throw new Error("No wallet connected for ETH donation");
+  }
 }
 
 export async function closeMatch(

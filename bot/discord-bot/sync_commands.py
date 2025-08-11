@@ -36,6 +36,7 @@ async def sync_commands():
         # Load the match cog
         await bot.load_extension('src.bot.cogs.match')
         await bot.load_extension('src.bot.cogs.utils')
+        await bot.load_extension('src.bot.cogs.admin')
         logger.info('Cogs loaded')
         
         # Sync commands

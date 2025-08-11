@@ -8,6 +8,19 @@ import { ONEVONE_ABI } from "@/lib/contracts/abis/ABI";
 // Base Sepolia contract address as fallback
 const FALLBACK_CONTRACT_ADDRESS = "0xC24Cea38b8D6e7303DFfA7d5bc309FE5f8FCaD08";
 
+// Environment variable validation
+const validateEnvironmentVariables = () => {
+    const missingVars = [];
+
+    if (!process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL) {
+        missingVars.push('NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL');
+    }
+
+    if (missingVars.length > 0) {
+        throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+    }
+};
+
 interface StatsData {
     matchesCreated: string;
     matchingPool: string;
@@ -52,10 +65,19 @@ export function StatsProvider({ children }: { children: React.ReactNode }) {
 
     // Create a single public client instance
     const publicClient = React.useMemo(() => {
-        return createPublicClient({
-            chain: baseSepolia,
-            transport: http(process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL!),
-        });
+        try {
+            // Validate environment variables
+            validateEnvironmentVariables();
+
+            return createPublicClient({
+                chain: baseSepolia,
+                transport: http(process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL!),
+            });
+        } catch (error) {
+            console.error("Error creating public client:", error);
+            // Return a fallback client or null - this will be handled by error state
+            return null;
+        }
     }, []);
 
     // Create a single contract instance
