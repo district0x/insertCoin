@@ -199,13 +199,10 @@ export default function TournamentsPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Tournaments</h1>
-          <Link
-            href="/tournaments/create"
-            className="inline-block px-4 py-2 bg-primary text-primary-foreground rounded-md"
-          >
-            Create Tournament
-          </Link>
+          {/* Title removed per request */}
+          {/* <h1 className="text-3xl font-bold">Tournaments</h1> */}
+          {/* Create Tournament button removed per request */}
+          {/* <Link href="/tournaments/create" className="inline-block px-4 py-2 bg-primary text-primary-foreground rounded-md">Create Tournament</Link> */}
         </div>
 
         {/* Error state */}
@@ -218,70 +215,72 @@ export default function TournamentsPage() {
         {/* Loading state */}
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin" />
-          </div>
-        ) : tournaments.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-lg text-muted-foreground">
-              No tournaments found
-            </p>
-            <p className="mt-2">Be the first to create a tournament!</p>
+            <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {tournaments.map((tournament) => (
-              <div
-                key={tournament.id.toString()}
-                className="p-6 border rounded-lg hover:border-primary transition-colors"
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold">
-                      Tournament #{tournament.id.toString()}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Prize Pool:{" "}
-                      {formatEther(
-                        tournament.totalDonations +
-                        tournament.entryFee * BigInt(tournament.numEntrants)
-                      )}
-                      {tournament.isERC20 ? " Tokens" : " ETH"}
-                    </p>
-                  </div>
-                  <span
-                    className={`px-2 py-1 text-xs rounded-full ${getStatusColor(
-                      tournament.status
-                    )}`}
-                  >
-                    {tournament.status}
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-sm">
-                    <span className="font-medium">Entry Fee:</span>{" "}
-                    {formatEther(tournament.entryFee)}
-                    {tournament.isERC20 ? " Tokens" : " ETH"}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Players:</span>{" "}
-                    {tournament.currentEntrants}/{tournament.numEntrants}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Winners Share:</span>{" "}
-                    {tournament.winnersPercentage}%
-                  </p>
-                </div>
-                <div className="mt-4 flex space-x-2">
-                  <Link
-                    href={`/tournaments/${tournament.id.toString()}`}
-                    className="w-full px-4 py-2 bg-primary text-primary-foreground text-center rounded-md"
-                  >
-                    View Tournament
-                  </Link>
-                </div>
+          <>
+            {tournaments.length === 0 && (
+              <div className="text-center py-12 text-gray-300">
+                <p>Insert Coin Tournament Coming Soon</p>
               </div>
-            ))}
-          </div>
+            )}
+            {tournaments.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {tournaments.map((tournament) => (
+                  <div
+                    key={tournament.id.toString()}
+                    className="p-6 border rounded-lg hover:border-primary transition-colors"
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold">
+                          Tournament #{tournament.id.toString()}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          Prize Pool:{" "}
+                          {formatEther(
+                            tournament.totalDonations +
+                            tournament.entryFee * BigInt(tournament.numEntrants)
+                          )}
+                          {tournament.isERC20 ? " Tokens" : " ETH"}
+                        </p>
+                      </div>
+                      <span
+                        className={`px-2 py-1 text-xs rounded-full ${getStatusColor(
+                          tournament.status
+                        )}`}
+                      >
+                        {tournament.status}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm">
+                        <span className="font-medium">Entry Fee:</span>{" "}
+                        {formatEther(tournament.entryFee)}
+                        {tournament.isERC20 ? " Tokens" : " ETH"}
+                      </p>
+                      <p className="text-sm">
+                        <span className="font-medium">Players:</span>{" "}
+                        {tournament.currentEntrants}/{tournament.numEntrants}
+                      </p>
+                      <p className="text-sm">
+                        <span className="font-medium">Winners Share:</span>{" "}
+                        {tournament.winnersPercentage}%
+                      </p>
+                    </div>
+                    <div className="mt-4 flex space-x-2">
+                      <Link
+                        href={`/tournaments/${tournament.id.toString()}`}
+                        className="w-full px-4 py-2 bg-primary text-primary-foreground text-center rounded-md"
+                      >
+                        View Tournament
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

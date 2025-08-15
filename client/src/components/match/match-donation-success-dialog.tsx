@@ -25,10 +25,17 @@ export function MatchDonationSuccessDialog({
   onOpenChange,
   convertToUsd,
 }: MatchDonationSuccessDialogProps) {
-  const newPool = match.totalAmount; // match already contains updated totalAmount
+  // The match.totalAmount already includes the updated total after donation
+  // We need to show the current total prize pool
+  const currentPrizePool = match.totalAmount;
+
+  const handleOpenChange = (next: boolean) => {
+    onOpenChange(next);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-[425px] w-[95vw] max-w-none p-4 sm:p-6 max-h-[85vh] overflow-y-auto rounded-lg sm:rounded-xl">
         <DialogHeader>
           <DialogTitle>Donation Successful!</DialogTitle>
           <DialogDescription>
@@ -51,20 +58,24 @@ export function MatchDonationSuccessDialog({
               )}
             </p>
             <p className="text-sm">
-              <span className="font-medium">New Prize Pool:</span>{" "}
+              <span className="font-medium">Current Prize Pool:</span>{" "}
               {match.isERC20 ? (
-                `${formatEther(newPool)} MATCH`
+                `${formatEther(currentPrizePool)} MATCH`
               ) : (
                 <>
-                  ${convertToUsd(newPool).toFixed(2)}
+                  ${convertToUsd(currentPrizePool).toFixed(2)}
                   <span className="text-muted-foreground ml-1">
-                    ({formatEther(newPool)} ETH)
+                    ({formatEther(currentPrizePool)} ETH)
                   </span>
                 </>
               )}
             </p>
           </div>
-          <PayoutSplitCard totalPool={newPool} isERC20={match.isERC20} />
+          <PayoutSplitCard
+            totalPool={currentPrizePool}
+            isERC20={match.isERC20}
+            convertEthToUsd={convertToUsd}
+          />
           <Button className="w-full" onClick={() => onOpenChange(false)}>
             Close
           </Button>

@@ -50,6 +50,15 @@ async def handle_create_match(
     
     try:
         logger.info(f"Creating match with type: {match_type}, platform: {platform}, game: {game}, token_type: {token_type}, amount: {amount}")
+
+        # Enforce ETH USD cap smoothly (no change for MATCH tokens)
+        if (token_type or '').upper() == 'ETH' and match_amount_usd is not None and match_amount_usd > 200:
+            await rate_limited_discord_operation(
+                interaction.followup.send,
+                "❌ ETH matches are limited to a maximum of $200. Please lower the amount or choose MATCH tokens.",
+                ephemeral=True
+            )
+            return
         
         # Prepare match data for channel creation
         match_data = {

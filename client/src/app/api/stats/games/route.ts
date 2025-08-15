@@ -9,26 +9,23 @@ function isPreparedStmtError(err: unknown) {
 
 export async function GET() {
     const doQuery = async () => {
-        const now = new Date();
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-        // Use groupBy if available; fall back to manual aggregation
+        // All-time aggregation of games played (top 5)
         try {
             const grouped = await prisma.match.groupBy({
                 by: ['game'],
-                where: { createdAt: { gte: weekAgo }, game: { not: null } },
-                _count: { _all: true },
-                orderBy: { _count: { _all: 'desc' } },
-                take: 5,
+                where: { game: { not: null } },
+                _count: { game: true },
             });
-            const topGames = grouped
+            const entries = grouped
                 .filter(g => g.game)
-                .map(g => ({ game: g.game as string, count: g._count._all }));
+                .map(g => ({ game: g.game as string, count: Number(g._count.game || 0) }));
+            entries.sort((a, b) => b.count - a.count);
+            const topGames = entries.slice(0, 5);
             return NextResponse.json({ success: true, data: { topGames } });
         } catch (e) {
-            // Fallback manual aggregation
+            // Fallback manual aggregation (all-time)
             const matches = await prisma.match.findMany({
-                where: { createdAt: { gte: weekAgo }, NOT: { game: null } },
+                where: { NOT: { game: null } },
                 select: { game: true },
             });
             const map = new Map<string, number>();

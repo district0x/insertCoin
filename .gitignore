@@ -104,4 +104,37 @@ pnpm-lock.yaml
 
 # Ignore documentation guides
 bot/discord-bot/VERCEL_INTEGRATION_GUIDE.md
-bot/discord-bot/FRONTEND_URL_SETUP.md 
+bot/discord-bot/FRONTEND_URL_SETUP.md
+
+# Additional files to ignore
+# Test and utility scripts
+test-*.js
+check-*.js
+test_*.py
+check_*.py
+run_*.py
+cleanup_*.py
+restart_bot.py
+force_sync_commands.py
+sync_commands.py
+run_bot.py
+run_cleanup.py
+
+# Build artifacts
+tsconfig.tsbuildinfo
+.next/
+*.tsbuildinfo
+
+# Documentation files (already covered but being explicit)
+DEPLOYMENT.md
+DEPLOYMENT_CHECKLIST.md
+IMPLEMENTATION_SUMMARY.md
+BAN_SYSTEM_SETUP.md
+VERCEL_INTEGRATION_GUIDE.md
+FRONTEND_URL_SETUP.md
+
+# Temporary and cache files
+*.tmp
+*.cache
+*.swp
+*.swo 

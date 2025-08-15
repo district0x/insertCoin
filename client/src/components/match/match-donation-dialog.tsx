@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -47,9 +47,7 @@ export function MatchDonationDialog({
           const data = await response.json();
           setDatabaseStatus(data.status);
         }
-      } catch (error) {
-        console.error("Error fetching database status:", error);
-      }
+      } catch { }
     };
 
     fetchDatabaseStatus();
@@ -75,14 +73,18 @@ export function MatchDonationDialog({
     }
   }, [isOpen]);
 
+  const handleOpenChange = useCallback((next: boolean) => {
+    setIsOpen(prev => (prev === next ? prev : next));
+  }, []);
+
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button className="w-full" variant="outline" disabled={!canDonate}>
           {canDonate ? "Donate to Prize Pool" : "Match Closed"}
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[425px] w-[95vw] max-w-none p-4 sm:p-6 max-h-[85vh] overflow-y-auto rounded-lg sm:rounded-xl">
         <DialogHeader>
           <DialogTitle>Donate to Match #{match.id.toString()}</DialogTitle>
           <DialogDescription>
@@ -95,6 +97,8 @@ export function MatchDonationDialog({
             <Input
               id="donation-amount"
               type="number"
+              inputMode="decimal"
+              pattern="[0-9]*"
               step="0.01"
               min="0"
               placeholder={`Enter amount in ${match.isERC20 ? "MATCH" : "USD"}`}
@@ -105,18 +109,19 @@ export function MatchDonationDialog({
 
                 try {
                   if (match.isERC20) {
-                    // For MATCH tokens, parse the input value
                     const value = parseEther(newValue || "0");
                     onDonationEthChange(value);
                   } else {
-                    // For ETH matches, convert USD to ETH
                     const usdAmount = parseFloat(newValue || "0");
+                    if (!isFinite(usdAmount) || usdAmount <= 0) {
+                      return;
+                    }
                     const ethAmount = convertUsdToEth(usdAmount);
-                    onDonationEthChange(ethAmount);
+                    if (ethAmount > 0n && ethAmount < 1000000000000000000n) {
+                      onDonationEthChange(ethAmount);
+                    }
                   }
-                } catch {
-                  // Invalid input, ignore
-                }
+                } catch { }
               }}
             />
             {!match.isERC20 && (
@@ -135,7 +140,7 @@ export function MatchDonationDialog({
             disabled={isProcessing || donationEthAmount <= 0n}
             onClick={async () => {
               await onDonate();
-              setInputValue(""); // Reset input after donation
+              setInputValue("");
               setIsOpen(false);
             }}
           >
@@ -150,3 +155,4 @@ export function MatchDonationDialog({
     </Dialog>
   );
 }
+

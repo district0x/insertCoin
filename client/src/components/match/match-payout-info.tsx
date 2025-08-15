@@ -7,7 +7,8 @@ interface MatchPayoutInfoProps {
     match: OnChainMatch;
     winnerAddress?: string;
     winnerAmount?: string;
-    poolAmount?: string;
+    platformFee?: string;
+    multisigFee?: string;
     convertEthToUsd: (ethAmount: bigint) => number;
 }
 
@@ -15,7 +16,8 @@ export function MatchPayoutInfo({
     match,
     winnerAddress,
     winnerAmount,
-    poolAmount,
+    platformFee,
+    multisigFee,
     convertEthToUsd,
 }: MatchPayoutInfoProps) {
     const truncateAddress = (address: string) => {
@@ -29,14 +31,14 @@ export function MatchPayoutInfo({
     // Calculate total prize pool (stake + donations)
     const totalPrizePool = totalStake + match.donatedAmount;
 
-    // Calculate contract fee (10% of total prize pool)
-    const contractFee = (totalPrizePool * 10n) / 100n;
+    // Calculate contract fee (15% of total prize pool)
+    const contractFee = (totalPrizePool * 15n) / 100n;
 
     // Calculate winner share (80% of total prize pool)
     const winnerShare = (totalPrizePool * 80n) / 100n;
 
-    // Calculate multisig share (10% of total prize pool)
-    const multisigShare = (totalPrizePool * 10n) / 100n;
+    // Calculate multisig share (5% of total prize pool)
+    const multisigShare = (totalPrizePool * 5n) / 100n;
 
     // Add comprehensive logging for payout verification
     console.log(`[PAYOUT-CALC] Match ${match.id} payout breakdown:`, {
@@ -162,7 +164,7 @@ export function MatchPayoutInfo({
                     </div>
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs text-muted-foreground">Contract Fee (10%):</span>
+                            <span className="text-xs text-muted-foreground">Contract Fee (15%):</span>
                             <div className="text-right">
                                 <div className="text-sm font-semibold">
                                     {formatEther(contractFee)} {match.isERC20 ? "MATCH" : "ETH"}
@@ -175,7 +177,7 @@ export function MatchPayoutInfo({
                             </div>
                         </div>
                         <div className="flex items-center justify-between">
-                            <span className="text-xs text-muted-foreground">Multisig (10%):</span>
+                            <span className="text-xs text-muted-foreground">Multisig (5%):</span>
                             <div className="text-right">
                                 <div className="text-sm font-semibold">
                                     {formatEther(multisigShare)} {match.isERC20 ? "MATCH" : "ETH"}
@@ -192,7 +194,7 @@ export function MatchPayoutInfo({
 
                 {/* Payout Breakdown */}
                 <div className="text-xs text-muted-foreground text-center">
-                    <p>Payout Breakdown: 80% Winner • 10% Platform • 10% Multisig</p>
+                    <p>Payout Breakdown: 80% Winner • 15% Platform • 5% Multisig</p>
                 </div>
             </CardContent>
         </Card>

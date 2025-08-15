@@ -30,7 +30,8 @@ interface MatchDetailContentProps {
   convertUsdToEth: (usdAmount: number) => bigint;
   winnerAddress?: string;
   winnerAmount?: string;
-  poolAmount?: string;
+  platformFee?: string;
+  multisigFee?: string;
 }
 
 const MatchDetailContent = ({
@@ -52,7 +53,8 @@ const MatchDetailContent = ({
   convertUsdToEth,
   winnerAddress,
   winnerAmount,
-  poolAmount,
+  platformFee,
+  multisigFee,
 }: MatchDetailContentProps) => {
   const [databaseStatus, setDatabaseStatus] = useState<string | undefined>();
 
@@ -116,7 +118,8 @@ const MatchDetailContent = ({
           match={match}
           winnerAddress={winnerAddress}
           winnerAmount={winnerAmount}
-          poolAmount={poolAmount}
+          platformFee={platformFee}
+          multisigFee={multisigFee}
           convertEthToUsd={convertEthToUsd}
         />
       )}
@@ -154,7 +157,11 @@ const MatchDetailContent = ({
 
       {/* Payouts Section */}
       <div className="mt-6">
-        <PayoutSplitCard totalPool={match.totalAmount + match.donatedAmount} isERC20={match.isERC20} />
+        <PayoutSplitCard
+          totalPool={match.totalAmount}
+          isERC20={match.isERC20}
+          convertEthToUsd={convertEthToUsd}
+        />
       </div>
 
       {/* Donations Section */}

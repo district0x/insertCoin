@@ -42,7 +42,6 @@ export function useEthPrice() {
       try {
         // Check memory cache first
         if (isValidCache(memoryCache)) {
-          // TypeScript now knows memoryCache is not null here
           setEthPrice(memoryCache.price);
           setLoading(false);
           return;
@@ -74,7 +73,6 @@ export function useEthPrice() {
         setEthPrice(price);
         setError(null);
       } catch (err) {
-        console.error("Error fetching ETH price:", err);
         // If we have any cached price, use it as fallback even if expired
         const fallbackPrice =
           memoryCache?.price ||
@@ -104,44 +102,32 @@ export function useEthPrice() {
 
   const convertUsdToEth = (usdAmount: number): bigint => {
     if (!ethPrice || ethPrice <= 0 || usdAmount <= 0) return 0n;
-    
+
     try {
-      // Current reasonable maximum (to prevent overflow)
-      const MAX_ETH_AMOUNT = 1000000n * 10n ** 18n; // 1M ETH in wei (much more than anyone would reasonably use)
-      
-      // Convert USD to ETH
+      const MAX_ETH_AMOUNT = 1000000n * 10n ** 18n;
       const ethAmount = usdAmount / ethPrice;
-      
-      // Guard against NaN or Infinity
-      if (!isFinite(ethAmount)) return 0n;
-      
-      // Convert to wei (18 decimal places)
-      // Use a safer conversion method with range checking
-      let weiAmount: bigint;
-      try {
-        // Convert with floor to ensure we don't exceed the amount
-        const weiFloat = ethAmount * 1e18;
-        
-        // Check for overflow before conversion
-        if (weiFloat > Number.MAX_SAFE_INTEGER) {
-          // If too large, we cap at maximum safe value
-          weiAmount = MAX_ETH_AMOUNT;
-        } else {
-          weiAmount = BigInt(Math.floor(weiFloat));
-        }
-      } catch (error) {
-        console.error("Error converting ETH to wei:", error);
+      if (!isFinite(ethAmount)) {
         return 0n;
       }
-      
-      // Final safety check
+      let weiAmount: bigint;
+      try {
+        const ethAmountScaled = ethAmount * 1e18;
+        if (ethAmountScaled > Number.MAX_SAFE_INTEGER) {
+          weiAmount = MAX_ETH_AMOUNT;
+        } else {
+          weiAmount = BigInt(Math.round(ethAmountScaled));
+        }
+      } catch {
+        return 0n;
+      }
       if (weiAmount > MAX_ETH_AMOUNT) {
         return MAX_ETH_AMOUNT;
       }
-      
+      if (weiAmount === 0n && usdAmount > 0) {
+        return 0n;
+      }
       return weiAmount;
-    } catch (error) {
-      console.error("Error in convertUsdToEth:", error);
+    } catch {
       return 0n;
     }
   };
@@ -157,6 +143,6 @@ export function useEthPrice() {
     loading,
     error,
     convertUsdToEth,
-    convertEthToUsd,
+    convertEthToUsd
   };
 }

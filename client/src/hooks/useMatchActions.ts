@@ -235,6 +235,9 @@ export function useMatchActions({
 
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
       if (receipt.status === "success") {
+        // Wait a moment for blockchain state to update
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
         // Get the updated match data to confirm the donation amount
         const updatedMatch = await publicClient.readContract({
           address: contract.address,
@@ -256,20 +259,23 @@ export function useMatchActions({
         // Use the actual donation amount that was sent
         const newDonationAmount = donationEthAmount;
         const newTotalAmount = updatedMatch[4]; // totalAmount is at index 4
+        const newDonatedAmount = updatedMatch[5]; // donatedAmount is at index 5
 
         console.log('[DONATION-SUCCESS] Debug info:', {
           donationEthAmount: donationEthAmount.toString(),
           newDonationAmount: newDonationAmount.toString(),
+          displayMatchTotalAmount: displayMatch.totalAmount.toString(),
           displayMatchDonatedAmount: displayMatch.donatedAmount.toString(),
-          updatedMatchDonatedAmount: updatedMatch[5].toString(),
-          newTotalAmount: newTotalAmount.toString()
+          updatedMatchTotalAmount: newTotalAmount.toString(),
+          updatedMatchDonatedAmount: newDonatedAmount.toString(),
+          expectedNewTotal: (displayMatch.totalAmount + donationEthAmount).toString()
         });
 
         // Update optimistic match data with new totals
         setOptimisticMatch({
           ...displayMatch,
           totalAmount: newTotalAmount,
-          donatedAmount: updatedMatch[5]
+          donatedAmount: newDonatedAmount
         });
 
         setLastDonationAmount(newDonationAmount);

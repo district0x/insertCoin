@@ -18,7 +18,7 @@ export default function TrendingGames() {
 
     return (
         <section className="container mx-auto px-4 mt-8">
-            <h2 className="text-xl font-semibold mb-4">Top Games (7d)</h2>
+            <h2 className="text-xl font-semibold mb-4">Top Games</h2>
             <div className="space-y-3">
                 {games.length === 0 && (
                     <p className="text-sm text-gray-400">No data available.</p>

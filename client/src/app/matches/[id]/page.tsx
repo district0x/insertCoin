@@ -39,7 +39,8 @@ export default function MatchPage() {
   const [winnerInfo, setWinnerInfo] = useState<{
     winnerAddress?: string;
     winnerAmount?: string;
-    poolAmount?: string;
+    platformFee?: string;
+    multisigFee?: string;
   }>({});
 
   // State for match metadata (original USD amount and game info)
@@ -81,7 +82,8 @@ export default function MatchPage() {
           setWinnerInfo({
             winnerAddress: data.winnerAddress,
             winnerAmount: data.winnerAmount,
-            poolAmount: data.poolAmount,
+            platformFee: data.platformFee,
+            multisigFee: data.multisigFee,
           });
         }
       } catch (error) {
@@ -149,12 +151,6 @@ export default function MatchPage() {
     address: address as `0x${string}` | undefined,
   });
 
-  const [closeMatchResult, setCloseMatchResult] = useState<{
-    winnerAmount: string;
-    poolAmount: string;
-    isOpen: boolean;
-  }>({ winnerAmount: '', poolAmount: '', isOpen: false });
-
   if (error) {
     console.log("[MatchPage] Rendering error state");
     return (
@@ -201,13 +197,7 @@ export default function MatchPage() {
   // Pass a callback to handleCloseMatch to set the result
   const handleCloseMatchWithResult = async () => {
     const result = await handleCloseMatch();
-    if (result && result.winnerAmount && result.poolAmount) {
-      setCloseMatchResult({
-        winnerAmount: result.winnerAmount,
-        poolAmount: result.poolAmount,
-        isOpen: true,
-      });
-
+    if (result) {
       // Refresh winner info after closing match
       setTimeout(() => {
         const fetchWinnerInfo = async () => {
@@ -218,7 +208,8 @@ export default function MatchPage() {
               setWinnerInfo({
                 winnerAddress: data.winnerAddress,
                 winnerAmount: data.winnerAmount,
-                poolAmount: data.poolAmount,
+                platformFee: data.platformFee,
+                multisigFee: data.multisigFee,
               });
             }
           } catch (error) {
@@ -260,7 +251,8 @@ export default function MatchPage() {
           convertUsdToEth={convertUsdToEth}
           winnerAddress={winnerInfo.winnerAddress}
           winnerAmount={winnerInfo.winnerAmount}
-          poolAmount={winnerInfo.poolAmount}
+          platformFee={winnerInfo.platformFee}
+          multisigFee={winnerInfo.multisigFee}
         />
       </Card>
 
@@ -272,24 +264,8 @@ export default function MatchPage() {
         convertToUsd={convertEthToUsd}
       />
 
-      {/* Custom modal for match close result */}
-      {closeMatchResult.isOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h2>Match Closed!</h2>
-            <p>
-              Winner Paid: <b>${convertEthToUsd(BigInt(Math.floor(Number(closeMatchResult.winnerAmount) * 1e18))).toFixed(2)} USD</b> (<b>{closeMatchResult.winnerAmount} {displayMatch.isERC20 ? "MATCH" : "ETH"}</b>)
-            </p>
-            <p>
-              Pool Paid: <b>${convertEthToUsd(BigInt(Math.floor(Number(closeMatchResult.poolAmount) * 1e18))).toFixed(2)} USD</b> (<b>{closeMatchResult.poolAmount} {displayMatch.isERC20 ? "MATCH" : "ETH"}</b>)
-            </p>
-            <button onClick={() => setCloseMatchResult({ ...closeMatchResult, isOpen: false })}>Close</button>
-          </div>
-        </div>
-      )}
-
       {/* Payout Information Modal - Show for completed matches with winner info */}
-      {winnerInfo.winnerAddress && !closeMatchResult.isOpen && (
+      {winnerInfo.winnerAddress && (
         <div className="modal-overlay">
           <div className="modal-content">
             <h2>Match Results</h2>
@@ -299,8 +275,8 @@ export default function MatchPage() {
                 const totalStake = displayMatch.player1Amount + displayMatch.player2Amount;
                 const totalPrizePool = totalStake + displayMatch.donatedAmount;
                 const winnerShare = (totalPrizePool * 80n) / 100n;
-                const contractFee = (totalPrizePool * 10n) / 100n;
-                const multisigShare = (totalPrizePool * 10n) / 100n;
+                const contractFee = (totalPrizePool * 15n) / 100n;
+                const multisigShare = (totalPrizePool * 5n) / 100n;
 
                 return (
                   <>

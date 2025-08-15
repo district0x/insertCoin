@@ -64,14 +64,16 @@ export async function GET(
         // Use the actual totalPrize from database (includes donations)
         const totalPrizePool = match.totalPrize || 0;
         const winnerAmount = (totalPrizePool * 0.8).toFixed(6); // 80% of total prize pool
-        const poolAmount = (totalPrizePool * 0.1).toFixed(6); // 10% for multisig
+        const platformFee = (totalPrizePool * 0.15).toFixed(6); // 15% for platform
+        const multisigFee = (totalPrizePool * 0.05).toFixed(6); // 5% for multisig
 
         console.log('[API-WINNER] Winner calculation for match', matchId, ':', {
             singlePlayerStake: match.stake,
             matchTotalPrize: match.totalPrize,
             calculatedTotalPrize: totalPrizePool,
             winnerAmount,
-            poolAmount,
+            platformFee,
+            multisigFee,
             tokenName: (match as any).tokenName
         });
 
@@ -79,7 +81,8 @@ export async function GET(
         return NextResponse.json({
             winnerAddress: match.winnerAddress,
             winnerAmount: winnerAmount,
-            poolAmount: poolAmount
+            platformFee: platformFee,
+            multisigFee: multisigFee
         });
 
     } catch (error) {

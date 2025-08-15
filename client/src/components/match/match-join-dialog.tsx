@@ -80,7 +80,6 @@ export function MatchJoinDialog({
     if (isProcessing) return true;
     if (!userAddress) return true;
 
-    // Check if user is already in either team
     if (
       match.teamA.includes(userAddress as `0x${string}`) ||
       match.teamB.includes(userAddress as `0x${string}`)
@@ -98,11 +97,9 @@ export function MatchJoinDialog({
     if (isProcessing) return true;
     if (!userAddress) return true;
 
-    // For 2v2 and 5v5, require team selection
     if (match.matchType !== "ONE_V_ONE" && !selectedTeam) return true;
 
     const spots = getTeamSpots();
-    // If team is selected, check if it has spots
     if (selectedTeam === "A" && spots.teamA === 0) return true;
     if (selectedTeam === "B" && spots.teamB === 0) return true;
 
@@ -110,13 +107,11 @@ export function MatchJoinDialog({
   };
 
   const handleJoin = async () => {
-    // For 1v1, team selection doesn't matter
     if (match.matchType === "ONE_V_ONE") {
       await onJoin(true);
       return;
     }
 
-    // For 2v2 and 5v5, require team selection
     if (!selectedTeam) {
       return;
     }
@@ -150,7 +145,7 @@ export function MatchJoinDialog({
           {getJoinButtonText()}
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[425px] w-[95vw] max-w-none p-4 sm:p-6 max-h-[85vh] overflow-y-auto rounded-lg sm:rounded-xl">
         <DialogHeader>
           <DialogTitle>
             Join {match.matchType} Match #{match.id.toString()}
@@ -159,7 +154,7 @@ export function MatchJoinDialog({
             {match.matchType === "ONE_V_ONE"
               ? `You are about to join this match with ${formatEther(
                 match.player1Amount
-              )} ${match.isERC20 ? "MATCH" : "ETH"} ${match.isERC20 ? "(No USD value)" : `(≈$${convertToUsd(match.player1Amount).toFixed(2)})`}.`
+              )} ${match.isERC20 ? "MATCH" : "ETH"} ${match.isERC20 ? "(No USD value)" : `(≈$${convertToUsd(match.player1Amount).toFixed(2)})`} .`
               : `Select a team to join with ${formatEther(
                 match.player1Amount
               )} ${match.isERC20 ? "MATCH" : "ETH"} ${match.isERC20 ? "(No USD value)" : `(≈$${convertToUsd(match.player1Amount).toFixed(2)})`} stake.`}

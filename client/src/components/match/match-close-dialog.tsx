@@ -37,16 +37,20 @@ export function MatchCloseDialog({
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  const totalPool = match.totalAmount + match.donatedAmount;
+  const totalPool = match.totalAmount;
+
+  const handleOpenChange = (next: boolean) => {
+    onOpenChange(next);
+  };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="secondary" className="w-full" disabled={isProcessing}>
           Close Match
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[425px] w-[95vw] max-w-none p-4 sm:p-6 max-h-[85vh] overflow-y-auto rounded-lg sm:rounded-xl">
         <DialogHeader>
           <DialogTitle>Close Match #{match.id.toString()}</DialogTitle>
           <DialogDescription className="space-y-2">
@@ -83,7 +87,11 @@ export function MatchCloseDialog({
             </Button>
           </div>
 
-          <PayoutSplitCard totalPool={totalPool} isERC20={match.isERC20} />
+          <PayoutSplitCard
+            totalPool={totalPool}
+            isERC20={match.isERC20}
+            convertEthToUsd={convertToUsd}
+          />
 
           <Button
             className="w-full"

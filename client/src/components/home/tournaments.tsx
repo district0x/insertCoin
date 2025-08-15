@@ -253,16 +253,9 @@ export default function Tournaments() {
               </CardHeader>
               <CardContent>
                 <p className="text-gray-300">
-                  Be the first to create a tournament and compete with others!
+                  Insert Coin Tournament Coming Soon
                 </p>
               </CardContent>
-              <CardFooter>
-                <Link href="/tournaments/create" className="w-full">
-                  <Button className="w-full bg-red-600 hover:bg-red-700">
-                    Create First Tournament
-                  </Button>
-                </Link>
-              </CardFooter>
             </Card>
           </div>
         ) : (

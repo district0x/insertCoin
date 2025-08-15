@@ -65,6 +65,8 @@ export async function POST(request: Request) {
         }
 
         const winnerEarnings = totalPrize * 0.8; // 80% to winner
+        const platformFee = totalPrize * 0.15; // 15% to platform
+        const multisigFee = totalPrize * 0.05; // 5% to multisig
 
         console.log(`[API] Manual completion payout calculation:`, {
             singlePlayerStake: match.stake,
