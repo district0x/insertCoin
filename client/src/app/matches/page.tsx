@@ -8,6 +8,7 @@ import { baseSepolia } from "@/lib/config/chains";
 import MatchList from "@/components/match/match-list";
 import PlayerStats from "@/components/match/player-stats";
 import ContractStats from "@/components/match/contract-stats";
+import LatestMatches from "@/components/match/latest-matches";
 import { fetchMatch } from "@/lib/match/fetch";
 import { WalletLinkBanner } from "@/components/WalletLinkBanner";
 import { DiscordLinkBanner } from "@/components/DiscordLinkBanner";
@@ -155,6 +156,22 @@ export default function MatchesPage() {
             <p className="text-gray-400 text-xs mt-2">
               Last updated: {new Date().toLocaleTimeString()}
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Latest Matches Section */}
+      <section className="py-16 bg-gradient-to-br from-black via-gray-900 to-black">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-white mb-4">Latest Matches</h2>
+            <p className="text-gray-300 max-w-2xl mx-auto">
+              Recent match activity and results
+            </p>
+          </div>
+
+          <div className="max-w-6xl mx-auto">
+            <LatestMatches />
           </div>
         </div>
       </section>
