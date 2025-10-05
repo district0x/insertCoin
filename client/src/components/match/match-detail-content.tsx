@@ -159,6 +159,8 @@ const MatchDetailContent = ({
       <div className="mt-6">
         <PayoutSplitCard
           totalPool={match.totalAmount}
+          playerStakes={match.player1Amount + match.player2Amount}
+          donations={match.donatedAmount}
           isERC20={match.isERC20}
           convertEthToUsd={convertEthToUsd}
         />

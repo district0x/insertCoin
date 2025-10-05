@@ -271,12 +271,18 @@ export default function MatchPage() {
             <h2>Match Results</h2>
             <div className="space-y-4">
               {(() => {
-                // Calculate correct amounts
+                // Calculate correct amounts - Only apply 80/15/5 split to player stakes, NOT donations
                 const totalStake = displayMatch.player1Amount + displayMatch.player2Amount;
-                const totalPrizePool = totalStake + displayMatch.donatedAmount;
-                const winnerShare = (totalPrizePool * 80n) / 100n;
-                const contractFee = (totalPrizePool * 15n) / 100n;
-                const multisigShare = (totalPrizePool * 5n) / 100n;
+                const donations = displayMatch.donatedAmount;
+                const totalPrizePool = totalStake + donations;
+
+                // Player stakes get 80/15/5 split
+                const winnerStakeShare = (totalStake * 80n) / 100n;
+                const contractFee = (totalStake * 15n) / 100n;
+                const multisigShare = (totalStake * 5n) / 100n;
+
+                // Donations go 100% to winner (no platform fees)
+                const totalWinnerAmount = winnerStakeShare + donations;
 
                 return (
                   <>
@@ -284,11 +290,16 @@ export default function MatchPage() {
                       <h3 className="font-semibold mb-2">Winner</h3>
                       <p className="text-sm text-muted-foreground">Address: {winnerInfo.winnerAddress}</p>
                       <p className="font-semibold">
-                        Amount: {formatEther(winnerShare)} {displayMatch.isERC20 ? "MATCH" : "ETH"}
+                        Amount: {formatEther(totalWinnerAmount)} {displayMatch.isERC20 ? "MATCH" : "ETH"}
                       </p>
                       {!displayMatch.isERC20 && (
                         <p className="text-sm text-muted-foreground">
-                          ≈ ${convertEthToUsd(winnerShare).toFixed(2)} USD
+                          ≈ ${convertEthToUsd(totalWinnerAmount).toFixed(2)} USD
+                        </p>
+                      )}
+                      {donations > 0n && (
+                        <p className="text-xs text-blue-400">
+                          Includes 80% of stakes + 100% of donations
                         </p>
                       )}
                     </div>

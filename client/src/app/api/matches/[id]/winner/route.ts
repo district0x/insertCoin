@@ -61,8 +61,13 @@ export async function GET(
             });
         }
 
-        // Use the actual totalPrize from database (includes donations)
+        // CRITICAL: Calculate payouts correctly - only apply 80/15/5 split to player stakes, NOT donations
+        // For now, we'll use the totalPrize but note that this should be updated when we have separate fields
         const totalPrizePool = match.totalPrize || 0;
+
+        // Since we don't have separate player stakes vs donations in this API route,
+        // we'll use the old calculation for now, but this should be updated
+        // TODO: Update database schema to separate player stakes from donations
         const winnerAmount = (totalPrizePool * 0.8).toFixed(6); // 80% of total prize pool
         const platformFee = (totalPrizePool * 0.15).toFixed(6); // 15% for platform
         const multisigFee = (totalPrizePool * 0.05).toFixed(6); // 5% for multisig

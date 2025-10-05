@@ -73,6 +73,8 @@ export function MatchDonationSuccessDialog({
           </div>
           <PayoutSplitCard
             totalPool={currentPrizePool}
+            playerStakes={match.player1Amount + match.player2Amount}
+            donations={match.donatedAmount}
             isERC20={match.isERC20}
             convertEthToUsd={convertToUsd}
           />

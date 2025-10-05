@@ -13,11 +13,15 @@ export default function FaqPage() {
                     <h2 className="text-xl font-semibold">How do I create a match?</h2>
                     <div className="mt-2 space-y-2 text-sm text-gray-300">
                         <p>
-                            From Discord: Use the /create-match command, choose game, platform, token (ETH or MATCH), and USD amount. Anyone in the lobby can then press Create Match and confirm by typing "Start" in the confirmation modal to proceed.
+                            Join our discord. Complete our onboarding process and verify your wallet and account.
+                            In game lobby use /create-match to interact with our matchmaking system.
+                            /create-match command, choose game, platform, token(ETH or MATCH), and amount.
+                            A notification that a new MATCH has been created will inform lobby members. Anyone in the lobby can join the match.
+                            Player 1 can create the match following instructions provided in the room lobby.
+                            After the match is created, player 2 can join the match following instructions provided in the room lobby.
+
                         </p>
-                        <p>
-                            From the website: If you opened from Discord, the form will be pre-filled. Connect your wallet and submit the on-chain transaction to escrow your stake.
-                        </p>
+
                         <p>
                             For ETH matches created via Discord, the USD amount is capped at $200.
                         </p>
@@ -34,9 +38,9 @@ export default function FaqPage() {
                 <section>
                     <h2 className="text-xl font-semibold">What are the payout splits?</h2>
                     <div className="mt-2 space-y-2 text-sm text-gray-300">
-                        <p>Winner: 80%</p>
-                        <p>Platform/Contract fee: 15%</p>
-                        <p>Multisig: 5%</p>
+                        <p>Winner: 80% of prize pool</p>
+                        <p>Platform/Contract fee: 15% of prize pool  - These funds will be allocated to for use in Insert Coin community tournaments. All funds received from player matches will be added to the prize pool of all Insert Coin tournaments.</p>
+                        <p>Multisig: 5% of prize pool - This wallet is used to donate to player matches & to distribute platform fee to the Insert Coin dev team.</p>
                         <p>Splits apply to the total prize pool (stakes + donations).</p>
                     </div>
                 </section>

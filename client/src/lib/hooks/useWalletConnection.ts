@@ -20,11 +20,11 @@ export function useWalletConnection() {
   const initializedRef = useRef(false);
   const hasShownToastRef = useRef(false);
 
-  // Get the connected external wallet address with priority system
+  // Get the connected wallet address with priority system
   const address = useMemo(() => {
     if (!user) return null;
 
-    // Priority order: User's linked external wallet > null
+    // Priority order: External wallet > Embedded wallet > null
     if (user.linkedAccounts && user.linkedAccounts.length > 0) {
       const walletAccount = user.linkedAccounts.find(account =>
         account.type === 'wallet' && account.verifiedAt
@@ -35,8 +35,13 @@ export function useWalletConnection() {
       }
     }
 
-    // Don't fall back to embedded wallet - require external wallet connection
-    console.log("No external wallet found. User needs to connect an external wallet.");
+    // NEW: Also check for embedded wallet (Gmail/Google users)
+    if (user.wallet?.address) {
+      console.log("Found embedded wallet:", user.wallet.address);
+      return user.wallet.address as `0x${string}`;
+    }
+
+    console.log("No wallet found. User needs to connect a wallet.");
     return null;
   }, [user]);
 
@@ -48,6 +53,24 @@ export function useWalletConnection() {
     );
   }, [user]);
 
+  // NEW: Check if user has embedded wallet (Gmail/Google users)
+  const isEmbeddedWallet = useMemo(() => {
+    return !isExternalWallet && !!user?.wallet?.address;
+  }, [isExternalWallet, user?.wallet?.address]);
+
+  // NEW: Get wallet type for display purposes
+  const walletType = useMemo(() => {
+    if (isExternalWallet) return 'external';
+    if (isEmbeddedWallet) return 'embedded';
+    return 'none';
+  }, [isExternalWallet, isEmbeddedWallet]);
+
+  // NEW: Get user's email for Gmail users
+  const userEmail = useMemo(() => {
+    return user?.email?.address || null;
+  }, [user?.email?.address]);
+
+  // UPDATED: Token addition with embedded wallet support
   const addTokenToWallet = useCallback(async () => {
     if (!user?.wallet) {
       console.warn("No wallet found");
@@ -55,7 +78,8 @@ export function useWalletConnection() {
     }
 
     try {
-      // Request to add the token to the user's wallet
+      // For embedded wallets, we can still try to add the token
+      // The user will see a modal to confirm the action
       await (user.wallet as any).request({
         method: "wallet_watchAsset",
         params: {
@@ -79,6 +103,13 @@ export function useWalletConnection() {
         // User rejected the token addition
         return;
       }
+
+      // For embedded wallets, this might fail silently - that's okay
+      if (isEmbeddedWallet) {
+        console.log("Token addition not supported for embedded wallets, but wallet can still receive tokens");
+        return;
+      }
+
       toast({
         variant: "destructive",
         title: "Error",
@@ -86,8 +117,9 @@ export function useWalletConnection() {
           "Failed to add MATCH token to your wallet. You can add it manually.",
       });
     }
-  }, [user?.wallet, toast]);
+  }, [user?.wallet, toast, isEmbeddedWallet]);
 
+  // UPDATED: Check token balance with embedded wallet support
   const checkAndAddToken = useCallback(async () => {
     if (!user?.wallet?.address) return;
 
@@ -110,10 +142,15 @@ export function useWalletConnection() {
       }
     } catch (error) {
       console.error("Error checking token balance:", error);
+      // For embedded wallets, this might fail - that's okay
+      if (isEmbeddedWallet) {
+        console.log("Token balance check not supported for embedded wallets, but wallet can still receive tokens");
+        return;
+      }
       // If there's an error reading the balance, still try to add the token
       await addTokenToWallet();
     }
-  }, [user?.wallet, addTokenToWallet]);
+  }, [user?.wallet, addTokenToWallet, isEmbeddedWallet]);
 
   const saveWallet = useCallback(async (address: string) => {
     try {
@@ -159,10 +196,12 @@ export function useWalletConnection() {
 
         // Only show toast if we haven't shown it before for this session
         if (!hasShownToastRef.current) {
+          // FIXED: Dynamic toast message based on wallet type
           toast({
             title: "Wallet Connected",
-            description:
-              "Your external wallet has been successfully connected and saved.",
+            description: isExternalWallet
+              ? "Your external wallet has been successfully connected and saved."
+              : "Your embedded wallet has been successfully connected and saved.",
           });
           hasShownToastRef.current = true;
         }
@@ -179,12 +218,15 @@ export function useWalletConnection() {
     };
 
     handleWalletConnection();
-  }, [ready, authenticated, address, toast, saveWallet, checkAndAddToken]);
+  }, [ready, authenticated, address, toast, saveWallet, checkAndAddToken, isExternalWallet]);
 
   return {
     address,
     isConnected: authenticated && !!address,
     isExternalWallet,
+    isEmbeddedWallet, // NEW
+    walletType, // NEW
+    userEmail, // NEW
     connect: login,
     disconnect: logout,
     user,
