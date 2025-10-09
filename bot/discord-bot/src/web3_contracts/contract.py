@@ -53,8 +53,10 @@ class ContractClient:
                 next_match_id = self._contract.functions.nextMatchId().call()
                 logger.info(f"Contract initialized successfully. Next match ID: {next_match_id}")
             except Exception as e:
-                logger.error(f"Failed to call nextMatchId: {e}")
-                raise
+                logger.warning(f"Failed to call nextMatchId: {e}")
+                logger.warning("Contract may not be deployed or initialized. Bot will continue with limited functionality.")
+                # Don't raise the exception, just log the warning
+                # This allows the bot to start even if the contract isn't available
             
         except Exception as e:
             logger.error(f"Failed to initialize Web3 contract: {e}", exc_info=True)

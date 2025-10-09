@@ -10,6 +10,11 @@ from src.db.prisma import prisma
 from src.web3_contracts.contract import contract
 from src.utils.config import config
 
+# Import health server
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+from health_server import start_health_server, stop_health_server
+
 # Load environment variables
 env_path = Path(__file__).parent.parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
@@ -36,13 +41,21 @@ class OneVOneBot(commands.Bot):
         
     async def setup_hook(self):
         """Setup hook that runs when the bot starts."""
+        # Start health check server
+        await start_health_server()
+        logger.info("Health check server started")
+        
         # Initialize database connection with proper connection string FIRST
         prisma.connect(config.DATABASE_URL)
         logger.info("Database connection initialized")
         
         # Initialize blockchain connection
-        contract.connect()
-        logger.info("Blockchain connection initialized")
+        try:
+            contract.connect()
+            logger.info("Blockchain connection initialized")
+        except Exception as e:
+            logger.warning(f"Failed to initialize blockchain connection: {e}")
+            logger.warning("Bot will continue with limited functionality (no blockchain features)")
         
         # Load cogs AFTER database is connected
         await self.load_extension('src.bot.cogs.match')
@@ -70,16 +83,24 @@ class OneVOneBot(commands.Bot):
                 logger.warning(f"Could not apply Banned role to new channel {channel.name}: {e}")
         
         # Sync commands with Discord
-        guild_id = os.getenv('DISCORD_GUILD_ID')
-        if guild_id:
-            guild = discord.Object(id=int(guild_id))
-            # This copies the global commands over to your guild.
-            self.tree.copy_global_to(guild=guild)
-            await self.tree.sync(guild=guild)
-        else:
-            # If no guild ID is provided, sync commands globally
-            await self.tree.sync()
-        logger.info('Command tree synced with Discord')
+        try:
+            guild_id = os.getenv('DISCORD_GUILD_ID')
+            if guild_id:
+                guild = discord.Object(id=int(guild_id))
+                # This copies the global commands over to your guild.
+                self.tree.copy_global_to(guild=guild)
+                await self.tree.sync(guild=guild)
+                logger.info(f'Command tree synced with guild {guild_id}')
+            else:
+                # If no guild ID is provided, sync commands globally
+                await self.tree.sync()
+                logger.info('Command tree synced globally')
+        except discord.Forbidden:
+            logger.warning("Missing permissions to sync commands. Please re-invite bot with 'applications.commands' scope.")
+            logger.warning("Bot will continue but slash commands may not work.")
+        except Exception as e:
+            logger.error(f"Failed to sync commands: {e}")
+            logger.warning("Bot will continue but slash commands may not work.")
         
     async def on_ready(self):
         """Event that runs when the bot is ready."""
@@ -88,6 +109,10 @@ class OneVOneBot(commands.Bot):
         
     async def close(self):
         """Cleanup when the bot is shutting down."""
+        # Stop health check server
+        await stop_health_server()
+        logger.info("Health check server stopped")
+        
         prisma.disconnect()
         logger.info("Database connection closed")
         await super().close()

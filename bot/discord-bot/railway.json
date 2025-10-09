@@ -4,7 +4,7 @@
         "builder": "NIXPACKS"
     },
     "deploy": {
-        "startCommand": "poetry run python run_bot.py",
+        "startCommand": "python run_bot.py",
         "healthcheckPath": "/health",
         "healthcheckTimeout": 300,
         "restartPolicyType": "ON_FAILURE",
