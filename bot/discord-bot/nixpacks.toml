@@ -1,3 +1,4 @@
+# Railway deployment configuration - forces use of requirements.txt
 [phases.setup]
 nixPkgs = ["python39", "pip"]
 
