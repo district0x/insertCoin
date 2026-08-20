@@ -1,0 +1,31 @@
+{
+  "proxyAddress": "0x63c6BDa9cfb31290Ea8a273308bcE1d7419F4C04",
+  "implementationAddress": "0xa5C4a773e7425FdF181f993707D5591F83A55Ab0",
+  "adminAddress": "0xf7E472d65EF9bA1A91842aE76ef71Db80B5c93D7",
+  "ownerAddress": "0x840DD3a83e3230382C90F92819b235f98cB236AF",
+  "deployer": "0x840DD3a83e3230382C90F92819b235f98cB236AF",
+  "icProxyAddress": "0xEa378f29B6fDB8BE81C7310Ca7b7305124d0278E",
+  "trustedForwarder": "0x1DF42D7090B6C42dD24C6C47Ed9493dde3d8538b",
+  "network": "baseMainnet",
+  "chainId": "8453",
+  "compilerSettings": {
+    "version": "0.8.20",
+    "optimizer": {
+      "enabled": true,
+      "runs": 1
+    },
+    "viaIR": true,
+    "evmVersion": "paris"
+  },
+  "basescanLinks": {
+    "proxy": "https://basescan.org/address/0x63c6BDa9cfb31290Ea8a273308bcE1d7419F4C04",
+    "implementation": "https://basescan.org/address/0xa5C4a773e7425FdF181f993707D5591F83A55Ab0",
+    "admin": "https://basescan.org/address/0xf7E472d65EF9bA1A91842aE76ef71Db80B5c93D7"
+  },
+  "timestamp": "2026-08-12T03:04:08.490Z",
+  "lastUpgrade": {
+    "timestamp": "2026-08-20T00:56:28.305Z",
+    "change": "Allow tournament creators to join their own tournaments",
+    "previousImplementation": "0xb3E75F5fc7b97551b19da6671cf4FeeD9F785D87"
+  }
+}
