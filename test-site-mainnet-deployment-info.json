@@ -1,0 +1,40 @@
+{
+  "purpose": "TEST ONLY for insert-coin-ule3.vercel.app. Dedicated test match contract and test tournament contract. NOT the live production IC (0xEa378f29B6fDB8BE81C7310Ca7b7305124d0278E) or live tournament hub (0x63c6BDa9cfb31290Ea8a273308bcE1d7419F4C04).",
+  "network": "baseMainnet",
+  "chainId": "8453",
+  "deployer": "0x840DD3a83e3230382C90F92819b235f98cB236AF",
+  "trustedForwarder": "0x1DF42D7090B6C42dD24C6C47Ed9493dde3d8538b",
+  "tokens": {
+    "usdc": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "match": "0x608DB20033fe825ef97f83Cb0D95E8903f3dCeEB"
+  },
+  "ic": {
+    "proxyAddress": "0x4B17C62389F715AEfB887164e1bd7A999e22B715",
+    "implementationAddress": "0x01623890013e10A9F1f92825B99217C962D828c9",
+    "adminAddress": "0x76227ef4fbd7421753a33e38D9b072064CbdCC6d",
+    "ownerAddress": "0x840DD3a83e3230382C90F92819b235f98cB236AF",
+    "multisigAddress": "0x840DD3a83e3230382C90F92819b235f98cB236AF"
+  },
+  "tournamentHub": {
+    "proxyAddress": "0x44E0564fa8B296aC0c2f26dA8e595676A58429b6",
+    "implementationAddress": "0x93CECC59250ca1Cf93eF506475f6bff53859AaAa",
+    "adminAddress": "0x438DfFD57e92A8e5B5AAf88F8a28a38f7dF03A4C",
+    "ownerAddress": "0x840DD3a83e3230382C90F92819b235f98cB236AF",
+    "icProxyAddress": "0x4B17C62389F715AEfB887164e1bd7A999e22B715"
+  },
+  "vercelEnv": {
+    "NEXT_PUBLIC_CONTRACT_ADDRESS": "0x4B17C62389F715AEfB887164e1bd7A999e22B715",
+    "NEXT_PUBLIC_TOURNAMENT_HUB_ADDRESS": "0x44E0564fa8B296aC0c2f26dA8e595676A58429b6",
+    "NEXT_PUBLIC_FORWARDER_ADDRESS": "0x1DF42D7090B6C42dD24C6C47Ed9493dde3d8538b",
+    "NEXT_PUBLIC_CHAIN_ID": "8453",
+    "NEXT_PUBLIC_USDC_TOKEN_ADDRESS": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "NEXT_PUBLIC_MATCH_TOKEN_ADDRESS": "0x608DB20033fe825ef97f83Cb0D95E8903f3dCeEB"
+  },
+  "basescanLinks": {
+    "icProxy": "https://basescan.org/address/0x4B17C62389F715AEfB887164e1bd7A999e22B715",
+    "icImpl": "https://basescan.org/address/0x01623890013e10A9F1f92825B99217C962D828c9",
+    "hubProxy": "https://basescan.org/address/0x44E0564fa8B296aC0c2f26dA8e595676A58429b6",
+    "hubImpl": "https://basescan.org/address/0x93CECC59250ca1Cf93eF506475f6bff53859AaAa"
+  },
+  "timestamp": "2026-10-12T02:32:42.842Z"
+}

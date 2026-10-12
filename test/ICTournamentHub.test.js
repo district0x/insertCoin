@@ -5,8 +5,9 @@ const { ethers, upgrades } = require("hardhat");
  * ICTournamentHub — standalone tournament satellite contract.
  *
  * User-created tournaments with entry-fee pots, optional creator seed,
- * whole-tournament donations, admin-only fund allocation, payout split with
- * no platform cut, money-less bracket matches gated to participants, and
+ * whole-tournament donations, admin-only fund allocation, 2.5% platform fee
+ * taken from the full pot at completion, money-less bracket matches gated
+ * to participants, and
  * EIP-2771 gasless support. Roles are delegated to the IC proxy.
  */
 describe("ICTournamentHub", function () {
@@ -117,12 +118,14 @@ describe("ICTournamentHub", function () {
                 .to.be.revertedWithCustomError(hub, "InvalidPayoutSplit");
         });
 
-        it("rejects unapproved tokens and maxEntrants of 1", async function () {
+        it("rejects unapproved tokens and maxEntrants below 3", async function () {
             const MockERC20 = await ethers.getContractFactory("MockERC20");
             const other = await MockERC20.deploy();
             await expect(createTournament({ token: other.target }))
                 .to.be.revertedWithCustomError(hub, "TokenNotApproved");
             await expect(createTournament({ maxEntrants: 1 }))
+                .to.be.revertedWithCustomError(hub, "InvalidMaxEntrants");
+            await expect(createTournament({ maxEntrants: 2 }))
                 .to.be.revertedWithCustomError(hub, "InvalidMaxEntrants");
         });
 
@@ -210,6 +213,18 @@ describe("ICTournamentHub", function () {
             expect((await hub.tournaments(id)).status).to.equal(LIVE);
         });
 
+        it("requires at least 3 participants (even with a 1-slot payout split)", async function () {
+            const id2 = await createTournament({ payoutSplit: [100] });
+            await hub.connect(players[0]).joinTournament(id2);
+            await hub.connect(players[1]).joinTournament(id2);
+            await expect(hub.connect(creator).startTournament(id2))
+                .to.be.revertedWithCustomError(hub, "NotEnoughParticipants");
+
+            await hub.connect(players[2]).joinTournament(id2);
+            await hub.connect(creator).startTournament(id2);
+            expect((await hub.tournaments(id2)).status).to.equal(LIVE);
+        });
+
         it("requires at least one participant per payout slot", async function () {
             // 3-way split but only 2 players — completing would be impossible
             await hub.connect(players[0]).joinTournament(id);
@@ -267,20 +282,29 @@ describe("ICTournamentHub", function () {
             await hub.connect(creator).startTournament(id);
         });
 
-        it("pays the split with no platform cut; dust goes to first place", async function () {
-            const pot = await hub.getPotBalance(id); // 50 seed + 4 * 10 entry = 90
+        it("takes 2.5% of the full pot (seed + entries + donations) then pays the split", async function () {
+            const donation = ethers.parseUnits("20", 18);
+            await hub.connect(outsider).donateToTournament(id, donation);
+
+            const pot = await hub.getPotBalance(id); // 50 seed + 4 * 10 entry + 20 donation = 110
+            const fee = (pot * 250n) / 10_000n;
+            const prize = pot - fee;
             const winners = [players[0], players[1], players[2]];
             const balancesBefore = await Promise.all(winners.map((w) => token.balanceOf(w.address)));
+            const multisig = await ic.multisigAddress();
+            const feeBefore = await token.balanceOf(multisig);
 
-            const p1 = (pot * 60n) / 100n;
-            const p2 = (pot * 30n) / 100n;
-            const p3 = (pot * 10n) / 100n;
-            const dust = pot - (p1 + p2 + p3);
+            const p1 = (prize * 60n) / 100n;
+            const p2 = (prize * 30n) / 100n;
+            const p3 = (prize * 10n) / 100n;
+            const dust = prize - (p1 + p2 + p3);
 
             await expect(
                 hub.connect(moderator).completeTournament(id, winners.map((w) => w.address))
             )
-                .to.emit(hub, "TournamentCompleted")
+                .to.emit(hub, "TournamentPlatformFeePaid")
+                .withArgs(id, multisig, fee)
+                .and.to.emit(hub, "TournamentCompleted")
                 .withArgs(id, winners.map((w) => w.address), [p1 + dust, p2, p3]);
 
             const gains = await Promise.all(
@@ -289,7 +313,9 @@ describe("ICTournamentHub", function () {
             expect(gains[0]).to.equal(p1 + dust);
             expect(gains[1]).to.equal(p2);
             expect(gains[2]).to.equal(p3);
-            expect(gains[0] + gains[1] + gains[2]).to.equal(pot); // full pot, no cut
+            expect(gains[0] + gains[1] + gains[2]).to.equal(prize);
+            expect((await token.balanceOf(multisig)) - feeBefore).to.equal(fee);
+            expect(gains[0] + gains[1] + gains[2] + fee).to.equal(pot);
 
             expect(await hub.getPotBalance(id)).to.equal(0n);
             expect((await hub.tournaments(id)).status).to.equal(COMPLETED);
@@ -437,9 +463,10 @@ describe("ICTournamentHub", function () {
             const pot = await hub.getPotBalance(id); // 3 entry fees, incl. forfeited one
             expect(pot).to.equal(ENTRY * 3n);
 
+            const fee = (pot * 250n) / 10_000n;
             const before = await token.balanceOf(players[1].address);
             await hub.connect(moderator).completeTournament(id, [players[1].address]);
-            expect((await token.balanceOf(players[1].address)) - before).to.equal(pot);
+            expect((await token.balanceOf(players[1].address)) - before).to.equal(pot - fee);
         });
 
         it("admin can recover forfeited fees only after a cancellation", async function () {
@@ -527,6 +554,7 @@ describe("ICTournamentHub", function () {
             id = await createTournament({ payoutSplit: [100] });
             await hub.connect(players[0]).joinTournament(id);
             await hub.connect(players[1]).joinTournament(id);
+            await hub.connect(players[2]).joinTournament(id);
             await hub.connect(creator).startTournament(id);
         });
 
@@ -704,6 +732,7 @@ describe("ICTournamentHub", function () {
         it("runs the whole participant flow gaslessly (join, match, leave)", async function () {
             await relay(players[0], hub.interface.encodeFunctionData("joinTournament", [id]));
             await relay(players[1], hub.interface.encodeFunctionData("joinTournament", [id]));
+            await relay(players[2], hub.interface.encodeFunctionData("joinTournament", [id]));
             await hub.connect(creator).startTournament(id);
 
             await relay(players[0], hub.interface.encodeFunctionData("startBracketMatch", [id]));

@@ -15,6 +15,7 @@ interface IICRoles {
     function approvedTokens(address token) external view returns (bool);
     function paused() external view returns (bool);
     function minDonationAmount() external view returns (uint256);
+    function multisigAddress() external view returns (address);
 }
 
 /**
@@ -38,8 +39,9 @@ interface IICRoles {
  *      - Bracket matches carry no money: no stakes, no fees, no per-match
  *        donations. Only tournament participants can start/join them. Wins
  *        are emitted as events for off-chain player records.
- *      - The pot (entry fees + seed + donations + admin allocations) is paid
- *        out per the payout split with NO platform cut.
+ *      - At completion, 2.5% of the full pot (entry fees + seed + donations +
+ *        admin allocations) is sent to the IC multisig as the platform fee.
+ *        The remaining 97.5% is paid to winners per the payout split.
  *      - Tournaments are not disputable; only admins/moderators complete them.
  *      - Gasless via EIP-2771 trusted forwarder (same as IC).
  */
@@ -144,6 +146,8 @@ contract ICTournamentHub is
     mapping(uint256 => mapping(address => uint256)) public tournamentDonations;
 
     uint256 public constant MAX_PAYOUT_WINNERS = 20;
+    uint256 public constant MIN_ENTRANTS = 3;
+    uint256 public constant PLATFORM_FEE_BPS = 250; // 2.5% of the full pot at completion
 
     address private _trustedForwarder;
 
@@ -167,6 +171,7 @@ contract ICTournamentHub is
     event TournamentLeft(uint256 indexed tournamentId, address indexed participant, uint256 refundAmount);
     event TournamentStarted(uint256 indexed tournamentId, address indexed startedBy);
     event TournamentCompleted(uint256 indexed tournamentId, address[] winners, uint256[] payouts);
+    event TournamentPlatformFeePaid(uint256 indexed tournamentId, address indexed recipient, uint256 amount);
     event TournamentCancelled(uint256 indexed tournamentId, address indexed cancelledBy);
     event TournamentDonation(uint256 indexed tournamentId, address indexed donor, uint256 amount);
     event TournamentFundedByAdmin(uint256 indexed tournamentId, address indexed admin, uint256 amount);
@@ -271,7 +276,7 @@ contract ICTournamentHub is
     ) external onlyAuthorized nonReentrant returns (uint256 tournamentId) {
         if (address(_token) == address(0)) revert InvalidToken();
         if (!icContract.approvedTokens(address(_token))) revert TokenNotApproved();
-        if (_maxEntrants == 1) revert InvalidMaxEntrants();
+        if (_maxEntrants != 0 && _maxEntrants < MIN_ENTRANTS) revert InvalidMaxEntrants();
 
         uint256 splitLen = _payoutSplit.length;
         if (splitLen == 0 || splitLen > MAX_PAYOUT_WINNERS) revert InvalidPayoutSplit();
@@ -369,19 +374,21 @@ contract ICTournamentHub is
         if (t.creator == address(0)) revert NotFound();
         if (t.status != TournamentStatus.OPEN) revert NotOpen();
         if (_msgSender() != t.creator && !icContract.isAdmin(_msgSender())) revert NotAuthorized();
-        // Need at least 2 players, and at least one participant per payout slot
+        // Need at least 3 players, and at least one participant per payout slot
         // (completeTournament requires winners.length == payoutSplit.length).
-        if (t.entrantCount < 2 || t.entrantCount < t.payoutSplit.length) revert NotEnoughParticipants();
+        if (t.entrantCount < MIN_ENTRANTS || t.entrantCount < t.payoutSplit.length) revert NotEnoughParticipants();
 
         t.status = TournamentStatus.LIVE;
         emit TournamentStarted(_tournamentId, _msgSender());
     }
 
     /**
-     * @dev Pays the pot out per the payout split and completes the tournament.
-     *      Winners must be participants; NO platform cut is taken. Rounding
-     *      dust is added to first place. Tournaments cannot be disputed, so
-     *      this is restricted to admins/moderators.
+     * @dev Pays the pot out. 2.5% of the full pot (entry fees + seed +
+     *      donations + admin allocations + forfeits) goes to the IC multisig
+     *      automatically — there is no per-player platform-fee button.
+     *      The remaining 97.5% is split among winners. Winners must be
+     *      participants. Rounding dust on the prize pot goes to first place.
+     *      Tournaments cannot be disputed, so this is admin/moderator only.
      */
     function completeTournament(
         uint256 _tournamentId,
@@ -395,6 +402,11 @@ contract ICTournamentHub is
         if (numWinners != t.payoutSplit.length) revert WinnersMismatch();
 
         uint256 pot = t.potBalance;
+        uint256 platformFee = (pot * PLATFORM_FEE_BPS) / 10_000;
+        uint256 prizePot = pot - platformFee;
+        address feeRecipient = icContract.multisigAddress();
+        if (platformFee > 0 && feeRecipient == address(0)) revert ZeroAddress();
+
         uint256[] memory payouts = new uint256[](numWinners);
         uint256 paidTotal;
 
@@ -404,12 +416,12 @@ contract ICTournamentHub is
             for (uint256 j = 0; j < i; j++) {
                 if (_winners[j] == winner) revert DuplicateWinner();
             }
-            payouts[i] = (pot * t.payoutSplit[i]) / 100;
+            payouts[i] = (prizePot * t.payoutSplit[i]) / 100;
             paidTotal += payouts[i];
         }
 
-        // Rounding dust goes to first place so the full pot always leaves.
-        payouts[0] += pot - paidTotal;
+        // Rounding dust on the prize pot goes to first place.
+        payouts[0] += prizePot - paidTotal;
 
         // --- Effects ---
         t.status = TournamentStatus.COMPLETED;
@@ -417,12 +429,16 @@ contract ICTournamentHub is
 
         // --- Interactions ---
         IERC20 token = t.token;
+        if (platformFee > 0) {
+            token.safeTransfer(feeRecipient, platformFee);
+        }
         for (uint256 i = 0; i < numWinners; i++) {
             if (payouts[i] > 0) {
                 token.safeTransfer(_winners[i], payouts[i]);
             }
         }
 
+        emit TournamentPlatformFeePaid(_tournamentId, feeRecipient, platformFee);
         emit TournamentCompleted(_tournamentId, _winners, payouts);
     }
 
